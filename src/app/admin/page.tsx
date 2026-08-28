@@ -42,7 +42,7 @@ interface ZonaEnvio {
 }
 
 export default function AdminPage() {
-  const CLAVE_CORRECTA = '1234';
+  const CLAVE_CORRECTA = 'Matias$4925107';
   const [claveIngresada, setClaveIngresada] = useState('');
   const [autenticado, setAutenticado] = useState(false);
   const [errorClave, setErrorClave] = useState(false);
