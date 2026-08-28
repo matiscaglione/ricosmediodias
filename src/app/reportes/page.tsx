@@ -33,6 +33,12 @@ export default function ReportesPage() {
   async function cargarReporte() {
     setCargando(true);
 
+    // 1. Calcular la fecha del día siguiente para cerrar el rango exacto de Argentina en UTC
+    const fFin = new Date(`${fechaFin}T00:00:00`);
+    fFin.setDate(fFin.getDate() + 1);
+    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
+
+    // 2. Filtrar en Supabase desde las 03:00:00 UTC del día de inicio hasta las 02:59:59 UTC del día posterior al fin
     const { data, error } = await supabase
       .from('pedidos')
       .select(`
@@ -43,8 +49,8 @@ export default function ReportesPage() {
           guarniciones ( nombre )
         )
       `)
-      .gte('created_at', `${fechaInicio}T00:00:00`)
-      .lte('created_at', `${fechaFin}T23:59:59`)
+      .gte('created_at', `${fechaInicio}T03:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T02:59:59`)
       .order('created_at', { ascending: false });
 
     if (error) {
