@@ -20,8 +20,9 @@ interface Pedido {
 }
 
 export default function ReportesPage() {
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]);
+  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const [fechaInicio, setFechaInicio] = useState(hoyArg);
+  const [fechaFin, setFechaFin] = useState(hoyArg);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargando, setCargando] = useState(false);
 
@@ -157,9 +158,9 @@ export default function ReportesPage() {
         <div className="flex gap-2 w-full md:w-auto justify-end">
           <button
             onClick={() => {
-              const hoy = new Date().toISOString().split('T')[0];
-              setFechaInicio(hoy);
-              setFechaFin(hoy);
+              const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+              setFechaInicio(hoyArg);
+              setFechaFin(hoyArg);
             }}
             className="bg-gray-200 text-gray-900 border-2 border-gray-400 text-xs px-3 py-2 rounded font-bold hover:bg-gray-300"
           >

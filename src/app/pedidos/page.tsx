@@ -39,24 +39,25 @@ export default function HistorialPedidosPage() {
 
   async function cargarPedidosDelDia() {
     setCargando(true);
-    const hoy = new Date().toISOString().split('T')[0];
+    // ✅ AHORA (obtiene la fecha exacta en zona horaria de Argentina):
+  const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
 
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select(`
-        *,
-        detalle_pedidos (
-          id,
-          cantidad,
-          precio_unitario,
-          subtotal,
-          menus ( nombre ),
-          guarniciones ( nombre )
-        )
-      `)
-      .gte('created_at', `${hoy}T00:00:00`)
-      .lte('created_at', `${hoy}T23:59:59`)
-      .order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select(`
+      *,
+      detalle_pedidos (
+      id,
+      cantidad,
+      precio_unitario,
+      subtotal,
+      menus ( nombre ),
+      guarniciones ( nombre )
+      )
+    `)
+    .gte('created_at', `${hoyArgentina}T03:00:00`)
+    .lte('created_at', `${hoyArgentina}T23:59:59`)
+    .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error al cargar pedidos:', error);
