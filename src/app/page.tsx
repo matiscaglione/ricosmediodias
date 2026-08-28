@@ -9,6 +9,7 @@ interface Menu {
   nombre: string;
   precio: number;
   lleva_guarnicion: boolean;
+  requiere_salsa: boolean;
 }
 
 interface Guarnicion {
@@ -23,6 +24,11 @@ interface Ingrediente {
   nombre: string;
 }
 
+interface Salsa {
+  id: string;
+  nombre: string;
+}
+
 interface ZonaEnvio {
   id: string;
   nombre_zona: string;
@@ -32,6 +38,7 @@ interface ZonaEnvio {
 interface ItemPedido {
   menu: Menu;
   guarnicion?: Guarnicion;
+  salsa?: Salsa;
   ingredientesEnsalada?: string[];
   cantidad: number;
   subtotal: number;
@@ -41,6 +48,7 @@ export default function TomaPedidosPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
+  const [salsas, setSalsas] = useState<Salsa[]>([]);
   const [zonasEnvio, setZonasEnvio] = useState<ZonaEnvio[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
 
@@ -55,6 +63,7 @@ export default function TomaPedidosPage() {
 
   const [menuSeleccionado, setMenuSeleccionado] = useState<Menu | null>(null);
   const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
+  const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   const [cantidad, setCantidad] = useState(1);
 
@@ -99,6 +108,9 @@ export default function TomaPedidosPage() {
     const { data: ingData } = await supabase.from('ingredientes_ensalada').select('*').eq('activo', true);
     if (ingData) setIngredientes(ingData);
 
+    const { data: salsasData } = await supabase.from('salsas').select('*').eq('activa', true);
+    if (salsasData) setSalsas(salsasData);
+
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').eq('activa', true);
     if (zonasData) {
       setZonasEnvio(zonasData);
@@ -116,6 +128,11 @@ export default function TomaPedidosPage() {
 
   function agregarItem() {
     if (!menuSeleccionado) return;
+
+    if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
+      alert('Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")');
+      return;
+    }
 
     const stockDisponible = stockMap[menuSeleccionado.id] || 0;
     const cantidadYaEnCarrito = items
@@ -135,6 +152,7 @@ export default function TomaPedidosPage() {
       {
         menu: menuSeleccionado,
         guarnicion: (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada : undefined,
+        salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
         ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes ? ingredientesElegidos : undefined,
         cantidad,
         subtotal
@@ -143,6 +161,7 @@ export default function TomaPedidosPage() {
 
     setMenuSeleccionado(null);
     setGuarnicionSeleccionada(null);
+    setSalsaSeleccionada(null);
     setIngredientesElegidos([]);
     setCantidad(1);
   }
@@ -168,7 +187,6 @@ export default function TomaPedidosPage() {
       minute: '2-digit'
     });
 
-    // Crear un nombre único con el cliente e ID para que no se llamen igual las descargas
     const nombreClienteLimpio = clienteNombre.replace(/[^a-zA-Z0-9]/g, '');
     const idCorto = idPedido.slice(0, 6);
     const tituloDocumento = `Ticket_#${idCorto}_${nombreClienteLimpio}`;
@@ -180,8 +198,11 @@ export default function TomaPedidosPage() {
           <div style="font-size: 15px; font-weight: bold;">
             ${i.cantidad}x ${i.menu.nombre}
           </div>
-          ${i.guarnicion ? `<div style="font-size: 14px; font-weight: bold; margin-left: 12px;">+ ${i.guarnicion.nombre}</div>` : ''}
-          ${i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0 ? `<div style="font-size: 14px; color: #000 ; margin-left: 16px;">(${i.ingredientesEnsalada.join(', ')})</div>` : ''}
+          ${i.salsa ? `<div style="font-size: 13px; font-weight: 900; color: #000; margin-left: 12px;">🍝 ${i.salsa.nombre}</div>` : ''}
+          ${i.guarnicion ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarnicion.nombre}</div>` : ''}
+          ${i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0 
+            ? `<div style="font-size: 14px; font-weight: 900; color: #000; margin-left: 16px; margin-top: 2px;">(${i.ingredientesEnsalada.join(', ')})</div>` 
+            : ''}
           <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
         </div>`
       )
@@ -194,18 +215,17 @@ export default function TomaPedidosPage() {
       </div>`;
     } else if (tipoEntrega === 'RETIRO') {
       cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-        🚶 RETIRA
+        🚶 RETIRA EN LOCAL
       </div>`;
     } else {
       cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-        🍽️ BAR
+        🍽️ COMER EN BAR
       </div>`;
     }
 
     ventanaImpresion.document.write(`
       <html>
         <head>
-          <!-- 1. CAMBIO DE NOMBRE DEL ARCHIVO: Usa el título dinámico -->
           <title>${tituloDocumento}</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
@@ -252,7 +272,7 @@ export default function TomaPedidosPage() {
                 <div style="font-size: 18px; font-weight: 900;">🕒 ${horario} hs</div>
               ` : `
                 <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-                <div style="font-size: 14px; font-weight: bold;">--</div>
+                <div style="font-size: 14px; font-weight: bold;">Lo antes posible</div>
               `}
             </div>
 
@@ -310,8 +330,7 @@ export default function TomaPedidosPage() {
     }
 
     for (const item of items) {
-      // Si la guarnición llevaba ensalada con ingredientes, agregar en observaciones del renglón o guardar
-      const { data: detGuardado } = await supabase.from('detalle_pedidos').insert([
+      await supabase.from('detalle_pedidos').insert([
         {
           pedido_id: pedidoGuardado.id,
           menu_id: item.menu.id,
@@ -376,6 +395,7 @@ export default function TomaPedidosPage() {
                     onClick={() => {
                       setMenuSeleccionado(m);
                       setGuarnicionSeleccionada(null);
+                      setSalsaSeleccionada(null);
                       setIngredientesElegidos([]);
                     }}
                     className={`p-3 rounded-lg border text-left transition-all ${
@@ -399,6 +419,28 @@ export default function TomaPedidosPage() {
                 <h3 className="font-bold text-sm" style={styleTextoNegro}>Opciones para: {menuSeleccionado.nombre}</h3>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* SELECTOR DE SALSA (SI EL PLATO REQUIERE SALSA) */}
+                  {menuSeleccionado.requiere_salsa && (
+                    <div className="sm:col-span-2 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                      <label className="block text-xs font-black text-red-900 mb-1">
+                        🍝 Seleccionar Salsa (Obligatorio)*:
+                      </label>
+                      <select
+                        style={styleTextoNegro}
+                        value={salsaSeleccionada?.id || ''}
+                        onChange={(e) => setSalsaSeleccionada(salsas.find((s) => s.id === e.target.value) || null)}
+                        className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold focus:outline-none"
+                      >
+                        <option value="">-- Elegir Salsa --</option>
+                        {salsas.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>
                       {menuSeleccionado.lleva_guarnicion ? 'Guarnición (Opcional)' : 'Guarnición (No Aplica)'}
@@ -437,7 +479,7 @@ export default function TomaPedidosPage() {
                   </div>
                 </div>
 
-                {/* SI LA GUARNICIÓN REQUIERE ELEGIR INGREDIENTES */}
+                {/* SI LA GUARNICIÓN REQUIERE INGREDIENTES */}
                 {guarnicionSeleccionada?.requiere_ingredientes && (
                   <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2">
                     <label className="block text-xs font-black text-emerald-900">
@@ -599,6 +641,11 @@ export default function TomaPedidosPage() {
                       <div className="font-extrabold" style={styleTextoNegro}>
                         {item.cantidad}x {item.menu.nombre}
                       </div>
+                      {item.salsa && (
+                        <div className="text-xs font-black text-red-800">
+                          🍝 {item.salsa.nombre}
+                        </div>
+                      )}
                       {item.guarnicion && (
                         <div className="text-xs font-bold text-gray-700">
                           + {item.guarnicion.nombre}
