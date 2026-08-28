@@ -35,6 +35,13 @@ interface ZonaEnvio {
 }
 
 export default function AdminPage() {
+  // SEGURIDAD: PIN O CLAVE DE ACCESO
+  const CLAVE_CORRECTA = 'Matias$4925107'; // Cambiá '1234' por la contraseña que quieras
+  const [claveIngresada, setClaveIngresada] = useState('');
+  const [autenticado, setAutenticado] = useState(false);
+  const [errorClave, setErrorClave] = useState(false);
+
+  // ESTADOS DEL PANEL
   const [menus, setMenus] = useState<Menu[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
@@ -60,8 +67,21 @@ export default function AdminPage() {
   const [nuevaZonaPrecio, setNuevaZonaPrecio] = useState('');
 
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    if (autenticado) {
+      cargarDatos();
+    }
+  }, [autenticado]);
+
+  function verificarClave(e: React.FormEvent) {
+    e.preventDefault();
+    if (claveIngresada === CLAVE_CORRECTA) {
+      setAutenticado(true);
+      setErrorClave(false);
+    } else {
+      setErrorClave(true);
+      setClaveIngresada('');
+    }
+  }
 
   async function cargarDatos() {
     const { data: menusData } = await supabase.from('menus').select('*').order('created_at', { ascending: true });
@@ -211,13 +231,68 @@ export default function AdminPage() {
 
   const styleTextoNegro = { color: '#000000' };
 
+  // VISTA 1: BLOQUEO DE SEGURIDAD (Si no ingresó la clave)
+  if (!autenticado) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white p-8 rounded-xl shadow-md border-2 border-gray-300 max-w-md w-full text-center">
+          <div className="text-4xl mb-2">🔒</div>
+          <h1 className="text-2xl font-black mb-2" style={styleTextoNegro}>Acceso Administrador</h1>
+          <p className="text-xs text-gray-600 font-bold mb-6">Ingresá la contraseña para gestionar precios y menús.</p>
+
+          <form onSubmit={verificarClave} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                style={styleTextoNegro}
+                value={claveIngresada}
+                onChange={(e) => setClaveIngresada(e.target.value)}
+                placeholder="Ingresar Clave"
+                className="w-full border-2 border-gray-400 p-3 rounded-lg text-center font-black text-lg focus:outline-none focus:border-black"
+                autoFocus
+              />
+            </div>
+
+            {errorClave && (
+              <p className="text-xs text-red-600 font-extrabold bg-red-50 p-2 rounded border border-red-200">
+                ⚠️ Clave incorrecta. Intentá de nuevo.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-black text-white font-extrabold py-3 rounded-lg hover:bg-gray-800 transition-colors shadow"
+            >
+              Ingresar
+            </button>
+          </form>
+
+          <div className="mt-6 border-t pt-4">
+            <Link href="/" className="text-xs font-bold text-gray-600 hover:text-black">
+              ⬅ Volver a Toma de Pedidos
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // VISTA 2: PANEL DE ADMINISTRACIÓN COMPLETO (Si ingresó la clave correcta)
   return (
     <div className="p-6 max-w-5xl mx-auto font-sans bg-gray-100 min-h-screen space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-black" style={styleTextoNegro}>Panel de Administración</h1>
-        <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
-          ⬅ Volver a Toma de Pedidos
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setAutenticado(false)}
+            className="bg-gray-300 text-gray-800 text-sm px-3 py-2 rounded font-bold hover:bg-gray-400"
+          >
+            🔒 Salir
+          </button>
+          <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
+            ⬅ Toma de Pedidos
+          </Link>
+        </div>
       </div>
 
       {/* SECCIÓN 1: MENÚS Y STOCK */}
