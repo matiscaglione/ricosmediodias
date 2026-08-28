@@ -272,7 +272,7 @@ export default function TomaPedidosPage() {
                 <div style="font-size: 18px; font-weight: 900;">🕒 ${horario} hs</div>
               ` : `
                 <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-                <div style="font-size: 14px; font-weight: bold;">Lo antes posible</div>
+                <div style="font-size: 14px; font-weight: bold;">--</div>
               `}
             </div>
 
@@ -643,7 +643,7 @@ export default function TomaPedidosPage() {
                       </div>
                       {item.salsa && (
                         <div className="text-xs font-black text-red-800">
-                          🍝 {item.salsa.nombre}
+                         {item.salsa.nombre}
                         </div>
                       )}
                       {item.guarnicion && (

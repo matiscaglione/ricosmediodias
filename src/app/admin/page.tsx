@@ -54,7 +54,14 @@ export default function AdminPage() {
   const [zonas, setZonas] = useState<ZonaEnvio[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
 
-  // Form Menú
+  // Buscador y Filtro para Menús
+  const [busquedaMenu, setBusquedaMenu] = useState('');
+  const [filtroMenuTipo, setFiltroMenuTipo] = useState<'TODOS' | 'FIJO' | 'DIA' | 'SALSA' | 'GUARNICION'>('TODOS');
+
+  // Estado para Edición de Menú
+  const [menuEditando, setMenuEditando] = useState<Menu | null>(null);
+
+  // Form Nuevo Menú
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoPrecio, setNuevoPrecio] = useState('');
   const [nuevoEsFijo, setNuevoEsFijo] = useState(true);
@@ -115,7 +122,7 @@ export default function AdminPage() {
     }
   }
 
-  // --- MENÚS ---
+  // --- ACCIONES DE MENÚS (AGREGAR, EDITAR, BORRAR) ---
   async function agregarMenu(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevoNombre || !nuevoPrecio) return;
@@ -140,6 +147,28 @@ export default function AdminPage() {
     }
   }
 
+  async function guardarEdicionMenu() {
+    if (!menuEditando) return;
+
+    const { error } = await supabase
+      .from('menus')
+      .update({
+        nombre: menuEditando.nombre,
+        precio: menuEditando.precio,
+        es_fijo: menuEditando.es_fijo,
+        lleva_guarnicion: menuEditando.lleva_guarnicion,
+        requiere_salsa: menuEditando.requiere_salsa
+      })
+      .eq('id', menuEditando.id);
+
+    if (!error) {
+      setMenuEditando(null);
+      cargarDatos();
+    } else {
+      alert('Error al guardar edición: ' + error.message);
+    }
+  }
+
   async function toggleActivoMenu(id: string, estadoActual: boolean) {
     await supabase.from('menus').update({ activo: !estadoActual }).eq('id', id);
     cargarDatos();
@@ -161,7 +190,20 @@ export default function AdminPage() {
     setStockMap((prev) => ({ ...prev, [menuId]: cantidad }));
   }
 
-  // --- GUARNICIONES ---
+  // --- FILTRADO Y BUSQUEDA DE MENUS ---
+  const menusFiltrados = menus.filter((m) => {
+    const coincideNombre = m.nombre.toLowerCase().includes(busquedaMenu.toLowerCase());
+    if (!coincideNombre) return false;
+
+    if (filtroMenuTipo === 'FIJO') return m.es_fijo;
+    if (filtroMenuTipo === 'DIA') return !m.es_fijo;
+    if (filtroMenuTipo === 'SALSA') return m.requiere_salsa;
+    if (filtroMenuTipo === 'GUARNICION') return m.lleva_guarnicion;
+
+    return true;
+  });
+
+  // --- GUARNICIONES / SALSAS / ZONAS ---
   async function agregarGuarnicion(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaGuarniNombre) return;
@@ -186,7 +228,6 @@ export default function AdminPage() {
     }
   }
 
-  // --- INGREDIENTES ENSALADA ---
   async function agregarIngrediente(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevoIngredienteNombre) return;
@@ -207,7 +248,6 @@ export default function AdminPage() {
     }
   }
 
-  // --- SALSAS ---
   async function agregarSalsa(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaSalsaNombre) return;
@@ -228,7 +268,6 @@ export default function AdminPage() {
     }
   }
 
-  // --- ZONAS ---
   async function agregarZona(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaZonaNombre || !nuevaZonaPrecio) return;
@@ -310,11 +349,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* SECCIÓN 1: MENÚS Y STOCK */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>1. Gestión de Menús y Stock Hoy</h2>
+      {/* SECCIÓN 1: MENÚS Y STOCK CON EDICIÓN Y FILTROS */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300 space-y-6">
+        <h2 className="text-xl font-bold" style={styleTextoNegro}>1. Gestión de Menús y Stock Hoy</h2>
         
-        <form onSubmit={agregarMenu} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        {/* FORMULARIO AGREGAR NUEVO MENU */}
+        <form onSubmit={agregarMenu} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre del plato</label>
             <input
@@ -322,7 +362,7 @@ export default function AdminPage() {
               style={styleTextoNegro}
               value={nuevoNombre}
               onChange={(e) => setNuevoNombre(e.target.value)}
-              placeholder="Ej: Canelones de Verdura / Ñoquis"
+              placeholder="Ej: Milanesa / Canelones"
               className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
             />
           </div>
@@ -353,58 +393,175 @@ export default function AdminPage() {
             </div>
           </div>
           <button type="submit" className="bg-blue-600 text-white text-sm font-extrabold py-2 px-3 rounded hover:bg-blue-700">
-            + Agregar
+            + Agregar Menú
           </button>
         </form>
 
-        <table className="w-full text-left border-collapse border border-gray-300">
-          <thead>
-            <tr className="border-b bg-gray-200 text-xs">
-              <th className="p-3 font-extrabold" style={styleTextoNegro}>Nombre</th>
-              <th className="p-3 font-extrabold" style={styleTextoNegro}>Opciones</th>
-              <th className="p-3 font-extrabold" style={styleTextoNegro}>Precio</th>
-              <th className="p-3 font-extrabold" style={styleTextoNegro}>Stock Hoy</th>
-              <th className="p-3 text-center font-extrabold" style={styleTextoNegro}>Estado</th>
-              <th className="p-3 text-center font-extrabold" style={styleTextoNegro}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {menus.map((m) => (
-              <tr key={m.id} className="border-b text-sm hover:bg-gray-50">
-                <td className="p-3 font-extrabold" style={styleTextoNegro}>{m.nombre}</td>
-                <td className="p-3 space-x-1">
-                  {m.lleva_guarnicion && <span className="text-xs bg-green-100 text-green-900 px-2 py-0.5 rounded font-extrabold">Guarnición</span>}
-                  {m.requiere_salsa && <span className="text-xs bg-red-100 text-red-900 px-2 py-0.5 rounded font-extrabold">🍝 Salsa</span>}
-                </td>
-                <td className="p-3 font-extrabold" style={styleTextoNegro}>${m.precio.toLocaleString('es-AR')}</td>
-                <td className="p-3">
-                  <input
-                    type="number"
-                    min="0"
-                    style={styleTextoNegro}
-                    value={stockMap[m.id] ?? ''}
-                    onChange={(e) => guardarStock(m.id, parseInt(e.target.value) || 0)}
-                    placeholder="Cant."
-                    className="w-20 border-2 border-gray-400 p-1 rounded text-center font-bold"
-                  />
-                </td>
-                <td className="p-3 text-center">
-                  <button onClick={() => toggleActivoMenu(m.id, m.activo)} className={`text-xs px-2 py-1 rounded font-bold ${m.activo ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-800'}`}>
-                    {m.activo ? 'Activo' : 'Oculto'}
-                  </button>
-                </td>
-                <td className="p-3 text-center">
-                  <button onClick={() => eliminarMenu(m.id)} className="text-red-600 hover:text-red-800 text-xs font-bold">
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
+        {/* BARRA DE BÚSQUEDA Y FILTROS */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-100 p-3 rounded-lg border border-gray-300">
+          <input
+            type="text"
+            value={busquedaMenu}
+            onChange={(e) => setBusquedaMenu(e.target.value)}
+            placeholder="🔍 Buscar plato..."
+            className="w-full md:w-64 border-2 border-gray-400 p-2 rounded text-sm font-bold bg-white"
+            style={styleTextoNegro}
+          />
+
+          <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
+            {(['TODOS', 'FIJO', 'DIA', 'SALSA', 'GUARNICION'] as const).map((tipo) => (
+              <button
+                key={tipo}
+                onClick={() => setFiltroMenuTipo(tipo)}
+                className={`px-3 py-1.5 rounded text-xs font-extrabold border transition-colors ${
+                  filtroMenuTipo === tipo
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-200'
+                }`}
+              >
+                {tipo === 'TODOS' ? 'Todos' : tipo === 'FIJO' ? '📌 Fijos' : tipo === 'DIA' ? '☀️ Del Día' : tipo === 'SALSA' ? '🍝 C/ Salsa' : '🥗 C/ Guarnición'}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {/* TARJETAS DE MENÚS CON OPCIÓN DE EDICIÓN EN LÍNEA */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {menusFiltrados.map((m) => {
+            const esEditando = menuEditando?.id === m.id;
+
+            return (
+              <div key={m.id} className={`p-4 rounded-lg border-2 transition-all ${m.activo ? 'bg-white border-gray-300 shadow-sm' : 'bg-gray-100 border-gray-300 opacity-60'}`}>
+                {esEditando ? (
+                  /* MODO EDICIÓN */
+                  <div className="space-y-3 bg-blue-50 p-3 rounded border border-blue-300">
+                    <h3 className="text-xs font-black text-blue-900 uppercase">Editando plato</h3>
+                    <div>
+                      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre</label>
+                      <input
+                        type="text"
+                        style={styleTextoNegro}
+                        value={menuEditando.nombre}
+                        onChange={(e) => setMenuEditando({ ...menuEditando, nombre: e.target.value })}
+                        className="w-full border-2 border-gray-400 p-1.5 rounded text-sm font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        style={styleTextoNegro}
+                        value={menuEditando.precio}
+                        onChange={(e) => setMenuEditando({ ...menuEditando, precio: parseFloat(e.target.value) || 0 })}
+                        className="w-full border-2 border-gray-400 p-1.5 rounded text-sm font-bold bg-white"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <label className="flex items-center gap-1 text-xs font-bold" style={styleTextoNegro}>
+                        <input
+                          type="checkbox"
+                          checked={menuEditando.es_fijo}
+                          onChange={(e) => setMenuEditando({ ...menuEditando, es_fijo: e.target.checked })}
+                        /> Plato Fijo
+                      </label>
+                      <label className="flex items-center gap-1 text-xs font-bold" style={styleTextoNegro}>
+                        <input
+                          type="checkbox"
+                          checked={menuEditando.lleva_guarnicion}
+                          onChange={(e) => setMenuEditando({ ...menuEditando, lleva_guarnicion: e.target.checked })}
+                        /> Lleva Guarnición
+                      </label>
+                      <label className="flex items-center gap-1 text-xs font-bold text-red-700">
+                        <input
+                          type="checkbox"
+                          checked={menuEditando.requiere_salsa}
+                          onChange={(e) => setMenuEditando({ ...menuEditando, requiere_salsa: e.target.checked })}
+                        /> Lleva Salsa
+                      </label>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button onClick={guardarEdicionMenu} className="flex-1 bg-green-600 text-white font-extrabold text-xs py-2 rounded hover:bg-green-700">
+                        💾 Guardar Cambios
+                      </button>
+                      <button onClick={() => setMenuEditando(null)} className="bg-gray-400 text-white font-bold text-xs px-3 rounded hover:bg-gray-500">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* MODO LECTURA DE TARJETA */
+                  <div className="flex flex-col justify-between h-full space-y-3">
+                    <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="font-black text-lg" style={styleTextoNegro}>{m.nombre}</h3>
+                        <span className="font-black text-base text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                          ${m.precio.toLocaleString('es-AR')}
+                        </span>
+                      </div>
+
+                      {/* ETIQUETAS DE ATRIBUTOS */}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className={`text-xs px-2 py-0.5 rounded font-extrabold border ${m.es_fijo ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-purple-100 text-purple-900 border-purple-300'}`}>
+                          {m.es_fijo ? '📌 Plato Fijo' : '☀️ Del Día'}
+                        </span>
+                        {m.lleva_guarnicion && (
+                          <span className="text-xs bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded font-extrabold">
+                            🥗 C/ Guarnición
+                          </span>
+                        )}
+                        {m.requiere_salsa && (
+                          <span className="text-xs bg-red-100 text-red-900 border border-red-300 px-2 py-0.5 rounded font-extrabold">
+                            🍝 C/ Salsa
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* CONTROLES DE STOCK Y BOTONES DE EDICIÓN */}
+                    <div className="border-t pt-3 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-gray-600">Stock Hoy:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          style={styleTextoNegro}
+                          value={stockMap[m.id] ?? ''}
+                          onChange={(e) => guardarStock(m.id, parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-16 border-2 border-gray-400 p-1 rounded text-center font-extrabold text-sm"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setMenuEditando(m)}
+                          className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1.5 rounded hover:bg-blue-700 transition-colors"
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          onClick={() => toggleActivoMenu(m.id, m.activo)}
+                          className={`text-xs px-2 py-1.5 rounded font-bold ${m.activo ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-amber-200 text-amber-900'}`}
+                        >
+                          {m.activo ? 'Ocultar' : 'Mostrar'}
+                        </button>
+                        <button onClick={() => eliminarMenu(m.id)} className="text-red-600 hover:text-red-800 text-xs font-bold px-1.5 py-1">
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* SECCIÓN NUEVA: SALSAS DISPONIBLES */}
+      {/* SECCIÓN 2: SALSAS DISPONIBLES */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
         <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>2. Gestión de Salsas (Pastas/Crepes)</h2>
 
