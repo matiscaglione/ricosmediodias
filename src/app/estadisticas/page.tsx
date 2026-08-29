@@ -8,13 +8,11 @@ interface DetallePedido {
   cantidad: number;
   menus: { nombre: string; es_fijo: boolean } | null;
   guarniciones: { nombre: string } | null;
-  salsas: { nombre: string } | null;
 }
 
 interface Pedido {
   id: string;
   created_at: string;
-  observaciones: string;
   detalle_pedidos: DetallePedido[];
 }
 
@@ -41,7 +39,6 @@ export default function EstadisticasPage() {
       .select(`
         id,
         created_at,
-        observaciones,
         detalle_pedidos (
           cantidad,
           menus ( nombre, es_fijo ),
@@ -52,32 +49,20 @@ export default function EstadisticasPage() {
       .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
 
     if (error) {
-      console.error('Error al cargar datos de estadísticas:', error);
+      console.error('Error al cargar estadísticas:', error);
     } else if (data) {
       setPedidos(data as unknown as Pedido[]);
     }
     setCargando(false);
   }
 
-  // --- CÁLCULO DE RANKINGS ---
+  // --- CÁLCULO DE RANKINGS DE PLATOS Y GUARNICIONES ---
   const rankingMenusMap: Record<string, { cantidad: number; es_fijo: boolean }> = {};
   const rankingGuarnicionesMap: Record<string, number> = {};
-  const rankingSalsasMap: Record<string, number> = {};
-  let totalHuevosFritos = 0;
 
   pedidos.forEach((p) => {
-    // 1. Detección de Huevos Fritos en observaciones
-    if (p.observaciones) {
-      const match = p.observaciones.match(/(\d+)\s*Huevo/i);
-      if (match) {
-        totalHuevosFritos += parseInt(match[1]);
-      } else if (p.observaciones.toLowerCase().includes('huevo frito')) {
-        totalHuevosFritos += 1;
-      }
-    }
-
     p.detalle_pedidos?.forEach((d) => {
-      // 2. Menús
+      // 1. Menús
       if (d.menus && d.menus.nombre) {
         const nombre = d.menus.nombre;
         const esFijo = d.menus.es_fijo ?? true;
@@ -87,7 +72,7 @@ export default function EstadisticasPage() {
         rankingMenusMap[nombre].cantidad += d.cantidad || 1;
       }
 
-      // 3. Guarniciones
+      // 2. Guarniciones
       if (d.guarniciones && d.guarniciones.nombre) {
         const nombreGuarni = d.guarniciones.nombre;
         rankingGuarnicionesMap[nombreGuarni] = (rankingGuarnicionesMap[nombreGuarni] || 0) + (d.cantidad || 1);
@@ -160,12 +145,6 @@ export default function EstadisticasPage() {
             Hoy
           </button>
         </div>
-      </div>
-
-      {/* MÉTRICA DE HUEVOS FRITOS */}
-      <div className="bg-amber-100 border-2 border-amber-300 p-4 rounded-lg text-center">
-        <p className="text-xs font-black text-amber-900 uppercase">🍳 Total Huevos Fritos Marchados en el Período</p>
-        <p className="text-3xl font-black text-amber-950 mt-1">{totalHuevosFritos}</p>
       </div>
 
       {/* TABLERO DE RANKINGS */}
