@@ -449,6 +449,9 @@ export default function TomaPedidosPage() {
           >
             📈 Reportes / Cierre
           </Link>
+          <Link href="/estadisticas" className="bg-amber-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-amber-700">
+  🏆 Ranking
+</Link>
           <Link
             href="/admin"
             className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800"
