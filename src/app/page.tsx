@@ -248,10 +248,10 @@ export default function TomaPedidosPage() {
           </div>
 
           <!-- SALSA: Pasó de 13px a 16px -->
-          ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
+          ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px;">+ ${i.salsa.nombre}</div>` : ""}
 
           <!-- GUARNICIÓN: Pasó de 13px a 16px en negrita bien marcada -->
-          ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; color: #000;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
+          ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; color: #000;">+ ${i.guarnicion.nombre}</div>` : ""}
 
           <!-- INGREDIENTES DE ENSALADA: Pasó de 14px a 15px -->
           ${
@@ -263,7 +263,7 @@ export default function TomaPedidosPage() {
           <!-- HUEVOS FRITOS: Pasó de 13px a 16px resaltados -->
           ${
             i.cantidadHuevos > 0
-              ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
+              ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "+ 1 HUEVO FRITO" : `+ ${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
               : ""
           }
 
