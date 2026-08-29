@@ -371,24 +371,32 @@ export default function TomaPedidosPage() {
 
     const hoy = new Date().toISOString().split("T")[0];
 
-    const { data: pedidoGuardado, error: errPedido } = await supabase
-      .from("pedidos")
-      .insert([
-        {
-          cliente_nombre: clienteNombre,
-          cliente_telefono: clienteTelefono,
-          tipo_entrega: tipoEntrega,
-          zona_envio_id: zonaSeleccionada?.id || null,
-          costo_envio: costoEnvio,
-          monto_platos: montoPlatos,
-          monto_total: montoTotal,
-          horario_solicitado: horario,
-          observaciones: observaciones,
-          estado: "PENDIENTE",
-        },
-      ])
-      .select()
-      .single();
+    // Armar texto de huevos fritos para guardarlo en las observaciones de Supabase
+  const detalleHuevos = items
+    .filter((i) => i.cantidadHuevos > 0)
+    .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+    .join(', ');
+
+  const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(' | ');
+
+  const { data: pedidoGuardado, error: errPedido } = await supabase
+    .from('pedidos')
+    .insert([
+      {
+        cliente_nombre: clienteNombre,
+        cliente_telefono: clienteTelefono,
+        tipo_entrega: tipoEntrega,
+        zona_envio_id: zonaSeleccionada?.id || null,
+        costo_envio: costoEnvio,
+        monto_platos: montoPlatos,
+        monto_total: montoTotal,
+        horario_solicitado: horario,
+        observaciones: obsFinal, // 👈 Se guardan las observaciones + huevos fritos
+        estado: 'PENDIENTE',
+      },
+    ])
+    .select()
+    .single();
 
     if (errPedido || !pedidoGuardado) {
       alert("Error al guardar el pedido: " + errPedido?.message);

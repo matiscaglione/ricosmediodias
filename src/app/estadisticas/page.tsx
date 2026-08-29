@@ -45,14 +45,15 @@ export default function EstadisticasPage() {
         detalle_pedidos (
           cantidad,
           menus ( nombre, es_fijo ),
-          guarniciones ( nombre ),
-          salsas ( nombre )
+          guarniciones ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)
       .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error al cargar datos de estadísticas:', error);
+    } else if (data) {
       setPedidos(data as unknown as Pedido[]);
     }
     setCargando(false);
@@ -65,33 +66,31 @@ export default function EstadisticasPage() {
   let totalHuevosFritos = 0;
 
   pedidos.forEach((p) => {
-    // Contar huevos fritos registrados en el detalle/observaciones
-    if (p.observaciones && p.observaciones.includes('Huevo Frito')) {
+    // 1. Detección de Huevos Fritos en observaciones
+    if (p.observaciones) {
       const match = p.observaciones.match(/(\d+)\s*Huevo/i);
-      totalHuevosFritos += match ? parseInt(match[1]) : 1;
+      if (match) {
+        totalHuevosFritos += parseInt(match[1]);
+      } else if (p.observaciones.toLowerCase().includes('huevo frito')) {
+        totalHuevosFritos += 1;
+      }
     }
 
     p.detalle_pedidos?.forEach((d) => {
-      // 1. Menús
-      if (d.menus) {
+      // 2. Menús
+      if (d.menus && d.menus.nombre) {
         const nombre = d.menus.nombre;
-        const esFijo = d.menus.es_fijo;
+        const esFijo = d.menus.es_fijo ?? true;
         if (!rankingMenusMap[nombre]) {
           rankingMenusMap[nombre] = { cantidad: 0, es_fijo: esFijo };
         }
-        rankingMenusMap[nombre].cantidad += d.cantidad;
+        rankingMenusMap[nombre].cantidad += d.cantidad || 1;
       }
 
-      // 2. Guarniciones
-      if (d.guarniciones) {
+      // 3. Guarniciones
+      if (d.guarniciones && d.guarniciones.nombre) {
         const nombreGuarni = d.guarniciones.nombre;
-        rankingGuarnicionesMap[nombreGuarni] = (rankingGuarnicionesMap[nombreGuarni] || 0) + d.cantidad;
-      }
-
-      // 3. Salsas
-      if (d.salsas) {
-        const nombreSalsa = d.salsas.nombre;
-        rankingSalsasMap[nombreSalsa] = (rankingSalsasMap[nombreSalsa] || 0) + d.cantidad;
+        rankingGuarnicionesMap[nombreGuarni] = (rankingGuarnicionesMap[nombreGuarni] || 0) + (d.cantidad || 1);
       }
     });
   });
@@ -104,10 +103,6 @@ export default function EstadisticasPage() {
   const rankingDelDia = rankingMenusCompleto.filter((m) => !m.es_fijo);
 
   const rankingGuarniciones = Object.entries(rankingGuarnicionesMap)
-    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
-    .sort((a, b) => b.cantidad - a.cantidad);
-
-  const rankingSalsas = Object.entries(rankingSalsasMap)
     .map(([nombre, cantidad]) => ({ nombre, cantidad }))
     .sort((a, b) => b.cantidad - a.cantidad);
 
@@ -167,7 +162,7 @@ export default function EstadisticasPage() {
         </div>
       </div>
 
-      {/* METRICA DE HUEVOS FRITOS */}
+      {/* MÉTRICA DE HUEVOS FRITOS */}
       <div className="bg-amber-100 border-2 border-amber-300 p-4 rounded-lg text-center">
         <p className="text-xs font-black text-amber-900 uppercase">🍳 Total Huevos Fritos Marchados en el Período</p>
         <p className="text-3xl font-black text-amber-950 mt-1">{totalHuevosFritos}</p>
@@ -175,7 +170,7 @@ export default function EstadisticasPage() {
 
       {/* TABLERO DE RANKINGS */}
       {cargando ? (
-        <p className="text-center py-8 font-bold text-gray-500">Calculando estadisticas...</p>
+        <p className="text-center py-8 font-bold text-gray-500">Calculando estadísticas...</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* COLUMNA 1: PLATOS */}
@@ -221,7 +216,7 @@ export default function EstadisticasPage() {
             </div>
           </div>
 
-          {/* COLUMNA 2: GUARNICIONES Y SALSAS */}
+          {/* COLUMNA 2: GUARNICIONES */}
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-3">
               <h2 className="text-lg font-black border-b pb-2 text-emerald-900">🥗 Guarniciones Más Pedidas</h2>
@@ -234,24 +229,6 @@ export default function EstadisticasPage() {
                       <span className="font-bold text-sm" style={styleTextoNegro}>{g.nombre}</span>
                       <span className="font-black text-sm bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded">
                         {g.cantidad}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-3">
-              <h2 className="text-lg font-black border-b pb-2 text-red-900">🍝 Salsas Más Pedidas</h2>
-              {rankingSalsas.length === 0 ? (
-                <p className="text-xs text-gray-500 font-bold">Sin datos de salsas.</p>
-              ) : (
-                <div className="space-y-2">
-                  {rankingSalsas.map((s, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-gray-50 p-2.5 rounded border border-gray-200">
-                      <span className="font-bold text-sm" style={styleTextoNegro}>{s.nombre}</span>
-                      <span className="font-black text-sm bg-red-100 text-red-900 px-2.5 py-0.5 rounded">
-                        {s.cantidad}
                       </span>
                     </div>
                   ))}
