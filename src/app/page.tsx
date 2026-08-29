@@ -241,23 +241,33 @@ export default function TomaPedidosPage() {
     const itemsHtml = items
       .map(
         (i) => `
-        <div style="margin-bottom: 6px;">
-          <div style="font-size: 15px; font-weight: bold;">
+        <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
+          <!-- MENÚ PRINCIPAL: Pasó de 15px a 18px y fuente más pesada -->
+          <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
             ${i.cantidad}x ${i.menu.nombre}
           </div>
-          ${i.salsa ? `<div style="font-size: 13px; font-weight: 900; color: #000; margin-left: 12px;">🍝 ${i.salsa.nombre}</div>` : ""}
-          ${i.guarnicion ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarnicion.nombre}</div>` : ""}
+
+          <!-- SALSA: Pasó de 13px a 16px -->
+          ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
+
+          <!-- GUARNICIÓN: Pasó de 13px a 16px en negrita bien marcada -->
+          ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; color: #000;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
+
+          <!-- INGREDIENTES DE ENSALADA: Pasó de 14px a 15px -->
           ${
             i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
-              ? `<div style="font-size: 14px; font-weight: 900; color: #000; margin-left: 16px; margin-top: 2px;">(${i.ingredientesEnsalada.join(", ")})</div>`
+              ? `<div style="font-size: 15px; font-weight: 900; color: #000; margin-left: 16px; margin-top: 2px;">(${i.ingredientesEnsalada.join(", ")})</div>`
               : ""
           }
+
+          <!-- HUEVOS FRITOS: Pasó de 13px a 16px resaltados -->
           ${
             i.cantidadHuevos > 0
-              ? `<div style="font-size: 13px; font-weight: 900; color: #000; margin-left: 12px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "1 Huevo Frito" : `${i.cantidadHuevos} Huevos Fritos`})</div>`
+              ? `<div style="font-size: 16px; font-weight: 900; color: #000; margin-left: 10px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
               : ""
           }
-          <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
+
+          <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
         </div>`,
       )
       .join("");
