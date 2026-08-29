@@ -14,6 +14,13 @@ interface Menu {
   activo: boolean;
 }
 
+interface Bebida {
+  id: string;
+  nombre: string;
+  precio: number;
+  activa: boolean;
+}
+
 interface Guarnicion {
   id: string;
   nombre: string;
@@ -48,6 +55,7 @@ export default function AdminPage() {
   const [errorClave, setErrorClave] = useState(false);
 
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [bebidas, setBebidas] = useState<Bebida[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [salsas, setSalsas] = useState<Salsa[]>([]);
@@ -58,8 +66,9 @@ export default function AdminPage() {
   const [busquedaMenu, setBusquedaMenu] = useState('');
   const [filtroMenuTipo, setFiltroMenuTipo] = useState<'TODOS' | 'FIJO' | 'DIA' | 'SALSA' | 'GUARNICION'>('TODOS');
 
-  // Estado para Edición de Menú
+  // Estado para Edición de Menú y Bebida
   const [menuEditando, setMenuEditando] = useState<Menu | null>(null);
+  const [bebidaEditando, setBebidaEditando] = useState<Bebida | null>(null);
 
   // Form Nuevo Menú
   const [nuevoNombre, setNuevoNombre] = useState('');
@@ -69,6 +78,8 @@ export default function AdminPage() {
   const [nuevoRequiereSalsa, setNuevoRequiereSalsa] = useState(false);
 
   // Forms secundarios
+  const [nuevaBebidaNombre, setNuevaBebidaNombre] = useState('');
+  const [nuevaBebidaPrecio, setNuevaBebidaPrecio] = useState('');
   const [nuevaGuarniNombre, setNuevaGuarniNombre] = useState('');
   const [nuevaGuarniPrecio, setNuevaGuarniPrecio] = useState('0');
   const [nuevaGuarniRequiereIng, setNuevaGuarniRequiereIng] = useState(false);
@@ -98,6 +109,9 @@ export default function AdminPage() {
     const { data: menusData } = await supabase.from('menus').select('*').order('created_at', { ascending: true });
     if (menusData) setMenus(menusData);
 
+    const { data: bebidasData } = await supabase.from('bebidas').select('*').order('created_at', { ascending: true });
+    if (bebidasData) setBebidas(bebidasData);
+
     const { data: guarniData } = await supabase.from('guarniciones').select('*').order('created_at', { ascending: true });
     if (guarniData) setGuarniciones(guarniData);
 
@@ -122,7 +136,7 @@ export default function AdminPage() {
     }
   }
 
-  // --- ACCIONES DE MENÚS (AGREGAR, EDITAR, BORRAR) ---
+  // --- SECCIÓN 1: MENÚS Y STOCK ---
   async function agregarMenu(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevoNombre || !nuevoPrecio) return;
@@ -190,7 +204,6 @@ export default function AdminPage() {
     setStockMap((prev) => ({ ...prev, [menuId]: cantidad }));
   }
 
-  // --- FILTRADO Y BUSQUEDA DE MENUS ---
   const menusFiltrados = menus.filter((m) => {
     const coincideNombre = m.nombre.toLowerCase().includes(busquedaMenu.toLowerCase());
     if (!coincideNombre) return false;
@@ -203,7 +216,36 @@ export default function AdminPage() {
     return true;
   });
 
-  // --- GUARNICIONES / SALSAS / ZONAS ---
+  // --- SECCIÓN 2: BEBIDAS ---
+  async function agregarBebida(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nuevaBebidaNombre || !nuevaBebidaPrecio) return;
+    await supabase.from('bebidas').insert([{ nombre: nuevaBebidaNombre, precio: parseFloat(nuevaBebidaPrecio), activa: true }]);
+    setNuevaBebidaNombre('');
+    setNuevaBebidaPrecio('');
+    cargarDatos();
+  }
+
+  async function guardarEdicionBebida() {
+    if (!bebidaEditando) return;
+    await supabase.from('bebidas').update({ nombre: bebidaEditando.nombre, precio: bebidaEditando.precio }).eq('id', bebidaEditando.id);
+    setBebidaEditando(null);
+    cargarDatos();
+  }
+
+  async function toggleActivaBebida(id: string, estadoActual: boolean) {
+    await supabase.from('bebidas').update({ activa: !estadoActual }).eq('id', id);
+    cargarDatos();
+  }
+
+  async function eliminarBebida(id: string) {
+    if (confirm('¿Seguro que querés eliminar esta bebida?')) {
+      await supabase.from('bebidas').delete().eq('id', id);
+      cargarDatos();
+    }
+  }
+
+  // --- SECCIÓN 3: GUARNICIONES ---
   async function agregarGuarnicion(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaGuarniNombre) return;
@@ -228,6 +270,7 @@ export default function AdminPage() {
     }
   }
 
+  // --- SECCIÓN 4: INGREDIENTES ENSALADA ---
   async function agregarIngrediente(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevoIngredienteNombre) return;
@@ -248,6 +291,7 @@ export default function AdminPage() {
     }
   }
 
+  // --- SECCIÓN 5: SALSAS ---
   async function agregarSalsa(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaSalsaNombre) return;
@@ -268,6 +312,7 @@ export default function AdminPage() {
     }
   }
 
+  // --- SECCIÓN 6: ZONAS DE ENVÍO ---
   async function agregarZona(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevaZonaNombre || !nuevaZonaPrecio) return;
@@ -349,11 +394,10 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* SECCIÓN 1: MENÚS Y STOCK CON EDICIÓN Y FILTROS */}
+      {/* SECCIÓN 1: MENÚS Y STOCK */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300 space-y-6">
         <h2 className="text-xl font-bold" style={styleTextoNegro}>1. Gestión de Menús y Stock Hoy</h2>
         
-        {/* FORMULARIO AGREGAR NUEVO MENU */}
         <form onSubmit={agregarMenu} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre del plato</label>
@@ -397,7 +441,6 @@ export default function AdminPage() {
           </button>
         </form>
 
-        {/* BARRA DE BÚSQUEDA Y FILTROS */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-100 p-3 rounded-lg border border-gray-300">
           <input
             type="text"
@@ -425,7 +468,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* TARJETAS DE MENÚS CON OPCIÓN DE EDICIÓN EN LÍNEA */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {menusFiltrados.map((m) => {
             const esEditando = menuEditando?.id === m.id;
@@ -433,7 +475,6 @@ export default function AdminPage() {
             return (
               <div key={m.id} className={`p-4 rounded-lg border-2 transition-all ${m.activo ? 'bg-white border-gray-300 shadow-sm' : 'bg-gray-100 border-gray-300 opacity-60'}`}>
                 {esEditando ? (
-                  /* MODO EDICIÓN */
                   <div className="space-y-3 bg-blue-50 p-3 rounded border border-blue-300">
                     <h3 className="text-xs font-black text-blue-900 uppercase">Editando plato</h3>
                     <div>
@@ -492,7 +533,6 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ) : (
-                  /* MODO LECTURA DE TARJETA */
                   <div className="flex flex-col justify-between h-full space-y-3">
                     <div>
                       <div className="flex justify-between items-start gap-2">
@@ -502,7 +542,6 @@ export default function AdminPage() {
                         </span>
                       </div>
 
-                      {/* ETIQUETAS DE ATRIBUTOS */}
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         <span className={`text-xs px-2 py-0.5 rounded font-extrabold border ${m.es_fijo ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-purple-100 text-purple-900 border-purple-300'}`}>
                           {m.es_fijo ? '📌 Plato Fijo' : '☀️ Del Día'}
@@ -520,7 +559,6 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* CONTROLES DE STOCK Y BOTONES DE EDICIÓN */}
                     <div className="border-t pt-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-gray-600">Stock Hoy:</span>
@@ -561,40 +599,73 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* SECCIÓN 2: SALSAS DISPONIBLES */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>2. Gestión de Salsas (Pastas/Crepes)</h2>
-
-        <form onSubmit={agregarSalsa} className="flex gap-3 items-end mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+      {/* SECCIÓN 2: BEBIDAS */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300 space-y-4">
+        <h2 className="text-xl font-bold" style={styleTextoNegro}>2. Gestión de Bebidas / Adicionales</h2>
+        <form onSubmit={agregarBebida} className="flex gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div className="flex-1">
-            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre de la Salsa</label>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre de Bebida</label>
             <input
               type="text"
               style={styleTextoNegro}
-              value={nuevaSalsaNombre}
-              onChange={(e) => setNuevaSalsaNombre(e.target.value)}
-              placeholder="Ej: Salsa Bolognesa, Salsa Mixta, Sin Salsa..."
+              value={nuevaBebidaNombre}
+              onChange={(e) => setNuevaBebidaNombre(e.target.value)}
+              placeholder="Ej: Coca Cola 500ml / Agua con Gas"
               className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
             />
           </div>
-          <button type="submit" className="bg-red-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-red-700">
-            + Agregar Salsa
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio ($)</label>
+            <input
+              type="number"
+              style={styleTextoNegro}
+              value={nuevaBebidaPrecio}
+              onChange={(e) => setNuevaBebidaPrecio(e.target.value)}
+              placeholder="1500"
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
+            />
+          </div>
+          <button type="submit" className="bg-blue-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-blue-700">
+            + Agregar Bebida
           </button>
         </form>
 
-        <div className="flex flex-wrap gap-2">
-          {salsas.map((s) => (
-            <div key={s.id} className="flex items-center gap-2 bg-gray-100 border border-gray-300 p-2 rounded">
-              <span className="text-sm font-extrabold" style={styleTextoNegro}>{s.nombre}</span>
-              <button
-                onClick={() => toggleActivaSalsa(s.id, s.activa)}
-                className={`text-xs px-2 py-0.5 rounded font-bold ${s.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}
-              >
-                {s.activa ? 'Disponible' : 'Oculta'}
-              </button>
-              <button onClick={() => eliminarSalsa(s.id)} className="text-red-600 font-bold text-xs ml-1">
-                ✕
-              </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {bebidas.map((b) => (
+            <div key={b.id} className="flex justify-between items-center p-3 border border-gray-300 rounded bg-gray-50">
+              {bebidaEditando?.id === b.id ? (
+                <div className="flex gap-2 w-full">
+                  <input
+                    type="text"
+                    style={styleTextoNegro}
+                    value={bebidaEditando.nombre}
+                    onChange={(e) => setBebidaEditando({ ...bebidaEditando, nombre: e.target.value })}
+                    className="border p-1 text-sm font-bold w-1/2"
+                  />
+                  <input
+                    type="number"
+                    style={styleTextoNegro}
+                    value={bebidaEditando.precio}
+                    onChange={(e) => setBebidaEditando({ ...bebidaEditando, precio: parseFloat(e.target.value) || 0 })}
+                    className="border p-1 text-sm font-bold w-1/4"
+                  />
+                  <button onClick={guardarEdicionBebida} className="bg-green-600 text-white text-xs font-bold px-2 rounded">💾</button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <span className="font-extrabold text-sm block" style={styleTextoNegro}>{b.nombre}</span>
+                    <span className="font-black text-xs text-green-700">${b.precio.toLocaleString('es-AR')}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setBebidaEditando(b)} className="text-xs bg-blue-100 text-blue-900 font-bold px-2 py-1 rounded">✏️ Editar</button>
+                    <button onClick={() => toggleActivaBebida(b.id, b.activa)} className={`text-xs font-bold px-2 py-1 rounded ${b.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
+                      {b.activa ? 'Activa' : 'Oculta'}
+                    </button>
+                    <button onClick={() => eliminarBebida(b.id)} className="text-xs text-red-600 font-bold px-1">✕</button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -667,9 +738,48 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* SECCIÓN 5: ZONAS */}
+      {/* SECCIÓN 5: SALSAS */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>5. Zonas de Envío</h2>
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>5. Gestión de Salsas (Pastas/Crepes)</h2>
+
+        <form onSubmit={agregarSalsa} className="flex gap-3 items-end mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex-1">
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre de la Salsa</label>
+            <input
+              type="text"
+              style={styleTextoNegro}
+              value={nuevaSalsaNombre}
+              onChange={(e) => setNuevaSalsaNombre(e.target.value)}
+              placeholder="Ej: Salsa Bolognesa, Salsa Mixta, Sin Salsa..."
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
+            />
+          </div>
+          <button type="submit" className="bg-red-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-red-700">
+            + Agregar Salsa
+          </button>
+        </form>
+
+        <div className="flex flex-wrap gap-2">
+          {salsas.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 bg-gray-100 border border-gray-300 p-2 rounded">
+              <span className="text-sm font-extrabold" style={styleTextoNegro}>{s.nombre}</span>
+              <button
+                onClick={() => toggleActivaSalsa(s.id, s.activa)}
+                className={`text-xs px-2 py-0.5 rounded font-bold ${s.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}
+              >
+                {s.activa ? 'Disponible' : 'Oculta'}
+              </button>
+              <button onClick={() => eliminarSalsa(s.id)} className="text-red-600 font-bold text-xs ml-1">
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SECCIÓN 6: ZONAS DE ENVÍO */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>6. Zonas de Envío</h2>
         <form onSubmit={agregarZona} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div><input type="text" style={styleTextoNegro} value={nuevaZonaNombre} onChange={(e) => setNuevaZonaNombre(e.target.value)} placeholder="Ej: Villa Gobernador Gálvez" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" /></div>
           <div><input type="number" step="0.01" style={styleTextoNegro} value={nuevaZonaPrecio} onChange={(e) => setNuevaZonaPrecio(e.target.value)} placeholder="Ej: 1500" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" /></div>
