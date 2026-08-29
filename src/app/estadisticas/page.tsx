@@ -8,6 +8,7 @@ interface DetallePedido {
   cantidad: number;
   menus: { nombre: string; es_fijo: boolean } | null;
   guarniciones: { nombre: string } | null;
+  bebidas: { nombre: string } | null;
 }
 
 interface Pedido {
@@ -42,23 +43,23 @@ export default function EstadisticasPage() {
         detalle_pedidos (
           cantidad,
           menus ( nombre, es_fijo ),
-          guarniciones ( nombre )
+          guarniciones ( nombre ),
+          bebidas ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)
       .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
 
-    if (error) {
-      console.error('Error al cargar estadísticas:', error);
-    } else if (data) {
+    if (!error && data) {
       setPedidos(data as unknown as Pedido[]);
     }
     setCargando(false);
   }
 
-  // --- CÁLCULO DE RANKINGS DE PLATOS Y GUARNICIONES ---
+  // --- CÁLCULO DE RANKINGS DE PLATOS, GUARNICIONES Y BEBIDAS ---
   const rankingMenusMap: Record<string, { cantidad: number; es_fijo: boolean }> = {};
   const rankingGuarnicionesMap: Record<string, number> = {};
+  const rankingBebidasMap: Record<string, number> = {};
 
   pedidos.forEach((p) => {
     p.detalle_pedidos?.forEach((d) => {
@@ -77,6 +78,12 @@ export default function EstadisticasPage() {
         const nombreGuarni = d.guarniciones.nombre;
         rankingGuarnicionesMap[nombreGuarni] = (rankingGuarnicionesMap[nombreGuarni] || 0) + (d.cantidad || 1);
       }
+
+      // 3. Bebidas
+      if (d.bebidas && d.bebidas.nombre) {
+        const nombreBebida = d.bebidas.nombre;
+        rankingBebidasMap[nombreBebida] = (rankingBebidasMap[nombreBebida] || 0) + (d.cantidad || 1);
+      }
     });
   });
 
@@ -91,13 +98,17 @@ export default function EstadisticasPage() {
     .map(([nombre, cantidad]) => ({ nombre, cantidad }))
     .sort((a, b) => b.cantidad - a.cantidad);
 
+  const rankingBebidas = Object.entries(rankingBebidasMap)
+    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
   const styleTextoNegro = { color: '#000000' };
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
-          🏆 Ranking de Platos Estrella
+          🏆 Ranking de Platos y Bebidas
         </h1>
         <div className="flex gap-2">
           <Link href="/reportes" className="bg-green-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-green-800">
@@ -134,17 +145,15 @@ export default function EstadisticasPage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setFechaInicio(hoyArg);
-              setFechaFin(hoyArg);
-            }}
-            className="bg-blue-600 text-white font-extrabold text-xs px-3 py-2 rounded hover:bg-blue-700"
-          >
-            Hoy
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setFechaInicio(hoyArg);
+            setFechaFin(hoyArg);
+          }}
+          className="bg-blue-600 text-white font-extrabold text-xs px-3 py-2 rounded hover:bg-blue-700"
+        >
+          Hoy
+        </button>
       </div>
 
       {/* TABLERO DE RANKINGS */}
@@ -152,6 +161,7 @@ export default function EstadisticasPage() {
         <p className="text-center py-8 font-bold text-gray-500">Calculando estadísticas...</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
           {/* COLUMNA 1: PLATOS */}
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-3">
@@ -195,8 +205,26 @@ export default function EstadisticasPage() {
             </div>
           </div>
 
-          {/* COLUMNA 2: GUARNICIONES */}
+          {/* COLUMNA 2: BEBIDAS Y GUARNICIONES */}
           <div className="space-y-6">
+            <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-3">
+              <h2 className="text-lg font-black border-b pb-2 text-blue-900">🥤 Bebidas Más Vendidas</h2>
+              {rankingBebidas.length === 0 ? (
+                <p className="text-xs text-gray-500 font-bold">Sin datos de bebidas.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rankingBebidas.map((b, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-gray-50 p-2.5 rounded border border-gray-200">
+                      <span className="font-bold text-sm" style={styleTextoNegro}>{b.nombre}</span>
+                      <span className="font-black text-sm bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded">
+                        {b.cantidad} u.
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-3">
               <h2 className="text-lg font-black border-b pb-2 text-emerald-900">🥗 Guarniciones Más Pedidas</h2>
               {rankingGuarniciones.length === 0 ? (
@@ -215,6 +243,7 @@ export default function EstadisticasPage() {
               )}
             </div>
           </div>
+
         </div>
       )}
     </div>

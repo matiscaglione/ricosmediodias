@@ -409,25 +409,25 @@ export default function TomaPedidosPage() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen">
       <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Toma de Pedidos</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/pedidos" className="bg-purple-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-purple-800">
-            📋 Pedidos
-          </Link>
-          <Link href="/cadetes" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-blue-700">
-            🛵 Cadetes
-          </Link>
-          <Link href="/reportes" className="bg-green-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-green-800">
-            📈 Cierre
-          </Link>
-          <Link href="/estadisticas" className="bg-amber-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-amber-700">
-            🏆 Ranking
-          </Link>
-          <Link href="/admin" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
-            ⚙️ Admin
-          </Link>
-        </div>
-      </header>
+  <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Toma de Pedidos</h1>
+  <div className="flex flex-wrap gap-2">
+    <Link href="/pedidos" className="bg-purple-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-purple-800">
+      📋 Pedidos
+    </Link>
+    <Link href="/cadetes" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-blue-700">
+      🛵 Cadetes
+    </Link>
+    <Link href="/reportes" className="bg-green-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-green-800">
+      📈 Cierre
+    </Link>
+    <Link href="/estadisticas" className="bg-amber-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-amber-700">
+      🏆 Ranking
+    </Link>
+    <Link href="/admin" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
+      ⚙️ Admin
+    </Link>
+  </div>
+</header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
