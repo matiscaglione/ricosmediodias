@@ -65,6 +65,7 @@ export default function TomaPedidosPage() {
   const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
+  const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
   useEffect(() => {
@@ -127,44 +128,56 @@ export default function TomaPedidosPage() {
   }
 
   function agregarItem() {
-    if (!menuSeleccionado) return;
+  if (!menuSeleccionado) return;
 
-    if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
-      alert('Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")');
-      return;
-    }
-
-    const stockDisponible = stockMap[menuSeleccionado.id] || 0;
-    const cantidadYaEnCarrito = items
-      .filter((item) => item.menu.id === menuSeleccionado.id)
-      .reduce((acc, item) => acc + item.cantidad, 0);
-
-    if (cantidad + cantidadYaEnCarrito > stockDisponible) {
-      alert(`¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`);
-      return;
-    }
-
-    const precioGuarnicion = (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada.precio_extra : 0;
-    const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidad;
-
-    setItems([
-      ...items,
-      {
-        menu: menuSeleccionado,
-        guarnicion: (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada : undefined,
-        salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
-        ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes ? ingredientesElegidos : undefined,
-        cantidad,
-        subtotal
-      }
-    ]);
-
-    setMenuSeleccionado(null);
-    setGuarnicionSeleccionada(null);
-    setSalsaSeleccionada(null);
-    setIngredientesElegidos([]);
-    setCantidad(1);
+  if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
+    alert('Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")');
+    return;
   }
+
+  const stockDisponible = stockMap[menuSeleccionado.id] || 0;
+  const cantidadYaEnCarrito = items
+    .filter((item) => item.menu.id === menuSeleccionado.id)
+    .reduce((acc, item) => acc + item.cantidad, 0);
+
+  if (cantidad + cantidadYaEnCarrito > stockDisponible) {
+    alert(`¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`);
+    return;
+  }
+
+  const precioGuarnicion = (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada.precio_extra : 0;
+  
+  // Si cobrás cada huevo extra (ej: $500 c/u), podés cambiar el 0 por el precio unitario del huevo:
+  const precioHuevosTotal = cantidadHuevos * 0; 
+  const subtotal = (menuSeleccionado.precio + precioGuarnicion + precioHuevosTotal) * cantidad;
+
+  // Si seleccionó 1 o más huevos, lo agregamos al detalle del ticket
+  let listaIngredientes = guarnicionSeleccionada?.requiere_ingredientes ? [...ingredientesElegidos] : [];
+  if (cantidadHuevos > 0) {
+    const textoHuevos = cantidadHuevos === 1 ? '🍳 1 Huevo Frito' : `🍳 ${cantidadHuevos} Huevos Fritos`;
+    listaIngredientes.push(textoHuevos);
+  }
+
+  setItems([
+    ...items,
+    {
+      menu: menuSeleccionado,
+      guarnicion: (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada : undefined,
+      salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
+      ingredientesEnsalada: listaIngredientes.length > 0 ? listaIngredientes : undefined,
+      cantidad,
+      subtotal
+    }
+  ]);
+
+  // Limpiar formulario
+  setMenuSeleccionado(null);
+  setGuarnicionSeleccionada(null);
+  setSalsaSeleccionada(null);
+  setIngredientesElegidos([]);
+  setCantidadHuevos(0); // 👈 Resetear la cantidad a 0
+  setCantidad(1);
+}
 
   function eliminarItem(index: number) {
     setItems(items.filter((_, i) => i !== index));
@@ -207,6 +220,32 @@ export default function TomaPedidosPage() {
         </div>`
       )
       .join('');
+
+      {/* SELECTOR DE CANTIDAD DE HUEVOS FRITOS */}
+<div className="flex items-center justify-between p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+  <label className="text-xs font-black text-yellow-900 flex items-center gap-1">
+    🍳 Huevos Fritos Extra:
+  </label>
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={() => setCantidadHuevos(Math.max(0, cantidadHuevos - 1))}
+      className="bg-yellow-200 text-yellow-900 border border-yellow-400 font-extrabold px-2 py-0.5 rounded hover:bg-yellow-300"
+    >
+      -
+    </button>
+    <span className="font-black text-sm text-yellow-950 min-w-[20px] text-center">
+      {cantidadHuevos}
+    </span>
+    <button
+      type="button"
+      onClick={() => setCantidadHuevos(cantidadHuevos + 1)}
+      className="bg-yellow-400 text-yellow-950 border border-yellow-500 font-extrabold px-2 py-0.5 rounded hover:bg-yellow-500"
+    >
+      +
+    </button>
+  </div>
+</div>
 
     let cabeceraEntrega = '';
     if (tipoEntrega === 'ENVIO') {
@@ -393,11 +432,12 @@ export default function TomaPedidosPage() {
                   <button
                     key={m.id}
                     onClick={() => {
-                      setMenuSeleccionado(m);
-                      setGuarnicionSeleccionada(null);
-                      setSalsaSeleccionada(null);
-                      setIngredientesElegidos([]);
-                    }}
+  setMenuSeleccionado(m);
+  setGuarnicionSeleccionada(null);
+  setSalsaSeleccionada(null);
+  setIngredientesElegidos([]);
+  setCantidadHuevos(0); // 👈 Reset a 0
+}}
                     className={`p-3 rounded-lg border text-left transition-all ${
                       menuSeleccionado?.id === m.id
                         ? 'border-blue-600 bg-blue-100 font-extrabold shadow-sm'
