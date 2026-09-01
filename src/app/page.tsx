@@ -77,7 +77,7 @@ export default function TomaPedidosPage() {
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
-  const [cantidad, setCantidad] = useState<number | string>(1);
+  const [cantidad, setCantidad] = useState(1);
 
   useEffect(() => {
     cargarDatosDelDia();
@@ -160,10 +160,7 @@ export default function TomaPedidosPage() {
     }
 
     const precioGuarnicion = (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada.precio_extra : 0;
-
-// 👈 Convertimos cantidad a número por si la casilla está temporalmente vacía
-const cantidadNum = typeof cantidad === 'number' ? cantidad : (parseInt(cantidad) || 1);
-const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidadNum;
+const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidad;
 
 setItems([
   ...items,
@@ -173,7 +170,7 @@ setItems([
     salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
     ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes ? ingredientesElegidos : undefined,
     cantidadHuevos,
-    cantidad: cantidadNum, // 👈 Pasamos el valor numérico asegurado
+    cantidad,
     subtotal
   }
 ]);
@@ -520,10 +517,18 @@ setItems([
   type="number"
   min="1"
   style={styleTextoNegro}
-  value={cantidad}
+  value={cantidad === 0 ? '' : cantidad}
   onChange={(e) => {
     const val = e.target.value;
-    setCantidad(val === '' ? '' : Math.max(1, parseInt(val) || 1));
+    if (val === '') {
+      setCantidad(0);
+    } else {
+      const parsed = parseInt(val, 10);
+      setCantidad(isNaN(parsed) ? 1 : Math.max(1, parsed));
+    }
+  }}
+  onBlur={() => {
+    if (cantidad === 0) setCantidad(1);
   }}
   className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
 />
