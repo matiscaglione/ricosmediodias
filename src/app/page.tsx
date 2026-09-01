@@ -77,7 +77,7 @@ export default function TomaPedidosPage() {
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
-  const [cantidad, setCantidad] = useState(1);
+  const [cantidad, setCantidad] = useState<number | string>(1);
 
   useEffect(() => {
     cargarDatosDelDia();
@@ -160,20 +160,23 @@ export default function TomaPedidosPage() {
     }
 
     const precioGuarnicion = (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada.precio_extra : 0;
-    const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidad;
 
-    setItems([
-      ...items,
-      {
-        menu: menuSeleccionado,
-        guarnicion: (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada : undefined,
-        salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
-        ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes ? ingredientesElegidos : undefined,
-        cantidadHuevos,
-        cantidad,
-        subtotal
-      }
-    ]);
+// 👈 Convertimos cantidad a número por si la casilla está temporalmente vacía
+const cantidadNum = typeof cantidad === 'number' ? cantidad : (parseInt(cantidad) || 1);
+const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidadNum;
+
+setItems([
+  ...items,
+  {
+    menu: menuSeleccionado,
+    guarnicion: (menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada) ? guarnicionSeleccionada : undefined,
+    salsa: menuSeleccionado.requiere_salsa && salsaSeleccionada ? salsaSeleccionada : undefined,
+    ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes ? ingredientesElegidos : undefined,
+    cantidadHuevos,
+    cantidad: cantidadNum, // 👈 Pasamos el valor numérico asegurado
+    subtotal
+  }
+]);
 
     setMenuSeleccionado(null);
     setGuarnicionSeleccionada(null);
@@ -512,16 +515,19 @@ export default function TomaPedidosPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Cantidad Platos</label>
-                    <input
-                      type="number"
-                      min="1"
-                      style={styleTextoNegro}
-                      value={cantidad}
-                      onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
-                      className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-                    />
-                  </div>
+  <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Cantidad Platos</label>
+  <input
+  type="number"
+  min="1"
+  style={styleTextoNegro}
+  value={cantidad}
+  onChange={(e) => {
+    const val = e.target.value;
+    setCantidad(val === '' ? '' : Math.max(1, parseInt(val) || 1));
+  }}
+  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+/>
+</div>
                 </div>
 
                 {guarnicionSeleccionada?.requiere_ingredientes && (
