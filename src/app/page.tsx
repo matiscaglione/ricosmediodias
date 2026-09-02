@@ -842,7 +842,7 @@ export default function TomaPedidosPage() {
 
                 {/* SELECTOR COMPACTO DE HUEVOS FRITOS */}
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                  <span className="text-xs font-bold text-gray-700">
+                  <span className="text-xs font-bold text-gray-800">
                     🍳 Huevos fritos extra:
                   </span>
                   <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded border border-gray-300">
