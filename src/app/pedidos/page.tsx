@@ -28,10 +28,24 @@ interface Pedido {
   detalle_pedidos?: DetallePedido[];
 }
 
+interface ItemOpcion {
+  id: string;
+  nombre: string;
+  precio: number;
+  es_bebida?: boolean;
+}
+
 export default function HistorialPedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [cargando, setCargando] = useState(true);
+
+  // Estados para Modal de Edición / Adición
+  const [pedidoAEditar, setPedidoAEditar] = useState<Pedido | null>(null);
+  const [opcionesDisponibles, setOpcionesDisponibles] = useState<ItemOpcion[]>([]);
+  const [itemSeleccionado, setItemSeleccionado] = useState<ItemOpcion | null>(null);
+  const [cantidadExtra, setCantidadExtra] = useState<number>(1);
+  const [guardandoExtra, setGuardandoExtra] = useState(false);
 
   useEffect(() => {
     cargarPedidosDelDia();
@@ -39,25 +53,24 @@ export default function HistorialPedidosPage() {
 
   async function cargarPedidosDelDia() {
     setCargando(true);
-    // ✅ AHORA (obtiene la fecha exacta en zona horaria de Argentina):
-  const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
 
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select(`
-      *,
-      detalle_pedidos (
-      id,
-      cantidad,
-      precio_unitario,
-      subtotal,
-      menus ( nombre ),
-      guarniciones ( nombre )
-      )
-    `)
-    .gte('created_at', `${hoyArgentina}T03:00:00`)
-    .lte('created_at', `${hoyArgentina}T23:59:59`)
-    .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('pedidos')
+      .select(`
+        *,
+        detalle_pedidos (
+          id,
+          cantidad,
+          precio_unitario,
+          subtotal,
+          menus ( nombre ),
+          guarniciones ( nombre )
+        )
+      `)
+      .gte('created_at', `${hoyArgentina}T03:00:00`)
+      .lte('created_at', `${hoyArgentina}T23:59:59`)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error al cargar pedidos:', error);
@@ -65,6 +78,140 @@ export default function HistorialPedidosPage() {
       setPedidos(data as Pedido[]);
     }
     setCargando(false);
+  }
+
+  // Cargar Menús y Bebidas para el Modal de Edición
+  async function abrirModalEdicion(pedido: Pedido) {
+    setPedidoAEditar(pedido);
+    setCantidadExtra(1);
+    setItemSeleccionado(null);
+
+    const { data: menusData } = await supabase.from('menus').select('id, nombre, precio').eq('activo', true);
+    const { data: bebidasData } = await supabase.from('bebidas').select('id, nombre, precio').eq('activa', true);
+
+    const combo: ItemOpcion[] = [
+      ...(menusData || []).map((m) => ({ id: m.id, nombre: `🍱 ${m.nombre}`, precio: m.precio, es_bebida: false })),
+      ...(bebidasData || []).map((b) => ({ id: b.id, nombre: `🥤 ${b.nombre}`, precio: b.precio, es_bebida: true }))
+    ];
+
+    setOpcionesDisponibles(combo);
+  }
+
+  // Guardar el ítem adicional al pedido existente
+  async function guardarItemAdicional() {
+    if (!pedidoAEditar || !itemSeleccionado) {
+      alert('Seleccioná un plato o bebida para agregar.');
+      return;
+    }
+
+    setGuardandoExtra(true);
+    const subtotalExtra = itemSeleccionado.precio * cantidadExtra;
+    const nuevoMontoPlatos = pedidoAEditar.monto_platos + subtotalExtra;
+    const nuevoMontoTotal = pedidoAEditar.monto_total + subtotalExtra;
+
+    // 1. Insertar el nuevo detalle
+    const payloadDetalle = itemSeleccionado.es_bebida
+      ? {
+          pedido_id: pedidoAEditar.id,
+          cantidad: cantidadExtra,
+          precio_unitario: itemSeleccionado.precio,
+          subtotal: subtotalExtra
+        }
+      : {
+          pedido_id: pedidoAEditar.id,
+          menu_id: itemSeleccionado.id,
+          cantidad: cantidadExtra,
+          precio_unitario: itemSeleccionado.precio,
+          subtotal: subtotalExtra
+        };
+
+    const { error: errDetalle } = await supabase.from('detalle_pedidos').insert([payloadDetalle]);
+
+    if (errDetalle) {
+      alert('Error al agregar el ítem: ' + errDetalle.message);
+      setGuardandoExtra(false);
+      return;
+    }
+
+    // 2. Actualizar el pedido principal con el nuevo Total
+    const { error: errPedido } = await supabase
+      .from('pedidos')
+      .update({
+        monto_platos: nuevoMontoPlatos,
+        monto_total: nuevoMontoTotal
+      })
+      .eq('id', pedidoAEditar.id);
+
+    if (errPedido) {
+      alert('Error al actualizar el total del pedido: ' + errPedido.message);
+      setGuardandoExtra(false);
+      return;
+    }
+
+    // 3. Descontar stock si es un menú
+    if (!itemSeleccionado.es_bebida) {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: stockActual } = await supabase
+        .from('stock_diario')
+        .select('cantidad_disponible')
+        .eq('fecha', hoy)
+        .eq('menu_id', itemSeleccionado.id)
+        .single();
+
+      if (stockActual) {
+        const nuevoStock = Math.max(0, stockActual.cantidad_disponible - cantidadExtra);
+        await supabase
+          .from('stock_diario')
+          .update({ cantidad_disponible: nuevoStock })
+          .eq('fecha', hoy)
+          .eq('menu_id', itemSeleccionado.id);
+      }
+    }
+
+    // 4. Imprimir comanda de Adicional
+    imprimirTicketAdicional(pedidoAEditar, itemSeleccionado.nombre, cantidadExtra, subtotalExtra, nuevoMontoTotal);
+
+    setGuardandoExtra(false);
+    setPedidoAEditar(null);
+    cargarPedidosDelDia();
+  }
+
+  function imprimirTicketAdicional(pedido: Pedido, nombreItem: string, cant: number, subtotal: number, totalActualizado: number) {
+    const ventana = window.open('', '_blank', 'width=350,height=500');
+    if (!ventana) return;
+
+    ventana.document.write(`
+      <html>
+        <head>
+          <title>Anexo Adicional</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            body { font-family: 'Courier New', Courier, monospace; width: 270px; padding: 8px; font-size: 13px; color: #000; }
+            .center { text-align: center; }
+            .line { border-bottom: 2px solid #000; margin: 6px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            <h2 style="margin:0; font-size: 18px; font-weight: 900;">➕ ADICIONAL / ANEXO</h2>
+            <p style="margin:2px 0; font-size: 11px;">Cliente: <strong>${pedido.cliente_nombre}</strong></p>
+          </div>
+          <div class="line"></div>
+          <div style="font-size: 15px; font-weight: bold; margin: 10px 0;">
+            ${cant}x ${nombreItem}
+            <div style="text-align: right;">${formatearMoneda(subtotal)}</div>
+          </div>
+          <div class="line"></div>
+          <div style="text-align: right; font-size: 16px; font-weight: 900;">
+            NUEVO TOTAL: ${formatearMoneda(totalActualizado)}
+          </div>
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `);
+    ventana.document.close();
   }
 
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
@@ -76,19 +223,14 @@ export default function HistorialPedidosPage() {
       return;
     }
 
-    // Encabezados del archivo
     const encabezados = ['Hora', 'Cliente', 'Telefono', 'Tipo Entrega', 'Detalle Platos', 'Costo Envio', 'Monto Platos', 'Total', 'Observaciones'];
 
-    // Convertir cada pedido en una fila de texto
     const filas = pedidosFiltrados.map((p) => {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      
-      // Armar string con los ítems del pedido (ej: "2x Milanesa (+ Puré); 1x Tarta")
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => `${i.cantidad}x ${i.menus?.nombre || 'Plato'}${i.guarniciones?.nombre ? ` (+ ${i.guarniciones.nombre})` : ''}`)
         .join('; ');
 
-      // Limpiar comillas dobles para evitar fallos de formato en CSV
       const obsLimpia = (p.observaciones || '').replace(/"/g, '""');
       const clienteLimpio = (p.cliente_nombre || '').replace(/"/g, '""');
 
@@ -105,15 +247,12 @@ export default function HistorialPedidosPage() {
       ].join(',');
     });
 
-    // Agregar BOM para UTF-8 (permite que Excel abra acentos y carácteres especiales correctamente)
     const contenidoCSV = '\uFEFF' + [encabezados.join(','), ...filas].join('\n');
-
-    // Descargar el archivo
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const fechaHoy = new Date().toISOString().split('T')[0];
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}.csv`);
     document.body.appendChild(link);
@@ -137,7 +276,7 @@ export default function HistorialPedidosPage() {
         (i) => `
         <div style="margin-bottom: 6px;">
           <div style="font-size: 15px; font-weight: bold;">
-            ${i.cantidad}x ${i.menus?.nombre || 'Plato'}
+            ${i.cantidad}x ${i.menus?.nombre || 'Plato/Bebida'}
           </div>
           ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
           <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
@@ -258,6 +397,9 @@ export default function HistorialPedidosPage() {
           <Link href="/" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-extrabold hover:bg-blue-700">
             ➕ Tomar Pedido
           </Link>
+          <Link href="/pedidos" className="bg-purple-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-purple-800">
+            📋 Pedidos
+          </Link>
           <Link href="/admin" className="bg-black text-white text-sm px-3 py-2 rounded font-bold hover:bg-gray-800">
             ⚙️ Admin
           </Link>
@@ -335,7 +477,7 @@ export default function HistorialPedidosPage() {
                   {pedido.detalle_pedidos?.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
                       <span className="font-extrabold" style={styleTextoNegro}>
-                        {item.cantidad}x {item.menus?.nombre || 'Plato'}
+                        {item.cantidad}x {item.menus?.nombre || 'Plato/Bebida'}
                         {item.guarniciones?.nombre && (
                           <span className="text-xs font-bold text-gray-600 block pl-3">
                             + {item.guarniciones.nombre}
@@ -355,22 +497,113 @@ export default function HistorialPedidosPage() {
                 </div>
               </div>
 
-              {/* PIE DE TARJETA Y REIMPRESIÓN */}
-              <div className="border-t border-gray-200 pt-3 flex justify-between items-center mt-2">
+              {/* PIE DE TARJETA CON BOTONES */}
+              <div className="border-t border-gray-200 pt-3 flex justify-between items-center mt-2 gap-2">
                 <div>
                   <span className="text-xs font-bold text-gray-500 block">Total:</span>
                   <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
                 </div>
 
-                <button
-                  onClick={() => reimprimirTicket(pedido)}
-                  className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-3 rounded flex items-center gap-1.5 shadow transition-colors"
-                >
-                  🖨️ Reimprimir Ticket
-                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => abrirModalEdicion(pedido)}
+                    className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <button
+                    onClick={() => reimprimirTicket(pedido)}
+                    className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+                  >
+                    🖨️ Ticket
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* MODAL / VENTANA FLOTANTE PARA EDITAR PEDIDO */}
+      {pedidoAEditar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl border-2 border-gray-300">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="text-lg font-black" style={styleTextoNegro}>
+                Agregar Ítem a Pedido
+              </h2>
+              <button
+                onClick={() => setPedidoAEditar(null)}
+                className="text-gray-500 hover:text-black font-black text-lg px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded text-xs space-y-1">
+              <p style={styleTextoNegro}><strong>Cliente:</strong> {pedidoAEditar.cliente_nombre}</p>
+              <p style={styleTextoNegro}><strong>Total actual:</strong> {formatearMoneda(pedidoAEditar.monto_total)}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>
+                Seleccionar Plato o Bebida
+              </label>
+              <select
+                style={styleTextoNegro}
+                value={itemSeleccionado?.id || ''}
+                onChange={(e) => {
+                  const encontrado = opcionesDisponibles.find((op) => op.id === e.target.value) || null;
+                  setItemSeleccionado(encontrado);
+                }}
+                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+              >
+                <option value="">-- Elegir de la lista --</option>
+                {opcionesDisponibles.map((op) => (
+                  <option key={op.id} value={op.id}>
+                    {op.nombre} (${op.precio})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>
+                Cantidad a sumar
+              </label>
+              <input
+                type="number"
+                min="1"
+                style={styleTextoNegro}
+                value={cantidadExtra}
+                onChange={(e) => setCantidadExtra(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+              />
+            </div>
+
+            {itemSeleccionado && (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900 font-bold flex justify-between">
+                <span>Monto a Adicionar:</span>
+                <span>{formatearMoneda(itemSeleccionado.precio * cantidadExtra)}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setPedidoAEditar(null)}
+                className="flex-1 bg-gray-300 text-gray-800 font-extrabold text-xs py-3 rounded hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarItemAdicional}
+                disabled={!itemSeleccionado || guardandoExtra}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-extrabold text-xs py-3 rounded shadow"
+              >
+                {guardandoExtra ? 'Guardando...' : '💾 Confirmar y Sumar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -97,78 +97,28 @@ export default function TomaPedidosPage() {
   }, []);
 
   async function cargarDatosDelDia() {
-  // 1. Cargar el stock del día
-  const hoy = new Date().toISOString().split("T")[0];
-  const { data: stockData } = await supabase
-    .from("stock_diario")
-    .select("menu_id, cantidad_disponible")
-    .eq("fecha", hoy);
+    const hoy = new Date().toISOString().split("T")[0];
 
-  const mapa: Record<string, number> = {};
-  if (stockData) {
-    stockData.forEach((s) => {
-      mapa[s.menu_id] = s.cantidad_disponible;
-    });
-  }
-  setStockMap(mapa);
+    const { data: stockData } = await supabase
+      .from("stock_diario")
+      .select("menu_id, cantidad_disponible")
+      .eq("fecha", hoy)
+      .gt("cantidad_disponible", 0);
 
-  // 2. Cargar Menús Activos (Platos Fijos siempre, Del Día solo con stock)
-  const { data: menusData } = await supabase
-    .from("menus")
-    .select("*")
-    .eq("activo", true)
-    .order("created_at", { ascending: true });
+    const mapa: Record<string, number> = {};
+    const idsConStock: string[] = [];
 
-  if (menusData) {
-    const menusVisibles = menusData.filter((m) => {
-      if (m.es_fijo) return true;
-      const stockHoy = mapa[m.id] ?? 0;
-      return stockHoy > 0;
-    });
-    setMenus(menusVisibles);
-  }
+    if (stockData) {
+      stockData.forEach((s) => {
+        mapa[s.menu_id] = s.cantidad_disponible;
+        idsConStock.push(s.menu_id);
+      });
+    }
+    setStockMap(mapa);
 
-  // 3. Cargar Bebidas, Guarniciones, Ingredientes, Salsas y Zonas
-  const { data: bebidasData } = await supabase
-    .from("bebidas")
-    .select("*")
-    .eq("activa", true);
-  if (bebidasData) setBebidas(bebidasData);
-
-  const { data: guarnicionesData } = await supabase
-    .from("guarniciones")
-    .select("*")
-    .eq("activa", true);
-  if (guarnicionesData) setGuarniciones(guarnicionesData);
-
-  const { data: ingredientesData } = await supabase
-    .from("ingredientes_ensalada")
-    .select("*")
-    .eq("activo", true);
-  if (ingredientesData) setIngredientes(ingredientesData);
-
-  const { data: salsasData } = await supabase
-    .from("salsas")
-    .select("*")
-    .eq("activa", true);
-  if (salsasData) setSalsas(salsasData);
-
-  const { data: zonasData } = await supabase
-    .from("zonas_envio")
-    .select("*")
-    .eq("activa", true);
-  if (zonasData) setZonas(zonasData);
-
-  // 4. Cargar Precio del Huevo Frito
-  const { data: confData } = await supabase
-    .from("configuracion")
-    .select("precio_huevo_frito")
-    .eq("id", "general")
-    .single();
-
-  if (confData && confData.precio_huevo_frito) {
-    setPrecioHuevo(Number(confData.precio_huevo_frito));
-  }
+    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
+if (confData && confData.precio_huevo_frito) {
+  setPrecioHuevo(Number(confData.precio_huevo_frito));
 }
     
     if (idsConStock.length > 0) {
