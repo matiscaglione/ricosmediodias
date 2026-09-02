@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -53,7 +53,7 @@ interface ItemPedido {
   subtotal: number;
 }
 
-export default function TomaPedidosPage() {
+function ContenidoTomaPedidos() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [bebidas, setBebidas] = useState<Bebida[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
@@ -481,7 +481,6 @@ export default function TomaPedidosPage() {
     let pedidoIdGuardado = pedidoEditandoId;
 
     if (pedidoEditandoId) {
-      // --- MODO EDICIÓN ---
       for (const itemViejo of itemsOriginalesEditar) {
         if (itemViejo.menu) {
           const { data: stockActualData } = await supabase
@@ -523,7 +522,6 @@ export default function TomaPedidosPage() {
         return;
       }
     } else {
-      // --- MODO CREACIÓN NUEVA ---
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from("pedidos")
         .insert([
@@ -1171,5 +1169,13 @@ export default function TomaPedidosPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TomaPedidosPage() {
+  return (
+    <Suspense fallback={<div className="text-center p-8 font-bold">Cargando toma de pedidos...</div>}>
+      <ContenidoTomaPedidos />
+    </Suspense>
   );
 }
