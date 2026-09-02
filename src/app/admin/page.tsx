@@ -61,6 +61,7 @@ export default function AdminPage() {
   const [salsas, setSalsas] = useState<Salsa[]>([]);
   const [zonas, setZonas] = useState<ZonaEnvio[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  const [precioHuevoFrito, setPrecioHuevoFrito] = useState('500');
 
   // Buscador y Filtro para Menús
   const [busquedaMenu, setBusquedaMenu] = useState('');
@@ -123,6 +124,9 @@ export default function AdminPage() {
 
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').order('created_at', { ascending: true });
     if (zonasData) setZonas(zonasData);
+
+    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
+if (confData) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
 
     const hoy = new Date().toISOString().split('T')[0];
     const { data: stockData } = await supabase.from('stock_diario').select('menu_id, cantidad_disponible').eq('fecha', hoy);
@@ -337,6 +341,22 @@ export default function AdminPage() {
       }
     }
   }
+
+  // Nueva función para guardar el precio de huevo frito:
+async function guardarPrecioHuevo(e: React.FormEvent) {
+  e.preventDefault();
+  const valor = parseFloat(precioHuevoFrito) || 0;
+  const { error } = await supabase
+    .from('configuracion')
+    .upsert({ id: 'general', precio_huevo_frito: valor }, { onConflict: 'id' });
+
+  if (!error) {
+    alert('Precio de huevo frito actualizado correctamente');
+    cargarDatos();
+  } else {
+    alert('Error al guardar precio: ' + error.message);
+  }
+}
 
   const styleTextoNegro = { color: '#000000' };
 
@@ -806,6 +826,28 @@ export default function AdminPage() {
           </tbody>
         </table>
       </div>
+
+      {/* SECCIÓN ADICIONALES: HUEVO FRITO */}
+<div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+  <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🍳 Precio de Adicional Huevo Frito</h2>
+  <form onSubmit={guardarPrecioHuevo} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
+    <div className="flex-1">
+      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio por unidad ($)</label>
+      <input
+        type="number"
+        step="0.01"
+        style={styleTextoNegro}
+        value={precioHuevoFrito}
+        onChange={(e) => setPrecioHuevoFrito(e.target.value)}
+        className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+      />
+    </div>
+    <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
+      💾 Guardar Precio
+    </button>
+  </form>
+</div>
+
     </div>
   );
 }

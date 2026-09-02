@@ -90,6 +90,8 @@ export default function TomaPedidosPage() {
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
+  const [precioHuevo, setPrecioHuevo] = useState<number>(500);
+
   useEffect(() => {
     cargarDatosDelDia();
   }, []);
@@ -114,6 +116,11 @@ export default function TomaPedidosPage() {
     }
     setStockMap(mapa);
 
+    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
+if (confData && confData.precio_huevo_frito) {
+  setPrecioHuevo(Number(confData.precio_huevo_frito));
+}
+    
     if (idsConStock.length > 0) {
       const { data: menusData } = await supabase
         .from("menus")
@@ -170,61 +177,64 @@ export default function TomaPedidosPage() {
   }
 
   function agregarItemMenu() {
-    if (!menuSeleccionado) return;
+  if (!menuSeleccionado) return;
 
-    if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
-      alert(
-        'Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")',
-      );
-      return;
-    }
-
-    const stockDisponible = stockMap[menuSeleccionado.id] || 0;
-    const cantidadYaEnCarrito = items
-      .filter((item) => item.menu?.id === menuSeleccionado.id)
-      .reduce((acc, item) => acc + item.cantidad, 0);
-
-    if (cantidad + cantidadYaEnCarrito > stockDisponible) {
-      alert(
-        `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`,
-      );
-      return;
-    }
-
-    const precioGuarnicion =
-      menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
-        ? guarnicionSeleccionada.precio_extra
-        : 0;
-    const subtotal = (menuSeleccionado.precio + precioGuarnicion) * cantidad;
-
-    setItems([
-      ...items,
-      {
-        menu: menuSeleccionado,
-        guarnicion:
-          menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
-            ? guarnicionSeleccionada
-            : undefined,
-        salsa:
-          menuSeleccionado.requiere_salsa && salsaSeleccionada
-            ? salsaSeleccionada
-            : undefined,
-        ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes
-          ? ingredientesElegidos
-          : undefined,
-        cantidadHuevos,
-        cantidad,
-        subtotal,
-      },
-    ]);
-
-    setMenuSeleccionado(null);
-    setGuarnicionSeleccionada(null);
-    setSalsaSeleccionada(null);
-    setIngredientesElegidos([]);
-    setCantidadHuevos(0);
-    setCantidad(1);
+  if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
+    alert(
+      'Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")',
+    );
+    return;
   }
+
+  const stockDisponible = stockMap[menuSeleccionado.id] || 0;
+  const cantidadYaEnCarrito = items
+    .filter((item) => item.menu?.id === menuSeleccionado.id)
+    .reduce((acc, item) => acc + item.cantidad, 0);
+
+  if (cantidad + cantidadYaEnCarrito > stockDisponible) {
+    alert(
+      `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`,
+    );
+    return;
+  }
+
+  const precioGuarnicion =
+    menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
+      ? guarnicionSeleccionada.precio_extra
+      : 0;
+
+  // Calculamos costo total de los huevos extra seleccionados
+  const costoHuevosTotal = cantidadHuevos * precioHuevo;
+  const subtotal = ((menuSeleccionado.precio + precioGuarnicion) * cantidad) + costoHuevosTotal;
+
+  setItems([
+    ...items,
+    {
+      menu: menuSeleccionado,
+      guarnicion:
+        menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
+          ? guarnicionSeleccionada
+          : undefined,
+      salsa:
+        menuSeleccionado.requiere_salsa && salsaSeleccionada
+          ? salsaSeleccionada
+          : undefined,
+      ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes
+        ? ingredientesElegidos
+        : undefined,
+      cantidadHuevos,
+      cantidad,
+      subtotal,
+    },
+  ]);
+
+  setMenuSeleccionado(null);
+  setGuarnicionSeleccionada(null);
+  setSalsaSeleccionada(null);
+  setIngredientesElegidos([]);
+  setCantidadHuevos(0);
+  setCantidad(1);
+}
 
   function agregarBebidaAlPedido() {
     if (!bebidaSeleccionada) return;
@@ -963,13 +973,10 @@ export default function TomaPedidosPage() {
                             </div>
                           )}
                           {item.cantidadHuevos > 0 && (
-                            <div className="text-xs font-black text-amber-800">
-                              🍳{" "}
-                              {item.cantidadHuevos === 1
-                                ? "1 Huevo Frito"
-                                : `${item.cantidadHuevos} Huevos Fritos`}
-                            </div>
-                          )}
+  <div className="text-xs font-black text-amber-800">
+    🍳 {item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`} (+{formatearMoneda(item.cantidadHuevos * precioHuevo)})
+  </div>
+)}
                         </>
                       )}
                     </div>
