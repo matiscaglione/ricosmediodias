@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams } from "next/navigation";
 
 interface Menu {
   id: string;
@@ -94,59 +94,59 @@ export default function TomaPedidosPage() {
   const [precioHuevo, setPrecioHuevo] = useState<number>(500);
 
   const searchParams = useSearchParams();
-const idEditarURL = searchParams.get('editar');
-const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
-const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
+  const idEditarURL = searchParams.get("editar");
+  const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
+  const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
 
   useEffect(() => {
-  async function inicializar() {
-    await cargarDatosDelDia();
+    async function inicializar() {
+      await cargarDatosDelDia();
 
-    if (idEditarURL) {
-      // Cargar los datos del pedido a modificar
-      const { data: pedidoData } = await supabase
-        .from("pedidos")
-        .select(`
-          *,
-          detalle_pedidos (
-            id,
-            menu_id,
-            guarnicion_id,
-            cantidad,
-            precio_unitario,
-            subtotal,
-            menus (*),
-            guarniciones (*)
-          )
-        `)
-        .eq("id", idEditarURL)
-        .single();
+      if (idEditarURL) {
+        // Cargar los datos del pedido a modificar
+        const { data: pedidoData } = await supabase
+          .from("pedidos")
+          .select(`
+            *,
+            detalle_pedidos (
+              id,
+              menu_id,
+              guarnicion_id,
+              cantidad,
+              precio_unitario,
+              subtotal,
+              menus (*),
+              guarniciones (*)
+            )
+          `)
+          .eq("id", idEditarURL)
+          .single();
 
-      if (pedidoData) {
-        setPedidoEditandoId(pedidoData.id);
-        setClienteNombre(pedidoData.cliente_nombre || "");
-        setClienteTelefono(pedidoData.cliente_telefono || "");
-        setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
-        setHorario(pedidoData.horario_solicitado || "");
-        setObservaciones(pedidoData.observaciones || "");
+        if (pedidoData) {
+          setPedidoEditandoId(pedidoData.id);
+          setClienteNombre(pedidoData.cliente_nombre || "");
+          setClienteTelefono(pedidoData.cliente_telefono || "");
+          setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
+          setHorario(pedidoData.horario_solicitado || "");
+          setObservaciones(pedidoData.observaciones || "");
 
-        // Mapear los ítems anteriores al carrito actual
-        const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any) => ({
-          menu: det.menus,
-          guarnicion: det.guarniciones || undefined,
-          cantidad: det.cantidad,
-          cantidadHuevos: 0,
-          subtotal: det.subtotal
-        }));
+          // Mapear los ítems anteriores al carrito actual
+          const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any) => ({
+            menu: det.menus || undefined,
+            guarnicion: det.guarniciones || undefined,
+            cantidad: det.cantidad,
+            cantidadHuevos: 0,
+            subtotal: det.subtotal
+          }));
 
-        setItems(itemsCargados);
-        setItemsOriginalesEditar(itemsCargados); // Para revertir stock si cambia algo
+          setItems(itemsCargados);
+          setItemsOriginalesEditar(itemsCargados);
+        }
       }
     }
-  }
 
-  inicializar();
-}, [idEditarURL]);
+    inicializar();
+  }, [idEditarURL]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
@@ -168,11 +168,16 @@ const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
     }
     setStockMap(mapa);
 
-    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
-if (confData && confData.precio_huevo_frito) {
-  setPrecioHuevo(Number(confData.precio_huevo_frito));
-}
-    
+    const { data: confData } = await supabase
+      .from("configuracion")
+      .select("precio_huevo_frito")
+      .eq("id", "general")
+      .single();
+
+    if (confData && confData.precio_huevo_frito) {
+      setPrecioHuevo(Number(confData.precio_huevo_frito));
+    }
+
     if (idsConStock.length > 0) {
       const { data: menusData } = await supabase
         .from("menus")
@@ -229,64 +234,63 @@ if (confData && confData.precio_huevo_frito) {
   }
 
   function agregarItemMenu() {
-  if (!menuSeleccionado) return;
+    if (!menuSeleccionado) return;
 
-  if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
-    alert(
-      'Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")',
-    );
-    return;
-  }
+    if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
+      alert(
+        'Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")',
+      );
+      return;
+    }
 
-  const stockDisponible = stockMap[menuSeleccionado.id] || 0;
-  const cantidadYaEnCarrito = items
-    .filter((item) => item.menu?.id === menuSeleccionado.id)
-    .reduce((acc, item) => acc + item.cantidad, 0);
+    const stockDisponible = stockMap[menuSeleccionado.id] || 0;
+    const cantidadYaEnCarrito = items
+      .filter((item) => item.menu?.id === menuSeleccionado.id)
+      .reduce((acc, item) => acc + item.cantidad, 0);
 
-  if (cantidad + cantidadYaEnCarrito > stockDisponible) {
-    alert(
-      `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`,
-    );
-    return;
-  }
+    if (cantidad + cantidadYaEnCarrito > stockDisponible) {
+      alert(
+        `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`,
+      );
+      return;
+    }
 
-  const precioGuarnicion =
-    menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
-      ? guarnicionSeleccionada.precio_extra
-      : 0;
+    const precioGuarnicion =
+      menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
+        ? guarnicionSeleccionada.precio_extra
+        : 0;
 
-  // Calculamos costo total de los huevos extra seleccionados
-  const costoHuevosTotal = cantidadHuevos * precioHuevo;
-  const subtotal = ((menuSeleccionado.precio + precioGuarnicion) * cantidad) + costoHuevosTotal;
+    const costoHuevosTotal = cantidadHuevos * precioHuevo;
+    const subtotal = ((menuSeleccionado.precio + precioGuarnicion) * cantidad) + costoHuevosTotal;
 
-  setItems([
-    ...items,
-    {
-      menu: menuSeleccionado,
-      guarnicion:
-        menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
-          ? guarnicionSeleccionada
+    setItems([
+      ...items,
+      {
+        menu: menuSeleccionado,
+        guarnicion:
+          menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada
+            ? guarnicionSeleccionada
+            : undefined,
+        salsa:
+          menuSeleccionado.requiere_salsa && salsaSeleccionada
+            ? salsaSeleccionada
+            : undefined,
+        ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes
+          ? ingredientesElegidos
           : undefined,
-      salsa:
-        menuSeleccionado.requiere_salsa && salsaSeleccionada
-          ? salsaSeleccionada
-          : undefined,
-      ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes
-        ? ingredientesElegidos
-        : undefined,
-      cantidadHuevos,
-      cantidad,
-      subtotal,
-    },
-  ]);
+        cantidadHuevos,
+        cantidad,
+        subtotal,
+      },
+    ]);
 
-  setMenuSeleccionado(null);
-  setGuarnicionSeleccionada(null);
-  setSalsaSeleccionada(null);
-  setIngredientesElegidos([]);
-  setCantidadHuevos(0);
-  setCantidad(1);
-}
+    setMenuSeleccionado(null);
+    setGuarnicionSeleccionada(null);
+    setSalsaSeleccionada(null);
+    setIngredientesElegidos([]);
+    setCantidadHuevos(0);
+    setCantidad(1);
+  }
 
   function agregarBebidaAlPedido() {
     if (!bebidaSeleccionada) return;
@@ -451,83 +455,57 @@ if (confData && confData.precio_huevo_frito) {
   }
 
   async function confirmarPedido() {
-  if (items.length === 0)
-    return alert("Agregá al menos un menú o bebida al pedido");
-  if (tipoEntrega === "ENVIO" && !direccion)
-    return alert("Ingresá la dirección para el envío");
+    if (items.length === 0)
+      return alert("Agregá al menos un menú o bebida al pedido");
+    if (tipoEntrega === "ENVIO" && !direccion)
+      return alert("Ingresá la dirección para el envío");
 
-  const nombreFinal =
-    clienteNombre.trim() !== ""
-      ? clienteNombre
-      : tipoEntrega === "BAR"
-        ? "Cliente Bar"
-        : tipoEntrega === "RETIRO"
-          ? "Retira Mostrador"
-          : "Cliente Envío";
+    const nombreFinal =
+      clienteNombre.trim() !== ""
+        ? clienteNombre
+        : tipoEntrega === "BAR"
+          ? "Cliente Bar"
+          : tipoEntrega === "RETIRO"
+            ? "Retira Mostrador"
+            : "Cliente Envío";
 
-  const hoy = new Date().toISOString().split("T")[0];
+    const hoy = new Date().toISOString().split("T")[0];
 
-  const detalleHuevos = items
-    .filter((i) => i.cantidadHuevos > 0)
-    .map((i) => `${i.cantidadHuevos} Huevo Frito`)
-    .join(", ");
+    const detalleHuevos = items
+      .filter((i) => i.cantidadHuevos > 0)
+      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+      .join(", ");
 
-  const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
+    const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
 
-  let pedidoIdGuardado = pedidoEditandoId;
+    let pedidoIdGuardado = pedidoEditandoId;
 
-  if (pedidoEditandoId) {
-    // --- MODO EDICIÓN ---
-
-    // 1. Revertir el stock de los platos anteriores para no perder unidades
-    for (const itemViejo of itemsOriginalesEditar) {
-      if (itemViejo.menu) {
-        const { data: stockActualData } = await supabase
-          .from("stock_diario")
-          .select("cantidad_disponible")
-          .eq("fecha", hoy)
-          .eq("menu_id", itemViejo.menu.id)
-          .single();
-
-        if (stockActualData) {
-          await supabase
+    if (pedidoEditandoId) {
+      // --- MODO EDICIÓN ---
+      for (const itemViejo of itemsOriginalesEditar) {
+        if (itemViejo.menu) {
+          const { data: stockActualData } = await supabase
             .from("stock_diario")
-            .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
+            .select("cantidad_disponible")
             .eq("fecha", hoy)
-            .eq("menu_id", itemViejo.menu.id);
+            .eq("menu_id", itemViejo.menu.id)
+            .single();
+
+          if (stockActualData) {
+            await supabase
+              .from("stock_diario")
+              .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
+              .eq("fecha", hoy)
+              .eq("menu_id", itemViejo.menu.id);
+          }
         }
       }
-    }
 
-    // 2. Borrar los detalles de pedido anteriores de Supabase (Limpia ranking y estadísticas)
-    await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
+      await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
 
-    // 3. Actualizar la cabecera del pedido existente
-    const { error: errUpdate } = await supabase
-      .from("pedidos")
-      .update({
-        cliente_nombre: nombreFinal,
-        cliente_telefono: clienteTelefono,
-        tipo_entrega: tipoEntrega,
-        zona_envio_id: zonaSeleccionada?.id || null,
-        costo_envio: costoEnvio,
-        monto_platos: montoPlatos,
-        monto_total: montoTotal,
-        horario_solicitado: horario,
-        observaciones: obsFinal,
-      })
-      .eq("id", pedidoEditandoId);
-
-    if (errUpdate) {
-      alert("Error al actualizar el pedido: " + errUpdate.message);
-      return;
-    }
-  } else {
-    // --- MODO CREACIÓN NUEVA ---
-    const { data: pedidoGuardado, error: errPedido } = await supabase
-      .from("pedidos")
-      .insert([
-        {
+      const { error: errUpdate } = await supabase
+        .from("pedidos")
+        .update({
           cliente_nombre: nombreFinal,
           cliente_telefono: clienteTelefono,
           tipo_entrega: tipoEntrega,
@@ -537,64 +515,84 @@ if (confData && confData.precio_huevo_frito) {
           monto_total: montoTotal,
           horario_solicitado: horario,
           observaciones: obsFinal,
-          estado: "PENDIENTE",
-        },
-      ])
-      .select()
-      .single();
+        })
+        .eq("id", pedidoEditandoId);
 
-    if (errPedido || !pedidoGuardado) {
-      alert("Error al guardar el pedido: " + errPedido?.message);
-      return;
-    }
-    pedidoIdGuardado = pedidoGuardado.id;
-  }
-
-  // Insertar los nuevos detalles y descontar el nuevo stock
-  for (const item of items) {
-    if (item.menu) {
-      await supabase.from("detalle_pedidos").insert([
-        {
-          pedido_id: pedidoIdGuardado,
-          menu_id: item.menu.id,
-          guarnicion_id: item.guarnicion?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.menu.precio,
-          subtotal: item.subtotal,
-        },
-      ]);
-
-      const { data: stockActualData } = await supabase
-        .from("stock_diario")
-        .select("cantidad_disponible")
-        .eq("fecha", hoy)
-        .eq("menu_id", item.menu.id)
+      if (errUpdate) {
+        alert("Error al actualizar el pedido: " + errUpdate.message);
+        return;
+      }
+    } else {
+      // --- MODO CREACIÓN NUEVA ---
+      const { data: pedidoGuardado, error: errPedido } = await supabase
+        .from("pedidos")
+        .insert([
+          {
+            cliente_nombre: nombreFinal,
+            cliente_telefono: clienteTelefono,
+            tipo_entrega: tipoEntrega,
+            zona_envio_id: zonaSeleccionada?.id || null,
+            costo_envio: costoEnvio,
+            monto_platos: montoPlatos,
+            monto_total: montoTotal,
+            horario_solicitado: horario,
+            observaciones: obsFinal,
+            estado: "PENDIENTE",
+          },
+        ])
+        .select()
         .single();
 
-      const stockActual = stockActualData?.cantidad_disponible || 0;
-      const nuevoStock = Math.max(0, stockActual - item.cantidad);
-
-      await supabase
-        .from("stock_diario")
-        .update({ cantidad_disponible: nuevoStock })
-        .eq("fecha", hoy)
-        .eq("menu_id", item.menu.id);
+      if (errPedido || !pedidoGuardado) {
+        alert("Error al guardar el pedido: " + errPedido?.message);
+        return;
+      }
+      pedidoIdGuardado = pedidoGuardado.id;
     }
+
+    for (const item of items) {
+      if (item.menu) {
+        await supabase.from("detalle_pedidos").insert([
+          {
+            pedido_id: pedidoIdGuardado,
+            menu_id: item.menu.id,
+            guarnicion_id: item.guarnicion?.id || null,
+            cantidad: item.cantidad,
+            precio_unitario: item.menu.precio,
+            subtotal: item.subtotal,
+          },
+        ]);
+
+        const { data: stockActualData } = await supabase
+          .from("stock_diario")
+          .select("cantidad_disponible")
+          .eq("fecha", hoy)
+          .eq("menu_id", item.menu.id)
+          .single();
+
+        const stockActual = stockActualData?.cantidad_disponible || 0;
+        const nuevoStock = Math.max(0, stockActual - item.cantidad);
+
+        await supabase
+          .from("stock_diario")
+          .update({ cantidad_disponible: nuevoStock })
+          .eq("fecha", hoy)
+          .eq("menu_id", item.menu.id);
+      }
+    }
+
+    imprimirTicket(pedidoIdGuardado!);
+
+    setItems([]);
+    setItemsOriginalesEditar([]);
+    setPedidoEditandoId(null);
+    setClienteNombre("");
+    setClienteTelefono("");
+    setDireccion("");
+    setHorario("");
+    setObservaciones("");
+    cargarDatosDelDia();
   }
-
-  imprimirTicket(pedidoIdGuardado!);
-
-  // Limpiar estados y salir del modo edición
-  setItems([]);
-  setItemsOriginalesEditar([]);
-  setPedidoEditandoId(null);
-  setClienteNombre("");
-  setClienteTelefono("");
-  setDireccion("");
-  setHorario("");
-  setObservaciones("");
-  cargarDatosDelDia();
-}
 
   const styleTextoNegro = { color: "#000000" };
 
@@ -640,7 +638,7 @@ if (confData && confData.precio_huevo_frito) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* SECCIÓN 1: TIPO DE ENTREGA Y CLIENTE (AHORA PRIMERO) */}
+          {/* SECCIÓN 1: TIPO DE ENTREGA Y CLIENTE */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-4">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
               1. Tipo de Entrega y Cliente
@@ -1087,10 +1085,10 @@ if (confData && confData.precio_huevo_frito) {
                             </div>
                           )}
                           {item.cantidadHuevos > 0 && (
-  <div className="text-xs font-black text-amber-800">
-    🍳 {item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`} (+{formatearMoneda(item.cantidadHuevos * precioHuevo)})
-  </div>
-)}
+                            <div className="text-xs font-black text-amber-800">
+                              🍳 {item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`} (+{formatearMoneda(item.cantidadHuevos * precioHuevo)})
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1136,6 +1134,24 @@ if (confData && confData.precio_huevo_frito) {
               <span>{formatearMoneda(montoTotal)}</span>
             </div>
 
+            {/* AVISO DE EDICIÓN */}
+            {pedidoEditandoId && (
+              <div className="bg-amber-100 border-2 border-amber-400 p-3 rounded-lg mt-3 flex justify-between items-center text-amber-900 font-bold text-xs">
+                <span>✏️ Modificando Pedido Existente</span>
+                <button
+                  onClick={() => {
+                    setPedidoEditandoId(null);
+                    setItems([]);
+                    setItemsOriginalesEditar([]);
+                    window.history.replaceState({}, '', '/');
+                  }}
+                  className="bg-amber-800 text-white px-2 py-1 rounded text-xs hover:bg-amber-900"
+                >
+                  Cancelar Edición
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-2">
               <button
                 onClick={imprimirSoloBebidas}
@@ -1144,28 +1160,12 @@ if (confData && confData.precio_huevo_frito) {
               >
                 🥤 Ticket Solo Bebida
               </button>
-              {pedidoEditandoId && (
-  <div className="bg-amber-100 border-2 border-amber-400 p-3 rounded-lg mb-4 flex justify-between items-center text-amber-900 font-bold text-xs">
-    <span>✏️ Modificando Pedido Existente</span>
-    <button
-      onClick={() => {
-        setPedidoEditandoId(null);
-        setItems([]);
-        setItemsOriginalesEditar([]);
-        window.history.replaceState({}, '', '/');
-      }}
-      className="bg-amber-800 text-white px-2 py-1 rounded text-xs hover:bg-amber-900"
-    >
-      Cancelar Edición
-    </button>
-  </div>
-)}
               <button
-  onClick={confirmarPedido}
-  className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-4 rounded-lg shadow-md transition-colors text-base"
->
-  {pedidoEditandoId ? "💾 Actualizar Pedido" : "Confirmar Pedido"}
-</button>
+                onClick={confirmarPedido}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-4 rounded-lg shadow-md transition-colors text-base"
+              >
+                {pedidoEditandoId ? "💾 Actualizar Pedido" : "Confirmar Pedido"}
+              </button>
             </div>
           </div>
         </div>
