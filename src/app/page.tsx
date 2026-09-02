@@ -99,7 +99,7 @@ export default function TomaPedidosPage() {
   async function cargarDatosDelDia() {
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 1. Cargar el stock del día
+  // 1. Cargar el stock del día de Supabase
   const { data: stockData } = await supabase
     .from("stock_diario")
     .select("menu_id, cantidad_disponible")
@@ -110,10 +110,10 @@ export default function TomaPedidosPage() {
     stockData.forEach((s) => {
       mapa[s.menu_id] = s.cantidad_disponible;
     });
-    setStockMap(mapa);
   }
+  setStockMap(mapa);
 
-  // 2. Cargar Menús Activos
+  // 2. Cargar Menús Activos y aplicar el filtro según si es FIJO o DEL DÍA
   const { data: menusData } = await supabase
     .from("menus")
     .select("*")
@@ -121,11 +121,11 @@ export default function TomaPedidosPage() {
     .order("created_at", { ascending: true });
 
   if (menusData) {
-    // FILTRO CLAVE:
-    // - Si es plato FIJO: Se muestra siempre (mientras esté activo).
-    // - Si es plato DEL DÍA: Se muestra SOLO si tiene stock cargado hoy mayor a 0.
     const menusVisibles = menusData.filter((m) => {
+      // Si es un plato fijo, se muestra siempre (mientras esté activo)
       if (m.es_fijo) return true;
+      
+      // Si es un plato del día, requiere stock cargado hoy mayor a 0
       const stockHoy = mapa[m.id] ?? 0;
       return stockHoy > 0;
     });
@@ -133,7 +133,7 @@ export default function TomaPedidosPage() {
     setMenus(menusVisibles);
   }
 
-  // 3. Cargar precio del huevo frito
+  // 3. Cargar el precio del huevo frito desde configuracion
   const { data: confData } = await supabase
     .from("configuracion")
     .select("precio_huevo_frito")
