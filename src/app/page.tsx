@@ -97,28 +97,52 @@ export default function TomaPedidosPage() {
   }, []);
 
   async function cargarDatosDelDia() {
-    const hoy = new Date().toISOString().split("T")[0];
+  const hoy = new Date().toISOString().split("T")[0];
 
-    const { data: stockData } = await supabase
-      .from("stock_diario")
-      .select("menu_id, cantidad_disponible")
-      .eq("fecha", hoy)
-      .gt("cantidad_disponible", 0);
+  // 1. Cargar el stock del día
+  const { data: stockData } = await supabase
+    .from("stock_diario")
+    .select("menu_id, cantidad_disponible")
+    .eq("fecha", hoy);
 
-    const mapa: Record<string, number> = {};
-    const idsConStock: string[] = [];
-
-    if (stockData) {
-      stockData.forEach((s) => {
-        mapa[s.menu_id] = s.cantidad_disponible;
-        idsConStock.push(s.menu_id);
-      });
-    }
+  const mapa: Record<string, number> = {};
+  if (stockData) {
+    stockData.forEach((s) => {
+      mapa[s.menu_id] = s.cantidad_disponible;
+    });
     setStockMap(mapa);
+  }
 
-    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
-if (confData && confData.precio_huevo_frito) {
-  setPrecioHuevo(Number(confData.precio_huevo_frito));
+  // 2. Cargar Menús Activos
+  const { data: menusData } = await supabase
+    .from("menus")
+    .select("*")
+    .eq("activo", true)
+    .order("created_at", { ascending: true });
+
+  if (menusData) {
+    // FILTRO CLAVE:
+    // - Si es plato FIJO: Se muestra siempre (mientras esté activo).
+    // - Si es plato DEL DÍA: Se muestra SOLO si tiene stock cargado hoy mayor a 0.
+    const menusVisibles = menusData.filter((m) => {
+      if (m.es_fijo) return true;
+      const stockHoy = mapa[m.id] ?? 0;
+      return stockHoy > 0;
+    });
+
+    setMenus(menusVisibles);
+  }
+
+  // 3. Cargar precio del huevo frito
+  const { data: confData } = await supabase
+    .from("configuracion")
+    .select("precio_huevo_frito")
+    .eq("id", "general")
+    .single();
+
+  if (confData && confData.precio_huevo_frito) {
+    setPrecioHuevo(Number(confData.precio_huevo_frito));
+  }
 }
     
     if (idsConStock.length > 0) {
