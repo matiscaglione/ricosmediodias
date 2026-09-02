@@ -97,9 +97,8 @@ export default function TomaPedidosPage() {
   }, []);
 
   async function cargarDatosDelDia() {
+  // 1. Cargar el stock del día
   const hoy = new Date().toISOString().split("T")[0];
-
-  // 1. Cargar el stock del día de Supabase
   const { data: stockData } = await supabase
     .from("stock_diario")
     .select("menu_id, cantidad_disponible")
@@ -113,7 +112,7 @@ export default function TomaPedidosPage() {
   }
   setStockMap(mapa);
 
-  // 2. Cargar Menús Activos y aplicar el filtro según si es FIJO o DEL DÍA
+  // 2. Cargar Menús Activos (Platos Fijos siempre, Del Día solo con stock)
   const { data: menusData } = await supabase
     .from("menus")
     .select("*")
@@ -122,18 +121,45 @@ export default function TomaPedidosPage() {
 
   if (menusData) {
     const menusVisibles = menusData.filter((m) => {
-      // Si es un plato fijo, se muestra siempre (mientras esté activo)
       if (m.es_fijo) return true;
-      
-      // Si es un plato del día, requiere stock cargado hoy mayor a 0
       const stockHoy = mapa[m.id] ?? 0;
       return stockHoy > 0;
     });
-
     setMenus(menusVisibles);
   }
 
-  // 3. Cargar el precio del huevo frito desde configuracion
+  // 3. Cargar Bebidas, Guarniciones, Ingredientes, Salsas y Zonas
+  const { data: bebidasData } = await supabase
+    .from("bebidas")
+    .select("*")
+    .eq("activa", true);
+  if (bebidasData) setBebidas(bebidasData);
+
+  const { data: guarnicionesData } = await supabase
+    .from("guarniciones")
+    .select("*")
+    .eq("activa", true);
+  if (guarnicionesData) setGuarniciones(guarnicionesData);
+
+  const { data: ingredientesData } = await supabase
+    .from("ingredientes_ensalada")
+    .select("*")
+    .eq("activo", true);
+  if (ingredientesData) setIngredientes(ingredientesData);
+
+  const { data: salsasData } = await supabase
+    .from("salsas")
+    .select("*")
+    .eq("activa", true);
+  if (salsasData) setSalsas(salsasData);
+
+  const { data: zonasData } = await supabase
+    .from("zonas_envio")
+    .select("*")
+    .eq("activa", true);
+  if (zonasData) setZonas(zonasData);
+
+  // 4. Cargar Precio del Huevo Frito
   const { data: confData } = await supabase
     .from("configuracion")
     .select("precio_huevo_frito")
