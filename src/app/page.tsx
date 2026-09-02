@@ -516,10 +516,157 @@ export default function TomaPedidosPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* SECCIÓN 1: MENÚS */}
+          {/* SECCIÓN 1: TIPO DE ENTREGA Y CLIENTE (AHORA PRIMERO) */}
+          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-4">
+            <h2 className="text-lg font-bold" style={styleTextoNegro}>
+              1. Tipo de Entrega y Cliente
+            </h2>
+
+            <div className="flex gap-2">
+              {(["RETIRO", "ENVIO", "BAR"] as const).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => setTipoEntrega(tipo)}
+                  className={`flex-1 py-2 rounded text-sm font-extrabold border-2 ${
+                    tipoEntrega === tipo
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white border-gray-300"
+                  }`}
+                  style={tipoEntrega !== tipo ? styleTextoNegro : {}}
+                >
+                  {tipo === "RETIRO"
+                    ? "🚶 Retiro"
+                    : tipo === "ENVIO"
+                      ? "🛵 Envío"
+                      : "🍽️ Bar"}
+                </button>
+              ))}
+            </div>
+
+            {tipoEntrega === "ENVIO" && (
+              <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-3">
+                <div>
+                  <label
+                    className="block text-xs font-bold mb-1"
+                    style={styleTextoNegro}
+                  >
+                    Dirección de Envío*
+                  </label>
+                  <input
+                    type="text"
+                    style={styleTextoNegro}
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    placeholder="Ej: Av. San Martín 1234"
+                    className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className="block text-xs font-bold mb-1"
+                    style={styleTextoNegro}
+                  >
+                    Zona de Envío
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {zonasEnvio.map((z) => (
+                      <button
+                        type="button"
+                        key={z.id}
+                        onClick={() => setZonaSeleccionada(z)}
+                        className={`px-3 py-1.5 rounded text-xs font-extrabold border-2 ${
+                          zonaSeleccionada?.id === z.id
+                            ? "bg-blue-700 text-white"
+                            : "bg-white"
+                        }`}
+                        style={
+                          zonaSeleccionada?.id !== z.id ? styleTextoNegro : {}
+                        }
+                      >
+                        {z.nombre_zona} (+{formatearMoneda(z.precio)})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label
+                  className="block text-xs font-bold mb-1"
+                  style={styleTextoNegro}
+                >
+                  Nombre Cliente (Opcional)
+                </label>
+                <input
+                  type="text"
+                  style={styleTextoNegro}
+                  value={clienteNombre}
+                  onChange={(e) => setClienteNombre(e.target.value)}
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-xs font-bold mb-1"
+                  style={styleTextoNegro}
+                >
+                  Teléfono
+                </label>
+                <input
+                  type="text"
+                  style={styleTextoNegro}
+                  value={clienteTelefono}
+                  onChange={(e) => setClienteTelefono(e.target.value)}
+                  placeholder="Ej: 341 123456"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-xs font-bold mb-1"
+                  style={styleTextoNegro}
+                >
+                  Horario Opcional
+                </label>
+                <input
+                  type="text"
+                  style={styleTextoNegro}
+                  value={horario}
+                  onChange={(e) => setHorario(e.target.value)}
+                  placeholder="Ej: 13:30 hs"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                className="block text-xs font-bold mb-1"
+                style={styleTextoNegro}
+              >
+                Observaciones
+              </label>
+              <input
+                type="text"
+                style={styleTextoNegro}
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Ej: Sin cebolla, paga con transferencia"
+                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+              />
+            </div>
+          </div>
+
+          {/* SECCIÓN 2: MENÚS DEL DÍA */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
             <h2 className="text-lg font-bold mb-4" style={styleTextoNegro}>
-              1. Seleccionar Menú del Día
+              2. Seleccionar Menú del Día
             </h2>
             {menus.length === 0 ? (
               <p className="text-red-600 text-sm font-bold">
@@ -734,10 +881,10 @@ export default function TomaPedidosPage() {
             )}
           </div>
 
-          {/* SECCIÓN SELECCIÓN DE BEBIDAS */}
+          {/* SECCIÓN 3: SELECCIÓN DE BEBIDAS */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              🥤 Agregar Bebida / Adicional
+              3. Agregar Bebida / Adicional
             </h2>
             <div className="flex gap-2">
               <select
@@ -764,153 +911,6 @@ export default function TomaPedidosPage() {
               >
                 + Agregar
               </button>
-            </div>
-          </div>
-
-          {/* SECCIÓN ENTREGA Y CLIENTE */}
-          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-4">
-            <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              2. Tipo de Entrega y Cliente
-            </h2>
-
-            <div className="flex gap-2">
-              {(["RETIRO", "ENVIO", "BAR"] as const).map((tipo) => (
-                <button
-                  key={tipo}
-                  onClick={() => setTipoEntrega(tipo)}
-                  className={`flex-1 py-2 rounded text-sm font-extrabold border-2 ${
-                    tipoEntrega === tipo
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white border-gray-300"
-                  }`}
-                  style={tipoEntrega !== tipo ? styleTextoNegro : {}}
-                >
-                  {tipo === "RETIRO"
-                    ? "🚶 Retiro"
-                    : tipo === "ENVIO"
-                      ? "🛵 Envío"
-                      : "🍽️ Bar"}
-                </button>
-              ))}
-            </div>
-
-            {tipoEntrega === "ENVIO" && (
-              <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-3">
-                <div>
-                  <label
-                    className="block text-xs font-bold mb-1"
-                    style={styleTextoNegro}
-                  >
-                    Dirección de Envío*
-                  </label>
-                  <input
-                    type="text"
-                    style={styleTextoNegro}
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
-                    placeholder="Ej: Av. San Martín 1234"
-                    className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className="block text-xs font-bold mb-1"
-                    style={styleTextoNegro}
-                  >
-                    Zona de Envío
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {zonasEnvio.map((z) => (
-                      <button
-                        type="button"
-                        key={z.id}
-                        onClick={() => setZonaSeleccionada(z)}
-                        className={`px-3 py-1.5 rounded text-xs font-extrabold border-2 ${
-                          zonaSeleccionada?.id === z.id
-                            ? "bg-blue-700 text-white"
-                            : "bg-white"
-                        }`}
-                        style={
-                          zonaSeleccionada?.id !== z.id ? styleTextoNegro : {}
-                        }
-                      >
-                        {z.nombre_zona} (+{formatearMoneda(z.precio)})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label
-                  className="block text-xs font-bold mb-1"
-                  style={styleTextoNegro}
-                >
-                  Nombre Cliente*
-                </label>
-                <input
-                  type="text"
-                  style={styleTextoNegro}
-                  value={clienteNombre}
-                  onChange={(e) => setClienteNombre(e.target.value)}
-                  placeholder="Ej: Juan Pérez"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-                />
-              </div>
-
-              <div>
-                <label
-                  className="block text-xs font-bold mb-1"
-                  style={styleTextoNegro}
-                >
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  style={styleTextoNegro}
-                  value={clienteTelefono}
-                  onChange={(e) => setClienteTelefono(e.target.value)}
-                  placeholder="Ej: 341 123456"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-                />
-              </div>
-
-              <div>
-                <label
-                  className="block text-xs font-bold mb-1"
-                  style={styleTextoNegro}
-                >
-                  Horario Opcional
-                </label>
-                <input
-                  type="text"
-                  style={styleTextoNegro}
-                  value={horario}
-                  onChange={(e) => setHorario(e.target.value)}
-                  placeholder="Ej: 13:30 hs"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                className="block text-xs font-bold mb-1"
-                style={styleTextoNegro}
-              >
-                Observaciones
-              </label>
-              <input
-                type="text"
-                style={styleTextoNegro}
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Ej: Sin cebolla, paga con transferencia"
-                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-              />
             </div>
           </div>
         </div>
