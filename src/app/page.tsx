@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+import { useSearchParams } from 'next/navigation';
 
 interface Menu {
   id: string;
@@ -92,9 +93,60 @@ export default function TomaPedidosPage() {
 
   const [precioHuevo, setPrecioHuevo] = useState<number>(500);
 
+  const searchParams = useSearchParams();
+const idEditarURL = searchParams.get('editar');
+const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
+const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
+
   useEffect(() => {
-    cargarDatosDelDia();
-  }, []);
+  async function inicializar() {
+    await cargarDatosDelDia();
+
+    if (idEditarURL) {
+      // Cargar los datos del pedido a modificar
+      const { data: pedidoData } = await supabase
+        .from("pedidos")
+        .select(`
+          *,
+          detalle_pedidos (
+            id,
+            menu_id,
+            guarnicion_id,
+            cantidad,
+            precio_unitario,
+            subtotal,
+            menus (*),
+            guarniciones (*)
+          )
+        `)
+        .eq("id", idEditarURL)
+        .single();
+
+      if (pedidoData) {
+        setPedidoEditandoId(pedidoData.id);
+        setClienteNombre(pedidoData.cliente_nombre || "");
+        setClienteTelefono(pedidoData.cliente_telefono || "");
+        setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
+        setHorario(pedidoData.horario_solicitado || "");
+        setObservaciones(pedidoData.observaciones || "");
+
+        // Mapear los ítems anteriores al carrito actual
+        const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any) => ({
+          menu: det.menus,
+          guarnicion: det.guarniciones || undefined,
+          cantidad: det.cantidad,
+          cantidadHuevos: 0,
+          subtotal: det.subtotal
+        }));
+
+        setItems(itemsCargados);
+        setItemsOriginalesEditar(itemsCargados); // Para revertir stock si cambia algo
+      }
+    }
+  }
+
+  inicializar();
+}, [idEditarURL]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
@@ -399,30 +451,79 @@ if (confData && confData.precio_huevo_frito) {
   }
 
   async function confirmarPedido() {
-    if (items.length === 0)
-      return alert("Agregá al menos un menú o bebida al pedido");
-    if (tipoEntrega === "ENVIO" && !direccion)
-      return alert("Ingresá la dirección para el envío");
+  if (items.length === 0)
+    return alert("Agregá al menos un menú o bebida al pedido");
+  if (tipoEntrega === "ENVIO" && !direccion)
+    return alert("Ingresá la dirección para el envío");
 
-    // Si no se ingresó nombre, asignamos uno por defecto según el tipo de entrega
-    const nombreFinal =
-      clienteNombre.trim() !== ""
-        ? clienteNombre
-        : tipoEntrega === "BAR"
-          ? "Cliente Bar"
-          : tipoEntrega === "RETIRO"
-            ? "Retira Mostrador"
-            : "Cliente Envío";
+  const nombreFinal =
+    clienteNombre.trim() !== ""
+      ? clienteNombre
+      : tipoEntrega === "BAR"
+        ? "Cliente Bar"
+        : tipoEntrega === "RETIRO"
+          ? "Retira Mostrador"
+          : "Cliente Envío";
 
-    const hoy = new Date().toISOString().split("T")[0];
+  const hoy = new Date().toISOString().split("T")[0];
 
-    const detalleHuevos = items
-      .filter((i) => i.cantidadHuevos > 0)
-      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
-      .join(", ");
+  const detalleHuevos = items
+    .filter((i) => i.cantidadHuevos > 0)
+    .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+    .join(", ");
 
-    const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
+  const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
 
+  let pedidoIdGuardado = pedidoEditandoId;
+
+  if (pedidoEditandoId) {
+    // --- MODO EDICIÓN ---
+
+    // 1. Revertir el stock de los platos anteriores para no perder unidades
+    for (const itemViejo of itemsOriginalesEditar) {
+      if (itemViejo.menu) {
+        const { data: stockActualData } = await supabase
+          .from("stock_diario")
+          .select("cantidad_disponible")
+          .eq("fecha", hoy)
+          .eq("menu_id", itemViejo.menu.id)
+          .single();
+
+        if (stockActualData) {
+          await supabase
+            .from("stock_diario")
+            .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
+            .eq("fecha", hoy)
+            .eq("menu_id", itemViejo.menu.id);
+        }
+      }
+    }
+
+    // 2. Borrar los detalles de pedido anteriores de Supabase (Limpia ranking y estadísticas)
+    await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
+
+    // 3. Actualizar la cabecera del pedido existente
+    const { error: errUpdate } = await supabase
+      .from("pedidos")
+      .update({
+        cliente_nombre: nombreFinal,
+        cliente_telefono: clienteTelefono,
+        tipo_entrega: tipoEntrega,
+        zona_envio_id: zonaSeleccionada?.id || null,
+        costo_envio: costoEnvio,
+        monto_platos: montoPlatos,
+        monto_total: montoTotal,
+        horario_solicitado: horario,
+        observaciones: obsFinal,
+      })
+      .eq("id", pedidoEditandoId);
+
+    if (errUpdate) {
+      alert("Error al actualizar el pedido: " + errUpdate.message);
+      return;
+    }
+  } else {
+    // --- MODO CREACIÓN NUEVA ---
     const { data: pedidoGuardado, error: errPedido } = await supabase
       .from("pedidos")
       .insert([
@@ -446,41 +547,54 @@ if (confData && confData.precio_huevo_frito) {
       alert("Error al guardar el pedido: " + errPedido?.message);
       return;
     }
-
-    for (const item of items) {
-      if (item.menu) {
-        await supabase.from("detalle_pedidos").insert([
-          {
-            pedido_id: pedidoGuardado.id,
-            menu_id: item.menu.id,
-            guarnicion_id: item.guarnicion?.id || null,
-            cantidad: item.cantidad,
-            precio_unitario: item.menu.precio,
-            subtotal: item.subtotal,
-          },
-        ]);
-
-        const stockActual = stockMap[item.menu.id] || 0;
-        const nuevoStock = Math.max(0, stockActual - item.cantidad);
-
-        await supabase
-          .from("stock_diario")
-          .update({ cantidad_disponible: nuevoStock })
-          .eq("fecha", hoy)
-          .eq("menu_id", item.menu.id);
-      }
-    }
-
-    imprimirTicket(pedidoGuardado.id);
-
-    setItems([]);
-    setClienteNombre("");
-    setClienteTelefono("");
-    setDireccion("");
-    setHorario("");
-    setObservaciones("");
-    cargarDatosDelDia();
+    pedidoIdGuardado = pedidoGuardado.id;
   }
+
+  // Insertar los nuevos detalles y descontar el nuevo stock
+  for (const item of items) {
+    if (item.menu) {
+      await supabase.from("detalle_pedidos").insert([
+        {
+          pedido_id: pedidoIdGuardado,
+          menu_id: item.menu.id,
+          guarnicion_id: item.guarnicion?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.menu.precio,
+          subtotal: item.subtotal,
+        },
+      ]);
+
+      const { data: stockActualData } = await supabase
+        .from("stock_diario")
+        .select("cantidad_disponible")
+        .eq("fecha", hoy)
+        .eq("menu_id", item.menu.id)
+        .single();
+
+      const stockActual = stockActualData?.cantidad_disponible || 0;
+      const nuevoStock = Math.max(0, stockActual - item.cantidad);
+
+      await supabase
+        .from("stock_diario")
+        .update({ cantidad_disponible: nuevoStock })
+        .eq("fecha", hoy)
+        .eq("menu_id", item.menu.id);
+    }
+  }
+
+  imprimirTicket(pedidoIdGuardado!);
+
+  // Limpiar estados y salir del modo edición
+  setItems([]);
+  setItemsOriginalesEditar([]);
+  setPedidoEditandoId(null);
+  setClienteNombre("");
+  setClienteTelefono("");
+  setDireccion("");
+  setHorario("");
+  setObservaciones("");
+  cargarDatosDelDia();
+}
 
   const styleTextoNegro = { color: "#000000" };
 
@@ -1030,13 +1144,28 @@ if (confData && confData.precio_huevo_frito) {
               >
                 🥤 Ticket Solo Bebida
               </button>
+              {pedidoEditandoId && (
+  <div className="bg-amber-100 border-2 border-amber-400 p-3 rounded-lg mb-4 flex justify-between items-center text-amber-900 font-bold text-xs">
+    <span>✏️ Modificando Pedido Existente</span>
+    <button
+      onClick={() => {
+        setPedidoEditandoId(null);
+        setItems([]);
+        setItemsOriginalesEditar([]);
+        window.history.replaceState({}, '', '/');
+      }}
+      className="bg-amber-800 text-white px-2 py-1 rounded text-xs hover:bg-amber-900"
+    >
+      Cancelar Edición
+    </button>
+  </div>
+)}
               <button
-                onClick={confirmarPedido}
-                disabled={items.length === 0}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-extrabold py-3 rounded-lg shadow transition-colors"
-              >
-                Confirmar Ticket Completo
-              </button>
+  onClick={confirmarPedido}
+  className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-4 rounded-lg shadow-md transition-colors text-base"
+>
+  {pedidoEditandoId ? "💾 Actualizar Pedido" : "Confirmar Pedido"}
+</button>
             </div>
           </div>
         </div>
