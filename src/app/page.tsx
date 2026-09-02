@@ -851,12 +851,12 @@ export default function TomaPedidosPage() {
                       onClick={() =>
                         setCantidadHuevos(Math.max(0, cantidadHuevos - 1))
                       }
-                      className="text-xs font-black px-1.5 py-0.5 rounded bg-white border"
+                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
                       -
                     </button>
                     <span
-                      className="text-xs font-black min-w-[16px] text-center"
+                      className="text-xs font-black text-gray-800 min-w-[16px] text-center"
                       style={styleTextoNegro}
                     >
                       {cantidadHuevos}
@@ -864,7 +864,7 @@ export default function TomaPedidosPage() {
                     <button
                       type="button"
                       onClick={() => setCantidadHuevos(cantidadHuevos + 1)}
-                      className="text-xs font-black px-1.5 py-0.5 rounded bg-white border"
+                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
                       +
                     </button>
