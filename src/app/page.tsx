@@ -1141,7 +1141,7 @@ function ContenidoTomaPedidos() {
       </button>
     </div>
   </div>
-)}
+)))}
               </div>
             )}
           </div>
