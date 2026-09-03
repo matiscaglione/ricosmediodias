@@ -244,6 +244,72 @@ export default function HistorialPedidosPage() {
   const totalRecaudado = pedidosFiltrados.reduce((acc, p) => acc + p.monto_total, 0);
   const styleTextoNegro = { color: '#000000' };
 
+  async function eliminarPedido(pedido: Pedido) {
+  const confirmar = window.confirm(
+    `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará del cierre de caja.`
+  );
+
+  if (!confirmar) return;
+
+  try {
+    setCargando(true);
+    const hoy = new Date().toISOString().split("T")[0];
+
+    // 1. Revertir el stock diario para cada plato del pedido
+    if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
+      for (const det of pedido.detalle_pedidos) {
+        // Verificamos si el ítem tiene un menu_id asociado
+        const menuId = (det as any).menu_id || (det.menus as any)?.id;
+
+        if (menuId) {
+          const { data: stockData } = await supabase
+            .from("stock_diario")
+            .select("cantidad_disponible")
+            .eq("fecha", hoy)
+            .eq("menu_id", menuId)
+            .single();
+
+          if (stockData) {
+            await supabase
+              .from("stock_diario")
+              .update({
+                cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
+              })
+              .eq("fecha", hoy)
+              .eq("menu_id", menuId);
+          }
+        }
+      }
+    }
+
+    // 2. Borrar las filas dependientes en detalle_pedidos
+    const { error: errDetalle } = await supabase
+      .from("detalle_pedidos")
+      .delete()
+      .eq("pedido_id", pedido.id);
+
+    if (errDetalle) throw errDetalle;
+
+    // 3. Borrar el pedido principal
+    const { error: errPedido } = await supabase
+      .from("pedidos")
+      .delete()
+      .eq("id", pedido.id);
+
+    if (errPedido) throw errPedido;
+
+    alert("Pedido eliminado correctamente y stock actualizado.");
+    
+    // 4. Recargar la lista de pedidos en pantalla
+    await cargarPedidosDelDia();
+  } catch (error: any) {
+    console.error("Error al eliminar el pedido:", error);
+    alert("Error al eliminar el pedido: " + (error.message || error));
+  } finally {
+    setCargando(false);
+  }
+}
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen">
       {/* ENCABEZADO */}
@@ -363,24 +429,33 @@ export default function HistorialPedidosPage() {
               </div>
 
               {/* PIE DE TARJETA Y REIMPRESIÓN */}
-              <div className="border-t border-gray-200 pt-3 flex justify-between items-center mt-2">
-                <div>
-                  <span className="text-xs font-bold text-gray-500 block">Total:</span>
-                  <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
-                </div>
-                <Link
-    href={`/?editar=${pedido.id}`}
-    className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
-  >
-    ✏️ Editar
-  </Link>
-                <button
-                  onClick={() => reimprimirTicket(pedido)}
-                  className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-3 rounded flex items-center gap-1.5 shadow transition-colors"
-                >
-                  🖨️ Reimprimir Ticket
-                </button>
-              </div>
+<div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
+  <div>
+    <span className="text-xs font-bold text-gray-500 block">Total:</span>
+    <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
+  </div>
+  <div className="flex items-center gap-1.5">
+    <button
+      onClick={() => eliminarPedido(pedido)}
+      className="bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+      title="Eliminar pedido y restaurar stock"
+    >
+      🗑️ Eliminar
+    </button>
+    <Link
+      href={`/?editar=${pedido.id}`}
+      className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+    >
+      ✏️ Editar
+    </Link>
+    <button
+      onClick={() => reimprimirTicket(pedido)}
+      className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-3 rounded flex items-center gap-1.5 shadow transition-colors"
+    >
+      🖨️ Reimprimir Ticket
+    </button>
+  </div>
+</div>
             </div>
           ))}
         </div>
