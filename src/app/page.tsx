@@ -103,6 +103,7 @@ function ContenidoTomaPedidos() {
       await cargarDatosDelDia();
 
       if (idEditarURL) {
+        // Cargar los datos del pedido a modificar
         const { data: pedidoData } = await supabase
           .from("pedidos")
           .select(`
@@ -127,15 +128,39 @@ function ContenidoTomaPedidos() {
           setClienteTelefono(pedidoData.cliente_telefono || "");
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
-          setObservaciones(pedidoData.observaciones || "");
 
-          const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any) => ({
-            menu: det.menus || undefined,
-            guarnicion: det.guarniciones || undefined,
-            cantidad: det.cantidad,
-            cantidadHuevos: 0,
-            subtotal: det.subtotal
-          }));
+          // 1. Limpiar el texto de observaciones para no arrastrar los parches de huevos viejos
+          let obsLimpia = (pedidoData.observaciones || "")
+            .split("|")
+            .map((s: string) => s.trim())
+            .filter((s: string) => !s.toLowerCase().includes("huevo frito"))
+            .join(" | ");
+
+          setObservaciones(obsLimpia);
+
+          // 2. Detectar si había huevos fritos guardados en el detalle para restaurar el contador
+          let totalHuevosPrevios = 0;
+          const itemsCargados: ItemPedido[] = [];
+
+          (pedidoData.detalle_pedidos || []).forEach((det: any) => {
+            // Si el renglón no tiene menú pero tiene precio de huevo frito, lo sumamos al contador
+            if (!det.menus && Number(det.precio_unitario) === precioHuevo) {
+              totalHuevosPrevios += det.cantidad;
+            } else if (det.menus) {
+              itemsCargados.push({
+                menu: det.menus,
+                guarnicion: det.guarniciones || undefined,
+                cantidad: det.cantidad,
+                cantidadHuevos: 0,
+                subtotal: det.subtotal,
+              });
+            }
+          });
+
+          // Si los ítems principales tenían asignados huevos fritos en su subtotal o en el primer plato
+          if (totalHuevosPrevios > 0 && itemsCargados.length > 0) {
+            itemsCargados[0].cantidadHuevos = totalHuevosPrevios;
+          }
 
           setItems(itemsCargados);
           setItemsOriginalesEditar(itemsCargados);
@@ -144,7 +169,7 @@ function ContenidoTomaPedidos() {
     }
 
     inicializar();
-  }, [idEditarURL]);
+  }, [idEditarURL, precioHuevo]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
