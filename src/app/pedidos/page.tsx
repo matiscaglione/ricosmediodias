@@ -38,8 +38,7 @@ export default function HistorialPedidosPage() {
   }, []);
 
   async function cargarPedidosDelDia() {
-    setCargando(true);
-    // ✅ AHORA (obtiene la fecha exacta en zona horaria de Argentina):
+  setCargando(true);
   const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
 
   const { data, error } = await supabase
@@ -47,25 +46,25 @@ export default function HistorialPedidosPage() {
     .select(`
       *,
       detalle_pedidos (
-      id,
-      cantidad,
-      precio_unitario,
-      subtotal,
-      menus ( nombre ),
-      guarniciones ( nombre )
+        id,
+        cantidad,
+        precio_unitario,
+        subtotal,
+        menus!left ( nombre ),
+        guarniciones!left ( nombre )
       )
     `)
     .gte('created_at', `${hoyArgentina}T03:00:00`)
     .lte('created_at', `${hoyArgentina}T23:59:59`)
     .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error al cargar pedidos:', error);
-    } else if (data) {
-      setPedidos(data as Pedido[]);
-    }
-    setCargando(false);
+  if (error) {
+    console.error('Error al cargar pedidos:', error);
+  } else if (data) {
+    setPedidos(data as Pedido[]);
   }
+  setCargando(false);
+}
 
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
 
@@ -133,17 +132,17 @@ export default function HistorialPedidosPage() {
     });
 
     const itemsHtml = (pedido.detalle_pedidos || [])
-      .map(
-        (i) => `
-        <div style="margin-bottom: 6px;">
-          <div style="font-size: 15px; font-weight: bold;">
-            ${i.cantidad}x ${i.menus?.nombre || 'Plato'}
-          </div>
-          ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
-          <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
-        </div>`
-      )
-      .join('');
+  .map(
+    (i) => `
+    <div style="margin-bottom: 6px;">
+      <div style="font-size: 15px; font-weight: bold;">
+        ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito Extra'}
+      </div>
+      ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
+      <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
+    </div>`
+  )
+  .join('');
 
     let cabeceraEntrega = '';
     if (pedido.tipo_entrega === 'ENVIO') {
