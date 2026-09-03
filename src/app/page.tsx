@@ -131,12 +131,14 @@ function ContenidoTomaPedidos() {
           const textoObs = pedidoData.observaciones || "";
 
           // 1. Extraer la dirección si era un Envío
-          const matchDireccion = textoObs.split("|").find((s) => s.toLowerCase().includes("dirección:"));
+          const matchDireccion = textoObs
+            .split("|")
+            .find((s) => s.toLowerCase().includes("dirección:"));
           if (matchDireccion) {
             setDireccion(matchDireccion.replace(/dirección:/i, "").trim());
           }
 
-          // 2. Extraer huevos fritos si existían
+          // 2. Extraer huevos fritos si existían en la nota
           let huevosEncontrados = 0;
           const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
           if (matchHuevos) {
@@ -147,7 +149,11 @@ function ContenidoTomaPedidos() {
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
-            .filter((s: string) => !s.toLowerCase().includes("huevo") && !s.toLowerCase().includes("dirección:"))
+            .filter(
+              (s: string) =>
+                !s.toLowerCase().includes("huevo") &&
+                !s.toLowerCase().includes("dirección:"),
+            )
             .join(" | ");
 
           setObservaciones(obsLimpia);
@@ -174,7 +180,7 @@ function ContenidoTomaPedidos() {
     }
 
     inicializar();
-  }, [idEditarURL]);
+  }, [idEditarURL, precioHuevo]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
@@ -289,7 +295,8 @@ function ContenidoTomaPedidos() {
         : 0;
 
     const costoHuevosTotal = cantidadHuevos * precioHuevo;
-    const subtotal = ((menuSeleccionado.precio + precioGuarnicion) * cantidad) + costoHuevosTotal;
+    const subtotal =
+      (menuSeleccionado.precio + precioGuarnicion) * cantidad + costoHuevosTotal;
 
     setItems([
       ...items,
@@ -499,16 +506,18 @@ function ContenidoTomaPedidos() {
 
     const hoy = new Date().toISOString().split("T")[0];
 
-    // Detalle de huevos fritos agregado automáticamente a observaciones
-   const detalleDireccion = tipoEntrega === "ENVIO" && direccion.trim() !== "" ? `Dirección: ${direccion.trim()}` : "";
-const detalleHuevos = items
-  .filter((i) => i.cantidadHuevos > 0)
-  .map((i) => `${i.cantidadHuevos} Huevo Frito`)
-  .join(", ");
+    const detalleDireccion =
+      tipoEntrega === "ENVIO" && direccion.trim() !== ""
+        ? `Dirección: ${direccion.trim()}`
+        : "";
+    const detalleHuevos = items
+      .filter((i) => i.cantidadHuevos > 0)
+      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+      .join(", ");
 
-const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
-  .filter(Boolean)
-  .join(" | ");
+    const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
+      .filter(Boolean)
+      .join(" | ");
 
     let pedidoIdGuardado = pedidoEditandoId;
 
@@ -526,14 +535,20 @@ const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
           if (stockActualData) {
             await supabase
               .from("stock_diario")
-              .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
+              .update({
+                cantidad_disponible:
+                  stockActualData.cantidad_disponible + itemViejo.cantidad,
+              })
               .eq("fecha", hoy)
               .eq("menu_id", itemViejo.menu.id);
           }
         }
       }
 
-      await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
+      await supabase
+        .from("detalle_pedidos")
+        .delete()
+        .eq("pedido_id", pedidoEditandoId);
 
       const { error: errUpdate } = await supabase
         .from("pedidos")
@@ -582,25 +597,25 @@ const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
       pedidoIdGuardado = pedidoGuardado.id;
     }
 
-    // Insertar los detalles asegurando que menu_id nunca sea null
     for (const item of items) {
       if (item.menu) {
-        const { error: errDetalle } = await supabase.from("detalle_pedidos").insert([
-          {
-            pedido_id: pedidoIdGuardado,
-            menu_id: item.menu.id,
-            guarnicion_id: item.guarnicion?.id || null,
-            cantidad: item.cantidad,
-            precio_unitario: item.menu.precio,
-            subtotal: item.subtotal,
-          },
-        ]);
+        const { error: errDetalle } = await supabase
+          .from("detalle_pedidos")
+          .insert([
+            {
+              pedido_id: pedidoIdGuardado,
+              menu_id: item.menu.id,
+              guarnicion_id: item.guarnicion?.id || null,
+              cantidad: item.cantidad,
+              precio_unitario: item.menu.precio,
+              subtotal: item.subtotal,
+            },
+          ]);
 
         if (errDetalle) {
           console.error("Error al guardar detalle:", errDetalle);
         }
 
-        // Actualizar stock
         const { data: stockActualData } = await supabase
           .from("stock_diario")
           .select("cantidad_disponible")
@@ -1123,50 +1138,62 @@ const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
                             </div>
                           )}
                           {item.cantidadHuevos > 0 && (
-  <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
-    <span>🍳 ({item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`})</span>
-    <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300">
-      <button
-        type="button"
-        onClick={() => {
-          setItems((prev) =>
-            prev.map((it, i) => {
-              if (i !== idx) return it;
-              const nuevaCant = Math.max(0, it.cantidadHuevos - 1);
-              return {
-                ...it,
-                cantidadHuevos: nuevaCant,
-                subtotal: Math.max(0, it.subtotal - precioHuevo),
-              };
-            })
-          );
-        }}
-        className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
-      >
-        -
-      </button>
-      <span>{item.cantidadHuevos}</span>
-      <button
-        type="button"
-        onClick={() => {
-          setItems((prev) =>
-            prev.map((it, i) => {
-              if (i !== idx) return it;
-              return {
-                ...it,
-                cantidadHuevos: it.cantidadHuevos + 1,
-                subtotal: it.subtotal + precioHuevo,
-              };
-            })
-          );
-        }}
-        className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
-      >
-        +
-      </button>
-    </div>
-  </div>
-)}
+                            <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
+                              <span>
+                                🍳 (
+                                {item.cantidadHuevos === 1
+                                  ? "1 Huevo Frito"
+                                  : `${item.cantidadHuevos} Huevos Fritos`}
+                                )
+                              </span>
+                              <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setItems((prev) =>
+                                      prev.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        const nuevaCant = Math.max(
+                                          0,
+                                          it.cantidadHuevos - 1,
+                                        );
+                                        return {
+                                          ...it,
+                                          cantidadHuevos: nuevaCant,
+                                          subtotal: Math.max(
+                                            0,
+                                            it.subtotal - precioHuevo,
+                                          ),
+                                        };
+                                      }),
+                                    );
+                                  }}
+                                  className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+                                >
+                                  -
+                                </button>
+                                <span>{item.cantidadHuevos}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setItems((prev) =>
+                                      prev.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        return {
+                                          ...it,
+                                          cantidadHuevos: it.cantidadHuevos + 1,
+                                          subtotal: it.subtotal + precioHuevo,
+                                        };
+                                      }),
+                                    );
+                                  }}
+                                  className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1216,17 +1243,17 @@ const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
             {pedidoEditandoId && (
               <div className="bg-amber-100 border-2 border-amber-400 p-3 rounded-lg mt-3 flex justify-between items-center text-amber-900 font-bold text-xs">
                 <span>✏️ Modificando Pedido Existente</span>
-                <button
+                <Link
+                  href="/"
                   onClick={() => {
                     setPedidoEditandoId(null);
                     setItems([]);
                     setItemsOriginalesEditar([]);
-                    window.history.replaceState({}, '', '/');
                   }}
-                  className="bg-amber-800 text-white px-2 py-1 rounded text-xs hover:bg-amber-900"
+                  className="bg-amber-800 text-white px-2 py-1 rounded text-xs hover:bg-amber-900 inline-block"
                 >
                   Cancelar Edición
-                </button>
+                </Link>
               </div>
             )}
 
@@ -1254,7 +1281,13 @@ const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
 
 export default function TomaPedidosPage() {
   return (
-    <Suspense fallback={<div className="text-center p-8 font-bold">Cargando toma de pedidos...</div>}>
+    <Suspense
+      fallback={
+        <div className="text-center p-8 font-bold">
+          Cargando toma de pedidos...
+        </div>
+      }
+    >
       <ContenidoTomaPedidos />
     </Suspense>
   );
