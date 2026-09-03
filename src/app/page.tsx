@@ -455,56 +455,75 @@ function ContenidoTomaPedidos() {
   }
 
   async function confirmarPedido() {
-    if (items.length === 0)
-      return alert("Agregá al menos un menú o bebida al pedido");
-    if (tipoEntrega === "ENVIO" && !direccion)
-      return alert("Ingresá la dirección para el envío");
+  if (items.length === 0)
+    return alert("Agregá al menos un menú o bebida al pedido");
+  if (tipoEntrega === "ENVIO" && !direccion)
+    return alert("Ingresá la dirección para el envío");
 
-    const nombreFinal =
-      clienteNombre.trim() !== ""
-        ? clienteNombre
-        : tipoEntrega === "BAR"
-          ? "Cliente Bar"
-          : tipoEntrega === "RETIRO"
-            ? "Retira Mostrador"
-            : "Cliente Envío";
+  const nombreFinal =
+    clienteNombre.trim() !== ""
+      ? clienteNombre
+      : tipoEntrega === "BAR"
+        ? "Cliente Bar"
+        : tipoEntrega === "RETIRO"
+          ? "Retira Mostrador"
+          : "Cliente Envío";
 
-    const hoy = new Date().toISOString().split("T")[0];
+  const hoy = new Date().toISOString().split("T")[0];
 
-    const detalleHuevos = items
-      .filter((i) => i.cantidadHuevos > 0)
-      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
-      .join(", ");
+  // Observaciones puras del cliente (sin parches de texto)
+  const obsFinal = observaciones.trim();
 
-    const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
+  let pedidoIdGuardado = pedidoEditandoId;
 
-    let pedidoIdGuardado = pedidoEditandoId;
+  if (pedidoEditandoId) {
+    // --- MODO EDICIÓN ---
+    for (const itemViejo of itemsOriginalesEditar) {
+      if (itemViejo.menu) {
+        const { data: stockActualData } = await supabase
+          .from("stock_diario")
+          .select("cantidad_disponible")
+          .eq("fecha", hoy)
+          .eq("menu_id", itemViejo.menu.id)
+          .single();
 
-    if (pedidoEditandoId) {
-      for (const itemViejo of itemsOriginalesEditar) {
-        if (itemViejo.menu) {
-          const { data: stockActualData } = await supabase
+        if (stockActualData) {
+          await supabase
             .from("stock_diario")
-            .select("cantidad_disponible")
+            .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
             .eq("fecha", hoy)
-            .eq("menu_id", itemViejo.menu.id)
-            .single();
-
-          if (stockActualData) {
-            await supabase
-              .from("stock_diario")
-              .update({ cantidad_disponible: stockActualData.cantidad_disponible + itemViejo.cantidad })
-              .eq("fecha", hoy)
-              .eq("menu_id", itemViejo.menu.id);
-          }
+            .eq("menu_id", itemViejo.menu.id);
         }
       }
+    }
 
-      await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
+    await supabase.from("detalle_pedidos").delete().eq("pedido_id", pedidoEditandoId);
 
-      const { error: errUpdate } = await supabase
-        .from("pedidos")
-        .update({
+    const { error: errUpdate } = await supabase
+      .from("pedidos")
+      .update({
+        cliente_nombre: nombreFinal,
+        cliente_telefono: clienteTelefono,
+        tipo_entrega: tipoEntrega,
+        zona_envio_id: zonaSeleccionada?.id || null,
+        costo_envio: costoEnvio,
+        monto_platos: montoPlatos,
+        monto_total: montoTotal,
+        horario_solicitado: horario,
+        observaciones: obsFinal,
+      })
+      .eq("id", pedidoEditandoId);
+
+    if (errUpdate) {
+      alert("Error al actualizar el pedido: " + errUpdate.message);
+      return;
+    }
+  } else {
+    // --- MODO CREACIÓN NUEVA ---
+    const { data: pedidoGuardado, error: errPedido } = await supabase
+      .from("pedidos")
+      .insert([
+        {
           cliente_nombre: nombreFinal,
           cliente_telefono: clienteTelefono,
           tipo_entrega: tipoEntrega,
@@ -514,83 +533,87 @@ function ContenidoTomaPedidos() {
           monto_total: montoTotal,
           horario_solicitado: horario,
           observaciones: obsFinal,
-        })
-        .eq("id", pedidoEditandoId);
+          estado: "PENDIENTE",
+        },
+      ])
+      .select()
+      .single();
 
-      if (errUpdate) {
-        alert("Error al actualizar el pedido: " + errUpdate.message);
-        return;
-      }
-    } else {
-      const { data: pedidoGuardado, error: errPedido } = await supabase
-        .from("pedidos")
-        .insert([
-          {
-            cliente_nombre: nombreFinal,
-            cliente_telefono: clienteTelefono,
-            tipo_entrega: tipoEntrega,
-            zona_envio_id: zonaSeleccionada?.id || null,
-            costo_envio: costoEnvio,
-            monto_platos: montoPlatos,
-            monto_total: montoTotal,
-            horario_solicitado: horario,
-            observaciones: obsFinal,
-            estado: "PENDIENTE",
-          },
-        ])
-        .select()
-        .single();
-
-      if (errPedido || !pedidoGuardado) {
-        alert("Error al guardar el pedido: " + errPedido?.message);
-        return;
-      }
-      pedidoIdGuardado = pedidoGuardado.id;
+    if (errPedido || !pedidoGuardado) {
+      alert("Error al guardar el pedido: " + errPedido?.message);
+      return;
     }
+    pedidoIdGuardado = pedidoGuardado.id;
+  }
 
-    for (const item of items) {
-      if (item.menu) {
+  // Guardar ítems principales y huevos fritos adicionales como detalle independiente
+  for (const item of items) {
+    if (item.menu) {
+      // 1. Plato principal
+      await supabase.from("detalle_pedidos").insert([
+        {
+          pedido_id: pedidoIdGuardado,
+          menu_id: item.menu.id,
+          guarnicion_id: item.guarnicion?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.menu.precio,
+          subtotal: item.subtotal - (item.cantidadHuevos * precioHuevo), // Subtotal sin el extra
+        },
+      ]);
+
+      // 2. Huevo Frito Extra (Renglón independiente en detalle_pedidos)
+      if (item.cantidadHuevos > 0) {
         await supabase.from("detalle_pedidos").insert([
           {
             pedido_id: pedidoIdGuardado,
-            menu_id: item.menu.id,
-            guarnicion_id: item.guarnicion?.id || null,
-            cantidad: item.cantidad,
-            precio_unitario: item.menu.precio,
-            subtotal: item.subtotal,
+            cantidad: item.cantidadHuevos,
+            precio_unitario: precioHuevo,
+            subtotal: item.cantidadHuevos * precioHuevo,
           },
         ]);
-
-        const { data: stockActualData } = await supabase
-          .from("stock_diario")
-          .select("cantidad_disponible")
-          .eq("fecha", hoy)
-          .eq("menu_id", item.menu.id)
-          .single();
-
-        const stockActual = stockActualData?.cantidad_disponible || 0;
-        const nuevoStock = Math.max(0, stockActual - item.cantidad);
-
-        await supabase
-          .from("stock_diario")
-          .update({ cantidad_disponible: nuevoStock })
-          .eq("fecha", hoy)
-          .eq("menu_id", item.menu.id);
       }
+
+      // Actualizar stock
+      const { data: stockActualData } = await supabase
+        .from("stock_diario")
+        .select("cantidad_disponible")
+        .eq("fecha", hoy)
+        .eq("menu_id", item.menu.id)
+        .single();
+
+      const stockActual = stockActualData?.cantidad_disponible || 0;
+      const nuevoStock = Math.max(0, stockActual - item.cantidad);
+
+      await supabase
+        .from("stock_diario")
+        .update({ cantidad_disponible: nuevoStock })
+        .eq("fecha", hoy)
+        .eq("menu_id", item.menu.id);
+    } else if (item.bebida) {
+      // Bebidas independientes
+      await supabase.from("detalle_pedidos").insert([
+        {
+          pedido_id: pedidoIdGuardado,
+          cantidad: item.cantidad,
+          precio_unitario: item.bebida.precio,
+          subtotal: item.subtotal,
+        },
+      ]);
     }
-
-    imprimirTicket(pedidoIdGuardado!);
-
-    setItems([]);
-    setItemsOriginalesEditar([]);
-    setPedidoEditandoId(null);
-    setClienteNombre("");
-    setClienteTelefono("");
-    setDireccion("");
-    setHorario("");
-    setObservaciones("");
-    cargarDatosDelDia();
   }
+
+  imprimirTicket(pedidoIdGuardado!);
+
+  setItems([]);
+  setItemsOriginalesEditar([]);
+  setPedidoEditandoId(null);
+  setClienteNombre("");
+  setClienteTelefono("");
+  setDireccion("");
+  setHorario("");
+  setObservaciones("");
+  cargarDatosDelDia();
+}
 
   const styleTextoNegro = { color: "#000000" };
 
