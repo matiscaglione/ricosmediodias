@@ -38,38 +38,38 @@ export default function HistorialPedidosPage() {
   }, []);
 
   async function cargarPedidosDelDia() {
-  setCargando(true);
-  
-  // Calculamos el inicio y fin del día actual en Argentina ajustado a UTC
-  const ahora = new Date();
-  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
-  const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+    setCargando(true);
+    
+    // Calculamos el inicio y fin del día actual en Argentina ajustado a UTC
+    const ahora = new Date();
+    const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+    const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
 
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select(`
-      *,
-      detalle_pedidos (
-        id,
-        cantidad,
-        precio_unitario,
-        subtotal,
-        menus!left ( nombre ),
-        guarniciones!left ( nombre )
-      )
-    `)
-    .gte('created_at', inicioDia.toISOString())
-    .lte('created_at', finDia.toISOString())
-    .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('pedidos')
+      .select(`
+        *,
+        detalle_pedidos (
+          id,
+          cantidad,
+          precio_unitario,
+          subtotal,
+          menus!left ( nombre ),
+          guarniciones!left ( nombre )
+        )
+      `)
+      .gte('created_at', inicioDia.toISOString())
+      .lte('created_at', finDia.toISOString())
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error al cargar pedidos:', error.message);
-    alert('Error al cargar los pedidos: ' + error.message);
-  } else if (data) {
-    setPedidos(data as Pedido[]);
+    if (error) {
+      console.error('Error al cargar pedidos:', error.message);
+      alert('Error al cargar los pedidos: ' + error.message);
+    } else if (data) {
+      setPedidos(data as Pedido[]);
+    }
+    setCargando(false);
   }
-  setCargando(false);
-}
 
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
 
@@ -80,19 +80,15 @@ export default function HistorialPedidosPage() {
       return;
     }
 
-    // Encabezados del archivo
     const encabezados = ['Hora', 'Cliente', 'Telefono', 'Tipo Entrega', 'Detalle Platos', 'Costo Envio', 'Monto Platos', 'Total', 'Observaciones'];
 
-    // Convertir cada pedido en una fila de texto
     const filas = pedidosFiltrados.map((p) => {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       
-      // Armar string con los ítems del pedido (ej: "2x Milanesa (+ Puré); 1x Tarta")
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => `${i.cantidad}x ${i.menus?.nombre || 'Plato'}${i.guarniciones?.nombre ? ` (+ ${i.guarniciones.nombre})` : ''}`)
         .join('; ');
 
-      // Limpiar comillas dobles para evitar fallos de formato en CSV
       const obsLimpia = (p.observaciones || '').replace(/"/g, '""');
       const clienteLimpio = (p.cliente_nombre || '').replace(/"/g, '""');
 
@@ -109,10 +105,8 @@ export default function HistorialPedidosPage() {
       ].join(',');
     });
 
-    // Agregar BOM para UTF-8 (permite que Excel abra acentos y carácteres especiales correctamente)
     const contenidoCSV = '\uFEFF' + [encabezados.join(','), ...filas].join('\n');
 
-    // Descargar el archivo
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -137,17 +131,17 @@ export default function HistorialPedidosPage() {
     });
 
     const itemsHtml = (pedido.detalle_pedidos || [])
-  .map(
-    (i) => `
-    <div style="margin-bottom: 6px;">
-      <div style="font-size: 15px; font-weight: bold;">
-        ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito / Adicional'}
-      </div>
-      ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
-      <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
-    </div>`
-  )
-  .join('');
+      .map(
+        (i) => `
+        <div style="margin-bottom: 6px;">
+          <div style="font-size: 15px; font-weight: bold;">
+            ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito / Adicional'}
+          </div>
+          ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
+          <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
+        </div>`
+      )
+      .join('');
 
     let cabeceraEntrega = '';
     if (pedido.tipo_entrega === 'ENVIO') {
@@ -245,70 +239,64 @@ export default function HistorialPedidosPage() {
   const styleTextoNegro = { color: '#000000' };
 
   async function eliminarPedido(pedido: Pedido) {
-  const confirmar = window.confirm(
-    `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará del cierre de caja.`
-  );
+    const confirmar = window.confirm(
+      `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará del cierre de caja.`
+    );
 
-  if (!confirmar) return;
+    if (!confirmar) return;
 
-  try {
-    setCargando(true);
-    const hoy = new Date().toISOString().split("T")[0];
+    try {
+      setCargando(true);
+      const hoy = new Date().toISOString().split("T")[0];
 
-    // 1. Revertir el stock diario para cada plato del pedido
-    if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
-      for (const det of pedido.detalle_pedidos) {
-        // Verificamos si el ítem tiene un menu_id asociado
-        const menuId = (det as any).menu_id || (det.menus as any)?.id;
+      if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
+        for (const det of pedido.detalle_pedidos) {
+          const menuId = (det as any).menu_id || (det.menus as any)?.id;
 
-        if (menuId) {
-          const { data: stockData } = await supabase
-            .from("stock_diario")
-            .select("cantidad_disponible")
-            .eq("fecha", hoy)
-            .eq("menu_id", menuId)
-            .single();
-
-          if (stockData) {
-            await supabase
+          if (menuId) {
+            const { data: stockData } = await supabase
               .from("stock_diario")
-              .update({
-                cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
-              })
+              .select("cantidad_disponible")
               .eq("fecha", hoy)
-              .eq("menu_id", menuId);
+              .eq("menu_id", menuId)
+              .single();
+
+            if (stockData) {
+              await supabase
+                .from("stock_diario")
+                .update({
+                  cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
+                })
+                .eq("fecha", hoy)
+                .eq("menu_id", menuId);
+            }
           }
         }
       }
+
+      const { error: errDetalle } = await supabase
+        .from("detalle_pedidos")
+        .delete()
+        .eq("pedido_id", pedido.id);
+
+      if (errDetalle) throw errDetalle;
+
+      const { error: errPedido } = await supabase
+        .from("pedidos")
+        .delete()
+        .eq("id", pedido.id);
+
+      if (errPedido) throw errPedido;
+
+      alert("Pedido eliminado correctamente y stock actualizado.");
+      await cargarPedidosDelDia();
+    } catch (error: any) {
+      console.error("Error al eliminar el pedido:", error);
+      alert("Error al eliminar el pedido: " + (error.message || error));
+    } finally {
+      setCargando(false);
     }
-
-    // 2. Borrar las filas dependientes en detalle_pedidos
-    const { error: errDetalle } = await supabase
-      .from("detalle_pedidos")
-      .delete()
-      .eq("pedido_id", pedido.id);
-
-    if (errDetalle) throw errDetalle;
-
-    // 3. Borrar el pedido principal
-    const { error: errPedido } = await supabase
-      .from("pedidos")
-      .delete()
-      .eq("id", pedido.id);
-
-    if (errPedido) throw errPedido;
-
-    alert("Pedido eliminado correctamente y stock actualizado.");
-    
-    // 4. Recargar la lista de pedidos en pantalla
-    await cargarPedidosDelDia();
-  } catch (error: any) {
-    console.error("Error al eliminar el pedido:", error);
-    alert("Error al eliminar el pedido: " + (error.message || error));
-  } finally {
-    setCargando(false);
   }
-}
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen">
@@ -371,93 +359,116 @@ export default function HistorialPedidosPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {pedidosFiltrados.map((pedido) => (
-            <div key={pedido.id} className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
-                  <div>
-                    <span className={`text-xs px-2.5 py-1 rounded font-black border ${
-                      pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
-                      pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
-                      'bg-green-100 text-green-900 border-green-300'
-                    }`}>
-                      {pedido.tipo_entrega === 'ENVIO' ? '🛵 ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRO' : '🍽️ BAR'}
-                    </span>
-                    <h2 className="text-lg font-black mt-2" style={styleTextoNegro}>
-                      {pedido.cliente_nombre}
-                    </h2>
-                    {pedido.cliente_telefono && (
-                      <p className="text-xs font-bold text-gray-700">📞 {pedido.cliente_telefono}</p>
-                    )}
+          {pedidosFiltrados.map((pedido) => {
+            // Extraer la dirección de las observaciones si existe
+            const direccionDetalle = pedido.observaciones && pedido.observaciones.includes('Dirección:')
+              ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
+              : null;
+
+            return (
+              <div key={pedido.id} className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
+                    <div>
+                      {/* ETIQUETA Y DIRECCIÓN (SI ES ENVÍO) */}
+                      <div className="mb-1">
+                        <span className={`text-xs px-2.5 py-1 rounded font-black border inline-block ${
+                          pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
+                          pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                          'bg-green-100 text-green-900 border-green-300'
+                        }`}>
+                          {pedido.tipo_entrega === 'ENVIO' ? '🛵 ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRO' : '🍽️ BAR'}
+                        </span>
+
+                        {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
+                          <p className="text-xs font-black text-purple-950 mt-1">
+                            📍 {direccionDetalle}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* TITULO ADAPTADO SEGÚN TIPO DE ENTREGA */}
+                      <h2 className="text-lg font-black mt-1" style={styleTextoNegro}>
+                        {pedido.tipo_entrega === 'BAR'
+                          ? `Bar${pedido.cliente_nombre && pedido.cliente_nombre !== 'Cliente Bar' ? ` - ${pedido.cliente_nombre}` : ''}`
+                          : pedido.tipo_entrega === 'RETIRO'
+                          ? `Retiro${pedido.cliente_nombre && pedido.cliente_nombre !== 'Retira Mostrador' ? ` - ${pedido.cliente_nombre}` : ''}`
+                          : pedido.cliente_nombre || 'Cliente Envío'}
+                      </h2>
+
+                      {pedido.cliente_telefono && (
+                        <p className="text-xs font-bold text-gray-700 mt-0.5">📞 {pedido.cliente_telefono}</p>
+                      )}
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-500 block">
+                        {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                      </span>
+                      {pedido.horario_solicitado && (
+                        <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-1">
+                          🕒 {pedido.horario_solicitado} hs
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-gray-500 block">
-                      {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
-                    </span>
-                    {pedido.horario_solicitado && (
-                      <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-1">
-                        🕒 {pedido.horario_solicitado} hs
-                      </span>
+                  {/* DETALLE DE ITEMS */}
+                  <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
+                    {pedido.detalle_pedidos?.map((item) => (
+                      <div key={item.id} className="flex justify-between text-sm">
+                        <span className="font-extrabold" style={styleTextoNegro}>
+                          {item.cantidad}x {item.menus?.nombre || '🍳 Huevo Frito / Adicional'}
+                          {item.guarniciones?.nombre && (
+                            <span className="text-xs font-bold text-gray-600 block pl-3">
+                              + {item.guarniciones.nombre}
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-extrabold" style={styleTextoNegro}>
+                          {formatearMoneda(item.subtotal)}
+                        </span>
+                      </div>
+                    ))}
+                    {pedido.observaciones && (
+                      <div className="text-xs font-bold text-gray-800 pt-2 border-t border-gray-200 mt-2">
+                        <strong>Obs:</strong> {pedido.observaciones}
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* DETALLE DE ITEMS */}
-<div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
-  {pedido.detalle_pedidos?.map((item) => (
-    <div key={item.id} className="flex justify-between text-sm">
-      <span className="font-extrabold" style={styleTextoNegro}>
-        {item.cantidad}x {item.menus?.nombre || '🍳 Huevo Frito / Adicional'}
-        {item.guarniciones?.nombre && (
-          <span className="text-xs font-bold text-gray-600 block pl-3">
-            + {item.guarniciones.nombre}
-          </span>
-        )}
-      </span>
-      <span className="font-extrabold" style={styleTextoNegro}>
-        {formatearMoneda(item.subtotal)}
-      </span>
-    </div>
-  ))}
-  {pedido.observaciones && (
-    <div className="text-xs font-bold text-gray-800 pt-2 border-t border-gray-200 mt-2">
-      <strong>Obs:</strong> {pedido.observaciones}
-    </div>
-  )}
-</div>
+                {/* PIE DE TARJETA Y REIMPRESIÓN */}
+                <div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
+                  <div>
+                    <span className="text-xs font-bold text-gray-500 block">Total:</span>
+                    <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => eliminarPedido(pedido)}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+                      title="Eliminar pedido y restaurar stock"
+                    >
+                      🗑️ Eliminar
+                    </button>
+                    <Link
+                      href={`/?editar=${pedido.id}`}
+                      className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
+                    >
+                      ✏️ Editar
+                    </Link>
+                    <button
+                      onClick={() => reimprimirTicket(pedido)}
+                      className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-3 rounded flex items-center gap-1.5 shadow transition-colors"
+                    >
+                      🖨️ Reimprimir Ticket
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              {/* PIE DE TARJETA Y REIMPRESIÓN */}
-<div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
-  <div>
-    <span className="text-xs font-bold text-gray-500 block">Total:</span>
-    <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
-  </div>
-  <div className="flex items-center gap-1.5">
-    <button
-      onClick={() => eliminarPedido(pedido)}
-      className="bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
-      title="Eliminar pedido y restaurar stock"
-    >
-      🗑️ Eliminar
-    </button>
-    <Link
-      href={`/?editar=${pedido.id}`}
-      className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"
-    >
-      ✏️ Editar
-    </Link>
-    <button
-      onClick={() => reimprimirTicket(pedido)}
-      className="bg-gray-900 hover:bg-black text-white text-xs font-extrabold py-2 px-3 rounded flex items-center gap-1.5 shadow transition-colors"
-    >
-      🖨️ Reimprimir Ticket
-    </button>
-  </div>
-</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
