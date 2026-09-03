@@ -39,8 +39,11 @@ export default function HistorialPedidosPage() {
 
   async function cargarPedidosDelDia() {
   setCargando(true);
-  // Obtiene la fecha exacta en Argentina
-  const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  
+  // Calculamos el inicio y fin del día actual en Argentina ajustado a UTC
+  const ahora = new Date();
+  const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
+  const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
 
   const { data, error } = await supabase
     .from('pedidos')
@@ -55,8 +58,8 @@ export default function HistorialPedidosPage() {
         guarniciones!left ( nombre )
       )
     `)
-    .gte('created_at', `${hoyArgentina}T00:00:00`)
-    .lte('created_at', `${hoyArgentina}T23:59:59`)
+    .gte('created_at', inicioDia.toISOString())
+    .lte('created_at', finDia.toISOString())
     .order('created_at', { ascending: false });
 
   if (error) {
