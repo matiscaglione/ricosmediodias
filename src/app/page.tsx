@@ -131,9 +131,9 @@ function ContenidoTomaPedidos() {
           const textoObs = pedidoData.observaciones || "";
 
           // 1. Extraer la dirección si era un Envío
-          const matchDireccion = textoObs
-            .split("|")
-            .find((s) => s.toLowerCase().includes("dirección:"));
+const matchDireccion = textoObs
+  .split("|")
+  .find((s: string) => s.toLowerCase().includes("dirección:"));
           if (matchDireccion) {
             setDireccion(matchDireccion.replace(/dirección:/i, "").trim());
           }
