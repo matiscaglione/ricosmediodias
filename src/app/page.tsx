@@ -128,24 +128,31 @@ function ContenidoTomaPedidos() {
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
 
-          // 1. Extraer cuántos huevos fritos figuraban en observaciones
           const textoObs = pedidoData.observaciones || "";
+
+          // 1. Extraer la dirección si era un Envío
+          const matchDireccion = textoObs.split("|").find((s) => s.toLowerCase().includes("dirección:"));
+          if (matchDireccion) {
+            setDireccion(matchDireccion.replace(/dirección:/i, "").trim());
+          }
+
+          // 2. Extraer huevos fritos si existían
           let huevosEncontrados = 0;
           const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
           if (matchHuevos) {
             huevosEncontrados = parseInt(matchHuevos[1], 10);
           }
 
-          // 2. Limpiar el texto de observaciones dejando solo lo que no sea de huevos fritos
+          // 3. Limpiar las observaciones (quitar texto de dirección y huevos para no duplicar)
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
-            .filter((s: string) => !s.toLowerCase().includes("huevo"))
+            .filter((s: string) => !s.toLowerCase().includes("huevo") && !s.toLowerCase().includes("dirección:"))
             .join(" | ");
 
           setObservaciones(obsLimpia);
 
-          // 3. Reconstruir los ítems asignando los huevos extraídos al primer plato
+          // 4. Reconstruir los ítems del carrito
           const detalles = pedidoData.detalle_pedidos || [];
           const itemsCargados: ItemPedido[] = detalles
             .filter((det: any) => det.menus || det.menu_id)
@@ -493,12 +500,15 @@ function ContenidoTomaPedidos() {
     const hoy = new Date().toISOString().split("T")[0];
 
     // Detalle de huevos fritos agregado automáticamente a observaciones
-    const detalleHuevos = items
-      .filter((i) => i.cantidadHuevos > 0)
-      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
-      .join(", ");
+   const detalleDireccion = tipoEntrega === "ENVIO" && direccion.trim() !== "" ? `Dirección: ${direccion.trim()}` : "";
+const detalleHuevos = items
+  .filter((i) => i.cantidadHuevos > 0)
+  .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+  .join(", ");
 
-    const obsFinal = [observaciones, detalleHuevos].filter(Boolean).join(" | ");
+const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
+  .filter(Boolean)
+  .join(" | ");
 
     let pedidoIdGuardado = pedidoEditandoId;
 
