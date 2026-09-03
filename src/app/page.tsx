@@ -103,7 +103,6 @@ function ContenidoTomaPedidos() {
       await cargarDatosDelDia();
 
       if (idEditarURL) {
-        // Cargar los datos del pedido a modificar
         const { data: pedidoData } = await supabase
           .from("pedidos")
           .select(`
@@ -129,16 +128,15 @@ function ContenidoTomaPedidos() {
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
 
-          // 1. Extraer la cantidad de huevos fritos del texto de observaciones
+          // 1. Extraer cuántos huevos fritos figuraban en observaciones
           const textoObs = pedidoData.observaciones || "";
-          let huevosDetectados = 0;
-          
+          let huevosEncontrados = 0;
           const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
           if (matchHuevos) {
-            huevosDetectados = parseInt(matchHuevos[1], 10);
+            huevosEncontrados = parseInt(matchHuevos[1], 10);
           }
 
-          // 2. Limpiar las observaciones dejando solo notas del cliente (sin el texto de huevos)
+          // 2. Limpiar el texto de observaciones dejando solo lo que no sea de huevos fritos
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
@@ -147,15 +145,20 @@ function ContenidoTomaPedidos() {
 
           setObservaciones(obsLimpia);
 
-          // 3. Reconstruir los ítems asignando la cantidad de huevos al primer plato
-          const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any, index: number) => ({
-            menu: det.menus || undefined,
-            guarnicion: det.guarniciones || undefined,
-            cantidad: det.cantidad,
-            // Si detectamos huevos en las observaciones, se los asignamos al primer plato para que los puedas editar/quitar
-            cantidadHuevos: index === 0 ? huevosDetectados : 0,
-            subtotal: det.subtotal
-          }));
+          // 3. Reconstruir los ítems asignando los huevos extraídos al primer plato
+          const detalles = pedidoData.detalle_pedidos || [];
+          const itemsCargados: ItemPedido[] = detalles
+            .filter((det: any) => det.menus || det.menu_id)
+            .map((det: any, index: number) => {
+              const cantH = index === 0 ? huevosEncontrados : 0;
+              return {
+                menu: det.menus || undefined,
+                guarnicion: det.guarniciones || undefined,
+                cantidad: det.cantidad,
+                cantidadHuevos: cantH,
+                subtotal: det.subtotal,
+              };
+            });
 
           setItems(itemsCargados);
           setItemsOriginalesEditar(itemsCargados);
@@ -1116,13 +1119,19 @@ function ContenidoTomaPedidos() {
       <button
         type="button"
         onClick={() => {
-          const nuevosItems = [...items];
-          const nuevaCant = Math.max(0, nuevosItems[idx].cantidadHuevos - 1);
-          nuevosItems[idx].cantidadHuevos = nuevaCant;
-          nuevosItems[idx].subtotal -= precioHuevo;
-          setItems(nuevosItems);
+          setItems((prev) =>
+            prev.map((it, i) => {
+              if (i !== idx) return it;
+              const nuevaCant = Math.max(0, it.cantidadHuevos - 1);
+              return {
+                ...it,
+                cantidadHuevos: nuevaCant,
+                subtotal: Math.max(0, it.subtotal - precioHuevo),
+              };
+            })
+          );
         }}
-        className="px-1 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+        className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
       >
         -
       </button>
@@ -1130,15 +1139,37 @@ function ContenidoTomaPedidos() {
       <button
         type="button"
         onClick={() => {
-          const nuevosItems = [...items];
-          nuevosItems[idx].cantidadHuevos += 1;
-          nuevosItems[idx].subtotal += precioHuevo;
-          setItems(nuevosItems);
+          setItems((prev) =>
+            prev.map((it, i) => {
+              if (i !== idx) return it;
+              return {
+                ...it,
+                cantidadHuevos: it.cantidadHuevos + 1,
+                subtotal: it.subtotal + precioHuevo,
+              };
+            })
+          );
         }}
-        className="px-1 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+        className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
       >
         +
       </button>
+    </div>
+  </div>
+)}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold" style={styleTextoNegro}>
+                        {formatearMoneda(item.subtotal)}
+                      </span>
+                      <button
+                        onClick={() => eliminarItem(idx)}
+                        className="text-red-600 font-extrabold text-xs p-1"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
                 ))}
