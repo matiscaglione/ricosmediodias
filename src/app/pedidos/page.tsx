@@ -39,6 +39,7 @@ export default function HistorialPedidosPage() {
 
   async function cargarPedidosDelDia() {
   setCargando(true);
+  // Obtiene la fecha exacta en Argentina
   const hoyArgentina = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
 
   const { data, error } = await supabase
@@ -54,12 +55,13 @@ export default function HistorialPedidosPage() {
         guarniciones!left ( nombre )
       )
     `)
-    .gte('created_at', `${hoyArgentina}T03:00:00`)
+    .gte('created_at', `${hoyArgentina}T00:00:00`)
     .lte('created_at', `${hoyArgentina}T23:59:59`)
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error al cargar pedidos:', error);
+    console.error('Error al cargar pedidos:', error.message);
+    alert('Error al cargar los pedidos: ' + error.message);
   } else if (data) {
     setPedidos(data as Pedido[]);
   }
@@ -136,7 +138,7 @@ export default function HistorialPedidosPage() {
     (i) => `
     <div style="margin-bottom: 6px;">
       <div style="font-size: 15px; font-weight: bold;">
-        ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito Extra'}
+        ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito / Adicional'}
       </div>
       ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
       <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
@@ -333,28 +335,28 @@ export default function HistorialPedidosPage() {
                 </div>
 
                 {/* DETALLE DE ITEMS */}
-                <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
-                  {pedido.detalle_pedidos?.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span className="font-extrabold" style={styleTextoNegro}>
-                        {item.cantidad}x {item.menus?.nombre || 'Plato'}
-                        {item.guarniciones?.nombre && (
-                          <span className="text-xs font-bold text-gray-600 block pl-3">
-                            + {item.guarniciones.nombre}
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-extrabold" style={styleTextoNegro}>
-                        {formatearMoneda(item.subtotal)}
-                      </span>
-                    </div>
-                  ))}
-                  {pedido.observaciones && (
-                    <div className="text-xs font-bold text-gray-800 pt-2 border-t border-gray-200 mt-2">
-                      <strong>Obs:</strong> {pedido.observaciones}
-                    </div>
-                  )}
-                </div>
+<div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
+  {pedido.detalle_pedidos?.map((item) => (
+    <div key={item.id} className="flex justify-between text-sm">
+      <span className="font-extrabold" style={styleTextoNegro}>
+        {item.cantidad}x {item.menus?.nombre || '🍳 Huevo Frito / Adicional'}
+        {item.guarniciones?.nombre && (
+          <span className="text-xs font-bold text-gray-600 block pl-3">
+            + {item.guarniciones.nombre}
+          </span>
+        )}
+      </span>
+      <span className="font-extrabold" style={styleTextoNegro}>
+        {formatearMoneda(item.subtotal)}
+      </span>
+    </div>
+  ))}
+  {pedido.observaciones && (
+    <div className="text-xs font-bold text-gray-800 pt-2 border-t border-gray-200 mt-2">
+      <strong>Obs:</strong> {pedido.observaciones}
+    </div>
+  )}
+</div>
               </div>
 
               {/* PIE DE TARJETA Y REIMPRESIÓN */}
