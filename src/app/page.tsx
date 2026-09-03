@@ -129,38 +129,33 @@ function ContenidoTomaPedidos() {
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
 
-          // 1. Limpiar el texto de observaciones para no arrastrar los parches de huevos viejos
-          let obsLimpia = (pedidoData.observaciones || "")
+          // 1. Extraer la cantidad de huevos fritos del texto de observaciones
+          const textoObs = pedidoData.observaciones || "";
+          let huevosDetectados = 0;
+          
+          const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
+          if (matchHuevos) {
+            huevosDetectados = parseInt(matchHuevos[1], 10);
+          }
+
+          // 2. Limpiar las observaciones dejando solo notas del cliente (sin el texto de huevos)
+          const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
-            .filter((s: string) => !s.toLowerCase().includes("huevo frito"))
+            .filter((s: string) => !s.toLowerCase().includes("huevo"))
             .join(" | ");
 
           setObservaciones(obsLimpia);
 
-          // 2. Detectar si había huevos fritos guardados en el detalle para restaurar el contador
-          let totalHuevosPrevios = 0;
-          const itemsCargados: ItemPedido[] = [];
-
-          (pedidoData.detalle_pedidos || []).forEach((det: any) => {
-            // Si el renglón no tiene menú pero tiene precio de huevo frito, lo sumamos al contador
-            if (!det.menus && Number(det.precio_unitario) === precioHuevo) {
-              totalHuevosPrevios += det.cantidad;
-            } else if (det.menus) {
-              itemsCargados.push({
-                menu: det.menus,
-                guarnicion: det.guarniciones || undefined,
-                cantidad: det.cantidad,
-                cantidadHuevos: 0,
-                subtotal: det.subtotal,
-              });
-            }
-          });
-
-          // Si los ítems principales tenían asignados huevos fritos en su subtotal o en el primer plato
-          if (totalHuevosPrevios > 0 && itemsCargados.length > 0) {
-            itemsCargados[0].cantidadHuevos = totalHuevosPrevios;
-          }
+          // 3. Reconstruir los ítems asignando la cantidad de huevos al primer plato
+          const itemsCargados = (pedidoData.detalle_pedidos || []).map((det: any, index: number) => ({
+            menu: det.menus || undefined,
+            guarnicion: det.guarniciones || undefined,
+            cantidad: det.cantidad,
+            // Si detectamos huevos en las observaciones, se los asignamos al primer plato para que los puedas editar/quitar
+            cantidadHuevos: index === 0 ? huevosDetectados : 0,
+            subtotal: det.subtotal
+          }));
 
           setItems(itemsCargados);
           setItemsOriginalesEditar(itemsCargados);
@@ -169,7 +164,7 @@ function ContenidoTomaPedidos() {
     }
 
     inicializar();
-  }, [idEditarURL, precioHuevo]);
+  }, [idEditarURL]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
@@ -1115,26 +1110,38 @@ function ContenidoTomaPedidos() {
                             </div>
                           )}
                           {item.cantidadHuevos > 0 && (
-                            <div className="text-xs font-black text-amber-800">
-                              🍳 {item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`} (+{formatearMoneda(item.cantidadHuevos * precioHuevo)})
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold" style={styleTextoNegro}>
-                        {formatearMoneda(item.subtotal)}
-                      </span>
-                      <button
-                        onClick={() => eliminarItem(idx)}
-                        className="text-red-600 font-extrabold text-xs p-1"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
+  <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
+    <span>🍳 ({item.cantidadHuevos === 1 ? '1 Huevo Frito' : `${item.cantidadHuevos} Huevos Fritos`})</span>
+    <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300">
+      <button
+        type="button"
+        onClick={() => {
+          const nuevosItems = [...items];
+          const nuevaCant = Math.max(0, nuevosItems[idx].cantidadHuevos - 1);
+          nuevosItems[idx].cantidadHuevos = nuevaCant;
+          nuevosItems[idx].subtotal -= precioHuevo;
+          setItems(nuevosItems);
+        }}
+        className="px-1 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+      >
+        -
+      </button>
+      <span>{item.cantidadHuevos}</span>
+      <button
+        type="button"
+        onClick={() => {
+          const nuevosItems = [...items];
+          nuevosItems[idx].cantidadHuevos += 1;
+          nuevosItems[idx].subtotal += precioHuevo;
+          setItems(nuevosItems);
+        }}
+        className="px-1 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
+      >
+        +
+      </button>
+    </div>
+  </div>
+)}
               </div>
             )}
           </div>
