@@ -839,51 +839,73 @@ const matchDireccion = textoObs
           </div>
 
           {/* SECCIÓN 2: MENÚS DEL DÍA */}
-          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
-            <h2 className="text-lg font-bold mb-4" style={styleTextoNegro}>
-              2. Seleccionar Menú del Día
-            </h2>
-            {menus.length === 0 ? (
-              <p className="text-red-600 text-sm font-bold">
-                No hay menús con stock cargado para hoy.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                {menus.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setMenuSeleccionado(m);
-                      setGuarnicionSeleccionada(null);
-                      setSalsaSeleccionada(null);
-                      setIngredientesElegidos([]);
-                      setCantidadHuevos(0);
-                    }}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      menuSeleccionado?.id === m.id
-                        ? "border-blue-600 bg-blue-100 font-extrabold shadow-sm"
-                        : "border-gray-300 hover:border-gray-400 bg-white"
-                    }`}
-                  >
-                    <div
-                      className="font-extrabold text-base"
-                      style={styleTextoNegro}
-                    >
-                      {m.nombre}
-                    </div>
-                    <div
-                      className="text-sm font-bold mt-1"
-                      style={styleTextoNegro}
-                    >
-                      {formatearMoneda(m.precio)}
-                    </div>
-                    <div className="text-xs text-blue-700 font-bold mt-1">
-                      Stock: {stockMap[m.id] ?? 0} disp.
-                    </div>
-                  </button>
-                ))}
+<div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
+  <div className="flex justify-between items-center mb-4">
+    <h2 className="text-lg font-bold" style={styleTextoNegro}>
+      2. Seleccionar Menú del Día
+    </h2>
+    {menuSeleccionado && (
+      <button
+        type="button"
+        onClick={() => setMenuSeleccionado(null)}
+        className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold px-2.5 py-1 rounded"
+      >
+        ▼ Ver todos los menús
+      </button>
+    )}
+  </div>
+
+  {menus.length === 0 ? (
+    <p className="text-red-600 text-sm font-bold">
+      No hay menús con stock cargado para hoy.
+    </p>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {menus
+        // Si hay un menú seleccionado, mostramos solo ese; si no, mostramos todos
+        .filter((m) => !menuSeleccionado || menuSeleccionado.id === m.id)
+        .map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => {
+              // Si ya está seleccionado, al tocarlo de nuevo se deselecciona (expande la lista)
+              if (menuSeleccionado?.id === m.id) {
+                setMenuSeleccionado(null);
+              } else {
+                setMenuSeleccionado(m);
+                setGuarnicionSeleccionada(null);
+                setSalsaSeleccionada(null);
+                setIngredientesElegidos([]);
+                setCantidadHuevos(0);
+              }
+            }}
+            className={`p-3 rounded-lg border text-left transition-all ${
+              menuSeleccionado?.id === m.id
+                ? "border-blue-600 bg-blue-100 font-extrabold shadow-md ring-2 ring-blue-400"
+                : "border-gray-300 hover:border-gray-400 bg-white"
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div className="font-extrabold text-base" style={styleTextoNegro}>
+                {m.nombre}
               </div>
-            )}
+              {menuSeleccionado?.id === m.id && (
+                <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
+                  Seleccionado (tocá para cambiar)
+                </span>
+              )}
+            </div>
+            <div className="text-sm font-bold mt-1" style={styleTextoNegro}>
+              {formatearMoneda(m.precio)}
+            </div>
+            <div className="text-xs text-blue-700 font-bold mt-1">
+              Stock: {stockMap[m.id] ?? 0} disp.
+            </div>
+          </button>
+        ))}
+    </div>
+  )}
 
             {menuSeleccionado && (
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 space-y-3">
@@ -985,35 +1007,35 @@ const matchDireccion = textoObs
                   </div>
                 </div>
 
-                {guarnicionSeleccionada?.requiere_ingredientes && (
-                  <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2">
-                    <label className="block text-xs font-black text-emerald-900">
-                      🥗 Ingredientes para Ensalada:
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {ingredientes.map((ing) => {
-                        const seleccionada = ingredientesElegidos.includes(
-                          ing.nombre,
-                        );
-                        return (
-                          <button
-                            type="button"
-                            key={ing.id}
-                            onClick={() => toggleIngrediente(ing.nombre)}
-                            className={`px-3 py-1 rounded text-xs font-bold border ${
-                              seleccionada
-                                ? "bg-emerald-700 text-white"
-                                : "bg-white text-gray-800"
-                            }`}
-                          >
-                            {seleccionada ? "✓ " : "+ "}
-                            {ing.nombre}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {/* MOSTRAR INGREDIENTES SI LA GUARNICIÓN LO REQUIERE O SI EL MENÚ PRINCIPAL ES UNA ENSALADA */}
+{(guarnicionSeleccionada?.requiere_ingredientes ||
+  (menuSeleccionado && menuSeleccionado.nombre.toLowerCase().includes("ensalada"))) && (
+  <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2">
+    <label className="block text-xs font-black text-emerald-900">
+      🥗 Ingredientes para la Ensalada:
+    </label>
+    <div className="flex flex-wrap gap-2">
+      {ingredientes.map((ing) => {
+        const seleccionada = ingredientesElegidos.includes(ing.nombre);
+        return (
+          <button
+            type="button"
+            key={ing.id}
+            onClick={() => toggleIngrediente(ing.nombre)}
+            className={`px-3 py-1 rounded text-xs font-bold border ${
+              seleccionada
+                ? "bg-emerald-700 text-white"
+                : "bg-white text-gray-800"
+            }`}
+          >
+            {seleccionada ? "✓ " : "+ "}
+            {ing.nombre}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+)}
 
                 {/* SELECTOR COMPACTO DE HUEVOS FRITOS */}
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200">
