@@ -298,6 +298,10 @@ const matchDireccion = textoObs
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion) * cantidad + costoHuevosTotal;
 
+    // Verificar si debe incluir ingredientes (por guarnición o porque el plato es ensalada)
+    const esEnsaladaPrincipal = menuSeleccionado.nombre.toLowerCase().includes("ensalada");
+    const llevaIngredientes = guarnicionSeleccionada?.requiere_ingredientes || esEnsaladaPrincipal;
+
     setItems([
       ...items,
       {
@@ -310,7 +314,7 @@ const matchDireccion = textoObs
           menuSeleccionado.requiere_salsa && salsaSeleccionada
             ? salsaSeleccionada
             : undefined,
-        ingredientesEnsalada: guarnicionSeleccionada?.requiere_ingredientes
+        ingredientesEnsalada: llevaIngredientes && ingredientesElegidos.length > 0
           ? ingredientesElegidos
           : undefined,
         cantidadHuevos,
@@ -326,7 +330,7 @@ const matchDireccion = textoObs
     setCantidadHuevos(0);
     setCantidad(1);
   }
-
+  
   function agregarBebidaAlPedido() {
     if (!bebidaSeleccionada) return;
 
@@ -419,24 +423,24 @@ const matchDireccion = textoObs
         }
 
         return `
-        <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
-          <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
-            ${i.cantidad}x ${i.menu?.nombre}
-          </div>
-          ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
-          ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
-          ${
-            i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
-              ? `<div style="font-size: 15px; font-weight: 900; margin-left: 16px; margin-top: 2px;">(${i.ingredientesEnsalada.join(", ")})</div>`
-              : ""
-          }
-          ${
-            i.cantidadHuevos > 0
-              ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
-              : ""
-          }
-          <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
-        </div>`;
+<div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
+  <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
+    ${i.cantidad}x ${i.menu?.nombre}
+  </div>
+  ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
+  ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
+  ${
+    i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
+      ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientesEnsalada.join(", ")})</div>`
+      : ""
+  }
+  ${
+    i.cantidadHuevos > 0
+      ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
+      : ""
+  }
+  <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+</div>`;
       })
       .join("");
 
@@ -1137,28 +1141,25 @@ const matchDireccion = textoObs
                         </div>
                       ) : (
                         <>
-                          <div
-                            className="font-extrabold"
-                            style={styleTextoNegro}
-                          >
-                            {item.cantidad}x {item.menu?.nombre}
-                          </div>
-                          {item.salsa && (
-                            <div className="text-xs font-black text-red-800">
-                              🍝 {item.salsa.nombre}
-                            </div>
-                          )}
-                          {item.guarnicion && (
-                            <div className="text-xs font-bold text-gray-700">
-                              + {item.guarnicion.nombre}
-                              {item.ingredientesEnsalada &&
-                                item.ingredientesEnsalada.length > 0 && (
-                                  <span className="block text-xs font-normal text-emerald-800">
-                                    ({item.ingredientesEnsalada.join(", ")})
-                                  </span>
-                                )}
-                            </div>
-                          )}
+                          <div className="font-extrabold" style={styleTextoNegro}>
+  {item.cantidad}x {item.menu?.nombre}
+</div>
+{item.salsa && (
+  <div className="text-xs font-black text-red-800">
+    🍝 {item.salsa.nombre}
+  </div>
+)}
+{item.guarnicion && (
+  <div className="text-xs font-bold text-gray-700">
+    + {item.guarnicion.nombre}
+  </div>
+)}
+{/* MOSTRAR INGREDIENTES SIEMPRE QUE EXISTAN EN EL ITEM */}
+{item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
+  <span className="block text-xs font-bold text-emerald-800">
+    🥗 ({item.ingredientesEnsalada.join(", ")})
+  </span>
+)}
                           {item.cantidadHuevos > 0 && (
                             <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
                               <span>
