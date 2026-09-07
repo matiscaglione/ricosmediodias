@@ -42,25 +42,25 @@ export default function CadetesPage() {
   const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
   const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
 
-  useEffect(() => {
-    // Cargar nombres guardados
-    const c1Guardado = localStorage.getItem('nombreCadete1');
-    const c2Guardado = localStorage.getItem('nombreCadete2');
-    if (c1Guardado) setNombreCadete1(c1Guardado);
-    if (c2Guardado) setNombreCadete2(c2Guardado);
+  // En el useEffect de src/app/cadetes/page.tsx:
+useEffect(() => {
+  const c1Guardado = localStorage.getItem('nombreCadete1');
+  const c2Guardado = localStorage.getItem('nombreCadete2');
+  if (c1Guardado) setNombreCadete1(c1Guardado);
+  if (c2Guardado) setNombreCadete2(c2Guardado);
 
-    // Cargar historial de vueltas rendidas del día/turno
-    const claveV1 = `vueltasCadete1_${hoyArg}_${filtroTurno}`;
-    const claveV2 = `vueltasCadete2_${hoyArg}_${filtroTurno}`;
-    const v1Guardadas = localStorage.getItem(claveV1);
-    const v2Guardadas = localStorage.getItem(claveV2);
+  // Clave única por día para que no se pierdan las vueltas al cambiar el filtro visual superior
+  const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
+  const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
+  setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
+  setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
 
-    setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
-    setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
+  cargarEnvios();
+}, [hoyArg, filtroTurno]);
 
-    cargarEnvios();
-  }, [hoyArg, filtroTurno]);
-
+// Y al guardar/reabrir las vueltas:
+localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
+localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
   function guardarNombre1(nuevoNombre: string) {
     setNombreCadete1(nuevoNombre);
     localStorage.setItem('nombreCadete1', nuevoNombre);

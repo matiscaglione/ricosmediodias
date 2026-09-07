@@ -45,9 +45,9 @@ export default function EstadisticasPage() {
         turno,
         detalle_pedidos (
           cantidad,
-          menus ( nombre, es_fijo ),
-          guarniciones ( nombre ),
-          bebidas ( nombre )
+          menus!left ( nombre, es_fijo ),
+          guarniciones!left ( nombre ),
+          bebidas!left ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)

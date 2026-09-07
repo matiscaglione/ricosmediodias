@@ -48,9 +48,9 @@ export default function ReportesPage() {
         *,
         detalle_pedidos (
           cantidad,
-          menus ( nombre ),
-          guarniciones ( nombre ),
-          bebidas ( nombre )
+          menus!left ( nombre ),
+          guarniciones!left ( nombre ),
+          bebidas!left ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)
@@ -84,7 +84,7 @@ export default function ReportesPage() {
     return acc + cantPlatos;
   }, 0);
 
-  // CONTEO EXCLUSIVO DE BEBIDAS
+  // CONTEO EXCLUSIVO DE BEBIDAS (independiente si vienen con menú o sueltas)
   const totalBebidasCant = pedidos.reduce((acc, p) => {
     const cantBebidas = (p.detalle_pedidos || []).reduce((subAcc, d) => {
       return d.bebidas ? subAcc + d.cantidad : subAcc;
@@ -96,7 +96,7 @@ export default function ReportesPage() {
   const totalRetirosCant = pedidos.filter((p) => p.tipo_entrega === 'RETIRO').length;
   const totalBarCant = pedidos.filter((p) => p.tipo_entrega === 'BAR').length;
 
-  // Conteo de platos principales, guarniciones y bebidas
+  // Conteo detallado de platos principales, guarniciones y bebidas
   const resumenPlatos: Record<string, number> = {};
   const resumenGuarniciones: Record<string, number> = {};
   const resumenBebidas: Record<string, number> = {};
