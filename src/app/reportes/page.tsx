@@ -15,9 +15,14 @@ interface Pedido {
   turno?: 'MAÑANA' | 'NOCHE';
   detalle_pedidos?: {
     cantidad: number;
-    menus?: { nombre: string };
-    guarniciones?: { nombre: string };
-    bebidas?: { nombre: string };
+    precio_unitario: number;
+    subtotal: number;
+    menu_id?: string | null;
+    bebida_id?: string | null;
+    guarnicion_id?: string | null;
+    menus?: { nombre: string } | null;
+    guarniciones?: { nombre: string } | null;
+    bebidas?: { nombre: string } | null;
   }[];
 }
 
@@ -36,18 +41,21 @@ export default function ReportesPage() {
   async function cargarReporte() {
     setCargando(true);
 
-    // 1. Calcular la fecha del día siguiente para cerrar el rango exacto de Argentina en UTC
     const fFin = new Date(`${fechaFin}T00:00:00`);
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
-    // 2. Consulta a Supabase
     let query = supabase
       .from('pedidos')
       .select(`
         *,
         detalle_pedidos (
           cantidad,
+          precio_unitario,
+          subtotal,
+          menu_id,
+          bebida_id,
+          guarnicion_id,
           menus!left ( nombre ),
           guarniciones!left ( nombre ),
           bebidas!left ( nombre )
@@ -76,27 +84,45 @@ export default function ReportesPage() {
   const totalPlatosMonto = pedidos.reduce((acc, p) => acc + p.monto_platos, 0);
   const totalEnviosMonto = pedidos.reduce((acc, p) => acc + p.costo_envio, 0);
 
-  // CONTEO EXCLUSIVO DE PLATOS / MENÚS PRINCIPALES
+  // 1. CONTEO Y MONTO DE PLATOS PRINCIPALES
   const totalPlatosCant = pedidos.reduce((acc, p) => {
-    const cantPlatos = (p.detalle_pedidos || []).reduce((subAcc, d) => {
-      return d.menus ? subAcc + d.cantidad : subAcc;
+    const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+      return d.menu_id ? subAcc + d.cantidad : subAcc;
     }, 0);
-    return acc + cantPlatos;
+    return acc + cant;
   }, 0);
 
-  // CONTEO EXCLUSIVO DE BEBIDAS (independiente si vienen con menú o sueltas)
+  // 2. CONTEO Y MONTO EXCLUSIVO DE BEBIDAS
+  let totalBebidasMonto = 0;
   const totalBebidasCant = pedidos.reduce((acc, p) => {
-    const cantBebidas = (p.detalle_pedidos || []).reduce((subAcc, d) => {
-      return d.bebidas ? subAcc + d.cantidad : subAcc;
+    const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+      if (d.bebida_id || d.bebidas) {
+        totalBebidasMonto += d.subtotal || (d.precio_unitario * d.cantidad);
+        return subAcc + d.cantidad;
+      }
+      return subAcc;
     }, 0);
-    return acc + cantBebidas;
+    return acc + cant;
+  }, 0);
+
+  // 3. CONTEO Y MONTO EXCLUSIVO DE EXTRAS SUELTOS (Guarniciones sin plato)
+  let totalExtrasMonto = 0;
+  const totalExtrasCant = pedidos.reduce((acc, p) => {
+    const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+      if (!d.menu_id && d.guarnicion_id) {
+        totalExtrasMonto += d.subtotal || (d.precio_unitario * d.cantidad);
+        return subAcc + d.cantidad;
+      }
+      return subAcc;
+    }, 0);
+    return acc + cant;
   }, 0);
 
   const totalEnviosCant = pedidos.filter((p) => p.tipo_entrega === 'ENVIO').length;
   const totalRetirosCant = pedidos.filter((p) => p.tipo_entrega === 'RETIRO').length;
   const totalBarCant = pedidos.filter((p) => p.tipo_entrega === 'BAR').length;
 
-  // Conteo detallado de platos principales, guarniciones y bebidas
+  // Desglose detallado de platos, guarniciones y bebidas
   const resumenPlatos: Record<string, number> = {};
   const resumenGuarniciones: Record<string, number> = {};
   const resumenBebidas: Record<string, number> = {};
@@ -254,17 +280,18 @@ export default function ReportesPage() {
           <span className="text-xs text-blue-800 block mt-1 font-bold">Platos principales</span>
         </div>
 
-        {/* CANTIDAD TOTAL DE BEBIDAS */}
+        {/* BEBIDAS SEPARADAS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50">
-          <span className="text-xs font-black text-cyan-900 block uppercase">Total Bebidas / Extras</span>
+          <span className="text-xs font-black text-cyan-900 block uppercase">🥤 Total Bebidas</span>
           <span className="text-2xl font-black text-cyan-950">{totalBebidasCant} u.</span>
-          <span className="text-xs text-cyan-800 block mt-1 font-bold">Bebidas vendidas</span>
+          <span className="text-xs text-cyan-800 block mt-1 font-bold">{formatearMoneda(totalBebidasMonto)}</span>
         </div>
 
-        {/* VENTAS MONTO PLATOS */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
-          <span className="text-xs font-bold text-gray-600 block">Ventas de Platos ($)</span>
-          <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalPlatosMonto)}</span>
+        {/* EXTRAS SEPARADOS */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50">
+          <span className="text-xs font-black text-purple-900 block uppercase">🍳 Total Extras</span>
+          <span className="text-2xl font-black text-purple-950">{totalExtrasCant} u.</span>
+          <span className="text-xs text-purple-800 block mt-1 font-bold">{formatearMoneda(totalExtrasMonto)}</span>
         </div>
 
         {/* MONTO ENVÍOS */}
@@ -273,7 +300,7 @@ export default function ReportesPage() {
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalEnviosMonto)}</span>
         </div>
 
-        {/* DESGLOSE CANTIDAD ENTREGAS */}
+        {/* DESGLOSE ENTREGAS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Desglose Entregas</span>
           <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>
@@ -308,10 +335,10 @@ export default function ReportesPage() {
           )}
         </div>
 
-        {/* GUARNICIONES VENDIDAS */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
-          <h2 className="text-base font-black mb-3" style={styleTextoNegro}>
-            🥗 Guarniciones Vendidas
+        {/* GUARNICIONES / EXTRAS */}
+        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50/30">
+          <h2 className="text-base font-black mb-3 text-purple-950">
+            🥗 Guarniciones y Extras
           </h2>
 
           {Object.keys(resumenGuarniciones).length === 0 ? (
@@ -319,8 +346,8 @@ export default function ReportesPage() {
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {Object.entries(resumenGuarniciones).map(([guarni, cantidad]) => (
-                <div key={guarni} className="p-2 bg-gray-50 rounded border border-gray-300 flex justify-between items-center text-xs">
-                  <span className="font-bold" style={styleTextoNegro}>{guarni}</span>
+                <div key={guarni} className="p-2 bg-white rounded border border-purple-200 flex justify-between items-center text-xs">
+                  <span className="font-bold text-purple-950">{guarni}</span>
                   <span className="bg-purple-600 text-white font-black px-2 py-0.5 rounded-full">
                     {cantidad} u.
                   </span>

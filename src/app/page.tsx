@@ -78,7 +78,6 @@ function ContenidoTomaPedidos() {
   const [horario, setHorario] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
-  // Selección
   const [menuSeleccionado, setMenuSeleccionado] = useState<Menu | null>(null);
   const [bebidaSeleccionada, setBebidaSeleccionada] = useState<Bebida | null>(
     null,
@@ -102,7 +101,6 @@ function ContenidoTomaPedidos() {
   const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
   const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
 
-  // Determinar turno actual automáticamente
   function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
     const horaActual = new Date().getHours();
     return (horaActual >= 6 && horaActual < 16) ? 'MAÑANA' : 'NOCHE';
@@ -705,6 +703,8 @@ function ContenidoTomaPedidos() {
           {
             pedido_id: pedidoIdGuardado,
             bebida_id: item.bebida.id,
+            menu_id: null,
+            guarnicion_id: null,
             cantidad: item.cantidad,
             precio_unitario: item.bebida.precio,
             subtotal: item.subtotal,
@@ -715,9 +715,14 @@ function ContenidoTomaPedidos() {
           {
             pedido_id: pedidoIdGuardado,
             guarnicion_id: item.guarnicion.id,
+            menu_id: null,
+            bebida_id: null,
             cantidad: item.cantidad,
             precio_unitario: precioGuarnicionExtra,
             subtotal: item.subtotal,
+            ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
+              ? item.ingredientesEnsalada.join(", ") 
+              : null,
           },
         ]);
       }
@@ -1101,7 +1106,6 @@ function ContenidoTomaPedidos() {
                   </div>
                 </div>
 
-                {/* INGREDIENTES PARA GUARNICIÓN O ENSALADA COMO PLATO */}
                 {(guarnicionSeleccionada?.requiere_ingredientes ||
                   (menuSeleccionado && menuSeleccionado.nombre.toLowerCase().includes("ensalada"))) && (
                   <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-3">
@@ -1129,7 +1133,6 @@ function ContenidoTomaPedidos() {
                       })}
                     </div>
 
-                    {/* CONTROL DE HUEVOS DUROS EXTRA */}
                     <div className="flex items-center justify-between pt-2 border-t border-emerald-200">
                       <span className="text-xs font-bold text-emerald-950">
                         🥚 Huevos duros extra (+{formatearMoneda(precioHuevo)} c/u):
@@ -1157,7 +1160,6 @@ function ContenidoTomaPedidos() {
                   </div>
                 )}
 
-                {/* SELECTOR COMPACTO DE HUEVOS FRITOS */}
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200">
                   <span className="text-xs font-bold text-gray-800">
                     🍳 Huevos fritos extra:
@@ -1230,7 +1232,6 @@ function ContenidoTomaPedidos() {
               </button>
             </div>
 
-            {/* Selector de ingredientes si la guarnición extra elegida es Ensalada */}
             {guarnicionExtraElegida?.requiere_ingredientes && (
               <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2 mt-2">
                 <label className="block text-xs font-black text-emerald-900">
@@ -1261,7 +1262,7 @@ function ContenidoTomaPedidos() {
           {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              4. Agregar Bebida / Adicional
+              4. Agregar Bebida
             </h2>
             <div className="flex gap-2">
               <select
@@ -1402,7 +1403,6 @@ function ContenidoTomaPedidos() {
               <span>{formatearMoneda(montoTotal)}</span>
             </div>
 
-            {/* AVISO DE EDICIÓN */}
             {pedidoEditandoId && (
               <div className="bg-amber-100 border-2 border-amber-400 p-3 rounded-lg mt-3 flex justify-between items-center text-amber-900 font-bold text-xs">
                 <span>✏️ Modificando Pedido Existente</span>
