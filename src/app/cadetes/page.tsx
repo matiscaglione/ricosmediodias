@@ -42,25 +42,20 @@ export default function CadetesPage() {
   const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
   const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
 
-  // En el useEffect de src/app/cadetes/page.tsx:
-useEffect(() => {
-  const c1Guardado = localStorage.getItem('nombreCadete1');
-  const c2Guardado = localStorage.getItem('nombreCadete2');
-  if (c1Guardado) setNombreCadete1(c1Guardado);
-  if (c2Guardado) setNombreCadete2(c2Guardado);
+  useEffect(() => {
+    const c1Guardado = localStorage.getItem('nombreCadete1');
+    const c2Guardado = localStorage.getItem('nombreCadete2');
+    if (c1Guardado) setNombreCadete1(c1Guardado);
+    if (c2Guardado) setNombreCadete2(c2Guardado);
 
-  // Clave única por día para que no se pierdan las vueltas al cambiar el filtro visual superior
-  const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
-  const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
-  setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
-  setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
+    const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
+    const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
+    setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
+    setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
 
-  cargarEnvios();
-}, [hoyArg, filtroTurno]);
+    cargarEnvios();
+  }, [hoyArg, filtroTurno]);
 
-// Y al guardar/reabrir las vueltas:
-localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
-localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
   function guardarNombre1(nuevoNombre: string) {
     setNombreCadete1(nuevoNombre);
     localStorage.setItem('nombreCadete1', nuevoNombre);
@@ -112,7 +107,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     }
   }
 
-  // Extraer dirección desde el texto de observaciones
   function obtenerDireccion(obs: string) {
     if (!obs) return 'Sin dirección especificada';
     const match = obs.split('|').find((s) => s.toLowerCase().includes('dirección:'));
@@ -122,8 +116,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     return obs;
   }
 
-  // Rendir la vuelta actual de un cadete
-  // Rendir la vuelta actual de un cadete
   async function rendirVueltaCadete(numeroCadete: 1 | 2) {
     const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
     const enviosActuales = pedidos.filter(
@@ -153,7 +145,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
 
     if (!confirmar) return;
 
-    // Actualizar pedidos en Supabase
     const idsRendidos = enviosActuales.map((p) => p.id);
     const { error } = await supabase
       .from('pedidos')
@@ -176,7 +167,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
       hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Declaración correcta de nuevoHistorial antes de guardarlo
     const nuevoHistorial = [...historialPrevio, nuevaVuelta];
 
     if (numeroCadete === 1) {
@@ -192,11 +182,9 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     );
   }
 
-  // Reabrir / Editar una vuelta rendida para corregirla
   async function reabrirVuelta(numeroCadete: 1 | 2, numeroVuelta: number) {
     const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
     
-    // Verificar si ya hay pedidos en viaje
     const hayEnViaje = pedidos.some(
       (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.estado_cadete === 'EN_VIAJE'
     );
@@ -209,14 +197,12 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     const confirmar = confirm(`¿Querés reabrir la Vuelta #${numeroVuelta} de ${nombreCadete} para modificar sus pedidos o agregar más?`);
     if (!confirmar) return;
 
-    // Buscar los pedidos asociados a esa vuelta
     const pedidosDeVuelta = pedidos.filter(
       (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.numero_vuelta === numeroVuelta
     );
 
     const idsReabrir = pedidosDeVuelta.map((p) => p.id);
 
-    // Cambiar estado en Supabase a 'EN_VIAJE'
     if (idsReabrir.length > 0) {
       const { error } = await supabase
         .from('pedidos')
@@ -229,16 +215,15 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
       }
     }
 
-    // Remover la vuelta del historial
     const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
     const nuevoHistorial = historialPrevio.filter((v) => v.numeroVuelta !== numeroVuelta);
 
     if (numeroCadete === 1) {
       setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
     } else {
       setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
     }
 
     setPedidos((prev) =>
@@ -246,7 +231,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     );
   }
 
-  // Filtros de pedidos
   const enviosSinAsignar = pedidos.filter((p) => !p.cadete);
   const enviosCadete1 = pedidos.filter(
     (p) => (p.cadete === nombreCadete1 || p.cadete === 'Cadete 1') && p.estado_cadete === 'EN_VIAJE'
@@ -255,14 +239,12 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
     (p) => (p.cadete === nombreCadete2 || p.cadete === 'Cadete 2') && p.estado_cadete === 'EN_VIAJE'
   );
 
-  // Totales de la vuelta actual (En Viaje)
   const totalEnviosVuelta1 = enviosCadete1.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
   const totalRendirVuelta1 = enviosCadete1.reduce((acc, p) => acc + p.monto_total, 0);
 
   const totalEnviosVuelta2 = enviosCadete2.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
   const totalRendirVuelta2 = enviosCadete2.reduce((acc, p) => acc + p.monto_total, 0);
 
-  // Totales acumulados del turno (Cierre total)
   const acumuladoEnvios1 = vueltasCadete1.reduce((acc, v) => acc + v.costoEnviosTotal, 0);
   const acumuladoRendido1 = vueltasCadete1.reduce((acc, v) => acc + v.montoTotalRendido, 0);
 
@@ -285,7 +267,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
         </Link>
       </header>
 
-      {/* FILTRO DE TURNO */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 flex justify-between items-center">
         <span className="text-xs font-bold" style={styleTextoNegro}>Filtrar Turno:</span>
         <div className="flex gap-1">
@@ -305,7 +286,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
         </div>
       </div>
 
-      {/* ENVIOS PENDIENTES */}
       <div className="bg-white p-5 rounded-lg border-2 border-red-400 shadow-sm space-y-3">
         <div className="flex justify-between items-center border-b border-gray-300 pb-2">
           <h2 className="text-lg font-black text-red-700">
@@ -366,7 +346,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
         )}
       </div>
 
-      {/* CADETES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* CADETE 1 */}
         <div className="bg-white p-5 rounded-lg border-2 border-blue-300 shadow-sm space-y-4">
@@ -401,7 +380,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
             </button>
           </div>
 
-          {/* VUELTA ACTUAL (EN VIAJE) */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
@@ -449,10 +427,9 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
             )}
           </div>
 
-          {/* RESUMEN DE VUELTAS RENDIDAS DEL DÍA */}
           <div className="pt-3 border-t border-gray-300 space-y-2">
             <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-              📋 Vueltas Rendidas en el Turno ({vueltasCadete1.length})
+              📋 Vueltas Rendidas en el Día ({vueltasCadete1.length})
             </h3>
             {vueltasCadete1.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
@@ -475,7 +452,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
               </div>
             )}
 
-            {/* TOTAL CIERRE DEL DÍA */}
             <div className="bg-blue-100 p-3 rounded-lg border border-blue-300 space-y-1 mt-2">
               <div className="text-xs font-black text-blue-950 uppercase">
                 📊 Cierre Acumulado ({nombreCadete1})
@@ -529,7 +505,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
             </button>
           </div>
 
-          {/* VUELTA ACTUAL (EN VIAJE) */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
@@ -577,10 +552,9 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
             )}
           </div>
 
-          {/* RESUMEN DE VUELTAS RENDIDAS DEL DÍA */}
           <div className="pt-3 border-t border-gray-300 space-y-2">
             <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-              📋 Vueltas Rendidas en el Turno ({vueltasCadete2.length})
+              📋 Vueltas Rendidas en el Día ({vueltasCadete2.length})
             </h3>
             {vueltasCadete2.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
@@ -603,7 +577,6 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
               </div>
             )}
 
-            {/* TOTAL CIERRE DEL DÍA */}
             <div className="bg-purple-100 p-3 rounded-lg border border-purple-300 space-y-1 mt-2">
               <div className="text-xs font-black text-purple-950 uppercase">
                 📊 Cierre Acumulado ({nombreCadete2})
