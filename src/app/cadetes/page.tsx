@@ -13,8 +13,8 @@ interface PedidoEnvio {
   costo_envio: number;
   observaciones: string;
   cadete: string | null;
-  estado_cadete?: 'EN_VIAJE' | 'RENDIDO';
-  numero_vuelta?: number;
+  estado_cadete?: 'EN_VIAJE' | 'RENDIDO' | null;
+  numero_vuelta?: number | null;
 }
 
 interface VueltaRendida {
@@ -86,12 +86,16 @@ export default function CadetesPage() {
   async function asignarCadete(idPedido: string, nombreCadete: string | null) {
     const { error } = await supabase
       .from('pedidos')
-      .update({ cadete: nombreCadete })
+      .update({ 
+        cadete: nombreCadete,
+        estado_cadete: nombreCadete ? 'EN_VIAJE' : null,
+        numero_vuelta: null
+      })
       .eq('id', idPedido);
 
     if (!error) {
       setPedidos((prev) =>
-        prev.map((p) => (p.id === idPedido ? { ...p, cadete: nombreCadete, estado_cadete: 'EN_VIAJE' } : p))
+        prev.map((p) => (p.id === idPedido ? { ...p, cadete: nombreCadete, estado_cadete: nombreCadete ? 'EN_VIAJE' : null, numero_vuelta: null } : p))
       );
     } else {
       alert('Error al asignar cadete: ' + error.message);
@@ -109,7 +113,7 @@ export default function CadetesPage() {
   }
 
   // Rendir la vuelta actual de un cadete
-  function rendirVueltaCadete(numeroCadete: 1 | 2) {
+  async function rendirVueltaCadete(numeroCadete: 1 | 2) {
     const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
     const enviosActuales = pedidos.filter(
       (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.estado_cadete !== 'RENDIDO'
@@ -124,8 +128,11 @@ export default function CadetesPage() {
     const totalEnvios = enviosActuales.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
     const cajaNeto = totalCobrado - totalEnvios;
 
+    const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
+    const numeroNuevaVuelta = historialPrevio.length + 1;
+
     const confirmar = confirm(
-      `Rendición de Vuelta - ${nombreCadete}:\n\n` +
+      `Rendición de Vuelta #${numeroNuevaVuelta} - ${nombreCadete}:\n\n` +
       `📦 Pedidos: ${enviosActuales.length}\n` +
       `💵 Total Cobrado: $${totalCobrado.toLocaleString('es-AR')}\n` +
       `🛵 Pagar a Cadete (Envíos): $${totalEnvios.toLocaleString('es-AR')}\n` +
@@ -135,9 +142,23 @@ export default function CadetesPage() {
 
     if (!confirmar) return;
 
-    const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
+    // Actualizar pedidos en Supabase
+    const idsRendidos = enviosActuales.map((p) => p.id);
+    const { error } = await supabase
+      .from('pedidos')
+      .update({
+        estado_cadete: 'RENDIDO',
+        numero_vuelta: numeroNuevaVuelta
+      })
+      .in('id', idsRendidos);
+
+    if (error) {
+      alert('Error al guardar la rendición en la base de datos: ' + error.message);
+      return;
+    }
+
     const nuevaVuelta: VueltaRendida = {
-      numeroVuelta: historialPrevio.length + 1,
+      numeroVuelta: numeroNuevaVuelta,
       montoTotalRendido: totalCobrado,
       costoEnviosTotal: totalEnvios,
       cantidadPedidos: enviosActuales.length,
@@ -154,19 +175,72 @@ export default function CadetesPage() {
       localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
     }
 
-    const idsRendidos = enviosActuales.map((p) => p.id);
     setPedidos((prev) =>
-      prev.map((p) => (idsRendidos.includes(p.id) ? { ...p, estado_cadete: 'RENDIDO' } : p))
+      prev.map((p) => (idsRendidos.includes(p.id) ? { ...p, estado_cadete: 'RENDIDO', numero_vuelta: numeroNuevaVuelta } : p))
     );
   }
 
-  // Filtros de pedidos en viaje
+  // Reabrir / Editar una vuelta rendida para corregirla
+  async function reabrirVuelta(numeroCadete: 1 | 2, numeroVuelta: number) {
+    const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
+    
+    // Verificar si ya hay pedidos en viaje
+    const hayEnViaje = pedidos.some(
+      (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.estado_cadete === 'EN_VIAJE'
+    );
+
+    if (hayEnViaje) {
+      alert('Para corregir una vuelta anterior, primero debés rendir o liberar los pedidos que están actualmente "En Viaje".');
+      return;
+    }
+
+    const confirmar = confirm(`¿Querés reabrir la Vuelta #${numeroVuelta} de ${nombreCadete} para modificar sus pedidos o agregar más?`);
+    if (!confirmar) return;
+
+    // Buscar los pedidos asociados a esa vuelta
+    const pedidosDeVuelta = pedidos.filter(
+      (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.numero_vuelta === numeroVuelta
+    );
+
+    const idsReabrir = pedidosDeVuelta.map((p) => p.id);
+
+    // Cambiar estado en Supabase a 'EN_VIAJE'
+    if (idsReabrir.length > 0) {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ estado_cadete: 'EN_VIAJE', numero_vuelta: null })
+        .in('id', idsReabrir);
+
+      if (error) {
+        alert('Error al reabrir la vuelta: ' + error.message);
+        return;
+      }
+    }
+
+    // Remover la vuelta del historial
+    const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
+    const nuevoHistorial = historialPrevio.filter((v) => v.numeroVuelta !== numeroVuelta);
+
+    if (numeroCadete === 1) {
+      setVueltasCadete1(nuevoHistorial);
+      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
+    } else {
+      setVueltasCadete2(nuevoHistorial);
+      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
+    }
+
+    setPedidos((prev) =>
+      prev.map((p) => (idsReabrir.includes(p.id) ? { ...p, estado_cadete: 'EN_VIAJE', numero_vuelta: null } : p))
+    );
+  }
+
+  // Filtros de pedidos
   const enviosSinAsignar = pedidos.filter((p) => !p.cadete);
   const enviosCadete1 = pedidos.filter(
-    (p) => (p.cadete === nombreCadete1 || p.cadete === 'Cadete 1') && p.estado_cadete !== 'RENDIDO'
+    (p) => (p.cadete === nombreCadete1 || p.cadete === 'Cadete 1') && p.estado_cadete === 'EN_VIAJE'
   );
   const enviosCadete2 = pedidos.filter(
-    (p) => (p.cadete === nombreCadete2 || p.cadete === 'Cadete 2') && p.estado_cadete !== 'RENDIDO'
+    (p) => (p.cadete === nombreCadete2 || p.cadete === 'Cadete 2') && p.estado_cadete === 'EN_VIAJE'
   );
 
   // Totales de la vuelta actual (En Viaje)
@@ -348,11 +422,19 @@ export default function CadetesPage() {
             {vueltasCadete1.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
             ) : (
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {vueltasCadete1.map((v, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
-                    <span>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
-                    <span className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {vueltasCadete1.map((v) => (
+                  <div key={v.numeroVuelta} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
+                    <div>
+                      <div>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</div>
+                      <div className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</div>
+                    </div>
+                    <button
+                      onClick={() => reabrirVuelta(1, v.numeroVuelta)}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] px-2 py-1 rounded shadow"
+                    >
+                      🔓 Corregir
+                    </button>
                   </div>
                 ))}
               </div>
@@ -468,11 +550,19 @@ export default function CadetesPage() {
             {vueltasCadete2.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
             ) : (
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {vueltasCadete2.map((v, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
-                    <span>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
-                    <span className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {vueltasCadete2.map((v) => (
+                  <div key={v.numeroVuelta} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
+                    <div>
+                      <div>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</div>
+                      <div className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</div>
+                    </div>
+                    <button
+                      onClick={() => reabrirVuelta(2, v.numeroVuelta)}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] px-2 py-1 rounded shadow"
+                    >
+                      🔓 Corregir
+                    </button>
                   </div>
                 ))}
               </div>
