@@ -48,20 +48,20 @@ export default function HistorialPedidosPage() {
     const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
 
     const { data, error } = await supabase
-  .from('pedidos')
-  .select(`
-    *,
-    detalle_pedidos (
-      id,
-      cantidad,
-      precio_unitario,
-      subtotal,
-      ingredientes_ensalada,
-      menus!left ( nombre ),
-      guarniciones!left ( nombre ),
-      bebidas!left ( nombre )
-    )
-  `)
+      .from('pedidos')
+      .select(`
+        *,
+        detalle_pedidos (
+          id,
+          cantidad,
+          precio_unitario,
+          subtotal,
+          ingredientes_ensalada,
+          menus!left ( nombre ),
+          guarniciones!left ( nombre ),
+          bebidas!left ( nombre )
+        )
+      `)
       .gte('created_at', inicioDia.toISOString())
       .lte('created_at', finDia.toISOString())
       .order('created_at', { ascending: false });
@@ -272,6 +272,15 @@ export default function HistorialPedidosPage() {
   });
 
   const totalRecaudado = pedidosFiltrados.reduce((acc, p) => acc + p.monto_total, 0);
+
+  // CONTEO EXCLUSIVO DE MENÚS/PLATOS VENDIDOS (Ignora bebidas y guarniciones extras sueltas)
+  const totalPlatosVendidos = pedidosFiltrados.reduce((acc, pedido) => {
+    const platosEnPedido = (pedido.detalle_pedidos || []).reduce((subAcc, item) => {
+      return item.menus ? subAcc + item.cantidad : subAcc;
+    }, 0);
+    return acc + platosEnPedido;
+  }, 0);
+
   const styleTextoNegro = { color: '#000000' };
 
   async function eliminarPedido(pedido: Pedido) {
@@ -361,7 +370,7 @@ export default function HistorialPedidosPage() {
         </div>
       </header>
 
-      {/* FILTROS Y RESUMEN */}
+      {/* FILTROS Y RESUMEN SEPARADO */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
           {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
@@ -380,9 +389,22 @@ export default function HistorialPedidosPage() {
           ))}
         </div>
 
-        <div className="text-right w-full md:w-auto bg-gray-50 p-3 rounded border border-gray-200">
-          <span className="text-xs font-bold text-gray-600 block">Total Recaudado ({pedidosFiltrados.length} pedidos):</span>
-          <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalRecaudado)}</span>
+        {/* CONTADORES DIFERENCIADOS */}
+        <div className="flex flex-wrap gap-3 w-full md:w-auto justify-end">
+          <div className="bg-gray-50 p-2.5 rounded border border-gray-200 text-center min-w-[110px]">
+            <span className="text-[11px] font-bold text-gray-600 block uppercase">Tickets</span>
+            <span className="text-lg font-black text-black">{pedidosFiltrados.length}</span>
+          </div>
+
+          <div className="bg-blue-50 p-2.5 rounded border border-blue-200 text-center min-w-[120px]">
+            <span className="text-[11px] font-black text-blue-800 block uppercase">Total Platos</span>
+            <span className="text-lg font-black text-blue-900">{totalPlatosVendidos}</span>
+          </div>
+
+          <div className="bg-green-50 p-2.5 rounded border border-green-200 text-center min-w-[140px]">
+            <span className="text-[11px] font-black text-green-800 block uppercase">Total Recaudado</span>
+            <span className="text-lg font-black text-green-900">{formatearMoneda(totalRecaudado)}</span>
+          </div>
         </div>
       </div>
 
@@ -401,13 +423,18 @@ export default function HistorialPedidosPage() {
               ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
               : null;
 
+            // Cantidad de menús principales en este pedido en particular
+            const platosEnPedido = (pedido.detalle_pedidos || []).reduce((acc, item) => {
+              return item.menus ? acc + item.cantidad : acc;
+            }, 0);
+
             return (
               <div key={pedido.id} className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
                     <div>
                       {/* ETIQUETA Y DIRECCIÓN (SI ES ENVÍO) */}
-                      <div className="mb-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <span className={`text-xs px-2.5 py-1 rounded font-black border inline-block ${
                           pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
                           pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
@@ -416,12 +443,17 @@ export default function HistorialPedidosPage() {
                           {pedido.tipo_entrega === 'ENVIO' ? '🛵 ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRO' : '🍽️ BAR'}
                         </span>
 
-                        {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
-                          <p className="text-xs font-black text-purple-950 mt-1">
-                            📍 {direccionDetalle}
-                          </p>
-                        )}
+                        {/* BADGE CON LA CANTIDAD DE PLATOS DEL TICKET */}
+                        <span className="text-xs px-2 py-0.5 rounded font-black bg-blue-50 text-blue-900 border border-blue-300">
+                          🍽️ {platosEnPedido} {platosEnPedido === 1 ? 'plato' : 'platos'}
+                        </span>
                       </div>
+
+                      {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
+                        <p className="text-xs font-black text-purple-950 mt-1">
+                          📍 {direccionDetalle}
+                        </p>
+                      )}
 
                       {/* TITULO ADAPTADO SEGÚN TIPO DE ENTREGA */}
                       <h2 className="text-lg font-black mt-1" style={styleTextoNegro}>
@@ -455,8 +487,8 @@ export default function HistorialPedidosPage() {
                       <div key={item.id} className="flex justify-between text-sm">
                         <div className="flex-1">
                           <span className="font-extrabold" style={styleTextoNegro}>
-  {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
-</span>
+                            {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
+                          </span>
                           {item.menus && item.guarniciones?.nombre && (
                             <span className="text-xs font-bold text-gray-600 block pl-3">
                               + {item.guarniciones.nombre}
