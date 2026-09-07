@@ -12,6 +12,7 @@ interface DetallePedido {
   ingredientes_ensalada?: string;
   menus?: { nombre: string };
   guarniciones?: { nombre: string };
+  bebidas?: { nombre: string };
 }
 
 interface Pedido {
@@ -47,19 +48,20 @@ export default function HistorialPedidosPage() {
     const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
 
     const { data, error } = await supabase
-      .from('pedidos')
-      .select(`
-        *,
-        detalle_pedidos (
-          id,
-          cantidad,
-          precio_unitario,
-          subtotal,
-          ingredientes_ensalada,
-          menus!left ( nombre ),
-          guarniciones!left ( nombre )
-        )
-      `)
+  .from('pedidos')
+  .select(`
+    *,
+    detalle_pedidos (
+      id,
+      cantidad,
+      precio_unitario,
+      subtotal,
+      ingredientes_ensalada,
+      menus!left ( nombre ),
+      guarniciones!left ( nombre ),
+      bebidas!left ( nombre )
+    )
+  `)
       .gte('created_at', inicioDia.toISOString())
       .lte('created_at', finDia.toISOString())
       .order('created_at', { ascending: false });
@@ -444,8 +446,8 @@ export default function HistorialPedidosPage() {
                       <div key={item.id} className="flex justify-between text-sm">
                         <div className="flex-1">
                           <span className="font-extrabold" style={styleTextoNegro}>
-                            {item.cantidad}x {item.menus?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
-                          </span>
+  {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
+</span>
                           {item.menus && item.guarniciones?.nombre && (
                             <span className="text-xs font-bold text-gray-600 block pl-3">
                               + {item.guarniciones.nombre}

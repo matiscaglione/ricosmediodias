@@ -109,19 +109,21 @@ function ContenidoTomaPedidos() {
         const { data: pedidoData } = await supabase
           .from("pedidos")
           .select(`
-  *,
-  detalle_pedidos (
-    id,
-    menu_id,
-    guarnicion_id,
-    cantidad,
-    precio_unitario,
-    subtotal,
-    ingredientes_ensalada,
-    menus (*),
-    guarniciones (*)
-  )
-`)
+            *,
+            detalle_pedidos (
+              id,
+              menu_id,
+              guarnicion_id,
+              bebida_id,
+              cantidad,
+              precio_unitario,
+              subtotal,
+              ingredientes_ensalada,
+              menus (*),
+              guarniciones (*),
+              bebidas (*)
+            )
+          `)
           .eq("id", idEditarURL)
           .single();
 
@@ -149,7 +151,7 @@ function ContenidoTomaPedidos() {
             huevosEncontrados = parseInt(matchHuevos[1], 10);
           }
 
-          // 3. Limpiar las observaciones (quitar texto de dirección y huevos para no duplicar)
+          // 3. Limpiar las observaciones
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
@@ -165,24 +167,24 @@ function ContenidoTomaPedidos() {
           // 4. Reconstruir los ítems del carrito
           const detalles = pedidoData.detalle_pedidos || [];
           const itemsCargados: ItemPedido[] = detalles
-  .filter((det: any) => det.menus || det.menu_id || det.guarniciones)
-  .map((det: any, index: number) => {
-    const cantH = index === 0 ? huevosEncontrados : 0;
-    
-    // Parsear el string de ingredientes guardado en DB a un Array
-    const ingsArray = det.ingredientes_ensalada 
-      ? det.ingredientes_ensalada.split(",").map((s: string) => s.trim()).filter(Boolean)
-      : undefined;
+            .filter((det: any) => det.menus || det.menu_id || det.guarniciones || det.bebidas || det.bebida_id)
+            .map((det: any, index: number) => {
+              const cantH = index === 0 ? huevosEncontrados : 0;
+              
+              const ingsArray = det.ingredientes_ensalada 
+                ? det.ingredientes_ensalada.split(",").map((s: string) => s.trim()).filter(Boolean)
+                : undefined;
 
-    return {
-      menu: det.menus || undefined,
-      guarnicion: det.guarniciones || undefined,
-      cantidad: det.cantidad,
-      cantidadHuevos: cantH,
-      subtotal: det.subtotal,
-      ingredientesEnsalada: ingsArray,
-    };
-  });
+              return {
+                menu: det.menus || undefined,
+                bebida: det.bebidas || undefined,
+                guarnicion: det.guarniciones || undefined,
+                cantidad: det.cantidad,
+                cantidadHuevos: cantH,
+                subtotal: det.subtotal,
+                ingredientesEnsalada: ingsArray,
+              };
+            });
 
           setItems(itemsCargados);
           setItemsOriginalesEditar(itemsCargados);
@@ -648,20 +650,20 @@ function ContenidoTomaPedidos() {
     for (const item of items) {
       if (item.menu) {
         const { error: errDetalle } = await supabase
-  .from("detalle_pedidos")
-  .insert([
-    {
-      pedido_id: pedidoIdGuardado,
-      menu_id: item.menu.id,
-      guarnicion_id: item.guarnicion?.id || null,
-      cantidad: item.cantidad,
-      precio_unitario: item.menu.precio,
-      subtotal: item.subtotal,
-      ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
-        ? item.ingredientesEnsalada.join(", ") 
-        : null,
-    },
-  ]);
+          .from("detalle_pedidos")
+          .insert([
+            {
+              pedido_id: pedidoIdGuardado,
+              menu_id: item.menu.id,
+              guarnicion_id: item.guarnicion?.id || null,
+              cantidad: item.cantidad,
+              precio_unitario: item.menu.precio,
+              subtotal: item.subtotal,
+              ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
+                ? item.ingredientesEnsalada.join(", ") 
+                : null,
+            },
+          ]);
 
         if (errDetalle) {
           console.error("Error al guardar detalle:", errDetalle);
@@ -682,6 +684,17 @@ function ContenidoTomaPedidos() {
           .update({ cantidad_disponible: nuevoStock })
           .eq("fecha", hoy)
           .eq("menu_id", item.menu.id);
+      } else if (item.bebida) {
+        // Guardar bebida en detalle_pedidos
+        await supabase.from("detalle_pedidos").insert([
+          {
+            pedido_id: pedidoIdGuardado,
+            bebida_id: item.bebida.id,
+            cantidad: item.cantidad,
+            precio_unitario: item.bebida.precio,
+            subtotal: item.subtotal,
+          },
+        ]);
       } else if (!item.menu && item.guarnicion) {
         // Guardar guarnición extra en detalle_pedidos
         await supabase.from("detalle_pedidos").insert([
