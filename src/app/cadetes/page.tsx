@@ -123,6 +123,7 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
   }
 
   // Rendir la vuelta actual de un cadete
+  // Rendir la vuelta actual de un cadete
   async function rendirVueltaCadete(numeroCadete: 1 | 2) {
     const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
     const enviosActuales = pedidos.filter(
@@ -175,14 +176,15 @@ localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial))
       hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
     };
 
+    // Declaración correcta de nuevoHistorial antes de guardarlo
     const nuevoHistorial = [...historialPrevio, nuevaVuelta];
 
     if (numeroCadete === 1) {
       setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
     } else {
       setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
     }
 
     setPedidos((prev) =>
