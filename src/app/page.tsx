@@ -109,18 +109,19 @@ function ContenidoTomaPedidos() {
         const { data: pedidoData } = await supabase
           .from("pedidos")
           .select(`
-            *,
-            detalle_pedidos (
-              id,
-              menu_id,
-              guarnicion_id,
-              cantidad,
-              precio_unitario,
-              subtotal,
-              menus (*),
-              guarniciones (*)
-            )
-          `)
+  *,
+  detalle_pedidos (
+    id,
+    menu_id,
+    guarnicion_id,
+    cantidad,
+    precio_unitario,
+    subtotal,
+    ingredientes_ensalada,
+    menus (*),
+    guarniciones (*)
+  )
+`)
           .eq("id", idEditarURL)
           .single();
 
@@ -164,17 +165,24 @@ function ContenidoTomaPedidos() {
           // 4. Reconstruir los ítems del carrito
           const detalles = pedidoData.detalle_pedidos || [];
           const itemsCargados: ItemPedido[] = detalles
-            .filter((det: any) => det.menus || det.menu_id || det.guarniciones)
-            .map((det: any, index: number) => {
-              const cantH = index === 0 ? huevosEncontrados : 0;
-              return {
-                menu: det.menus || undefined,
-                guarnicion: det.guarniciones || undefined,
-                cantidad: det.cantidad,
-                cantidadHuevos: cantH,
-                subtotal: det.subtotal,
-              };
-            });
+  .filter((det: any) => det.menus || det.menu_id || det.guarniciones)
+  .map((det: any, index: number) => {
+    const cantH = index === 0 ? huevosEncontrados : 0;
+    
+    // Parsear el string de ingredientes guardado en DB a un Array
+    const ingsArray = det.ingredientes_ensalada 
+      ? det.ingredientes_ensalada.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : undefined;
+
+    return {
+      menu: det.menus || undefined,
+      guarnicion: det.guarniciones || undefined,
+      cantidad: det.cantidad,
+      cantidadHuevos: cantH,
+      subtotal: det.subtotal,
+      ingredientesEnsalada: ingsArray,
+    };
+  });
 
           setItems(itemsCargados);
           setItemsOriginalesEditar(itemsCargados);
@@ -640,17 +648,20 @@ function ContenidoTomaPedidos() {
     for (const item of items) {
       if (item.menu) {
         const { error: errDetalle } = await supabase
-          .from("detalle_pedidos")
-          .insert([
-            {
-              pedido_id: pedidoIdGuardado,
-              menu_id: item.menu.id,
-              guarnicion_id: item.guarnicion?.id || null,
-              cantidad: item.cantidad,
-              precio_unitario: item.menu.precio,
-              subtotal: item.subtotal,
-            },
-          ]);
+  .from("detalle_pedidos")
+  .insert([
+    {
+      pedido_id: pedidoIdGuardado,
+      menu_id: item.menu.id,
+      guarnicion_id: item.guarnicion?.id || null,
+      cantidad: item.cantidad,
+      precio_unitario: item.menu.precio,
+      subtotal: item.subtotal,
+      ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
+        ? item.ingredientesEnsalada.join(", ") 
+        : null,
+    },
+  ]);
 
         if (errDetalle) {
           console.error("Error al guardar detalle:", errDetalle);
