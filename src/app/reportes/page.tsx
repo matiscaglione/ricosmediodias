@@ -12,10 +12,12 @@ interface Pedido {
   monto_platos: number;
   monto_total: number;
   created_at: string;
+  turno?: 'MAÑANA' | 'NOCHE';
   detalle_pedidos?: {
     cantidad: number;
     menus?: { nombre: string };
     guarniciones?: { nombre: string };
+    bebidas?: { nombre: string };
   }[];
 }
 
@@ -23,12 +25,13 @@ export default function ReportesPage() {
   const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
     cargarReporte();
-  }, [fechaInicio, fechaFin]);
+  }, [fechaInicio, fechaFin, filtroTurno]);
 
   async function cargarReporte() {
     setCargando(true);
@@ -38,20 +41,26 @@ export default function ReportesPage() {
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
-    // 2. Filtrar en Supabase desde las 03:00:00 UTC del día de inicio hasta las 02:59:59 UTC del día posterior al fin
-    const { data, error } = await supabase
+    // 2. Consulta a Supabase
+    let query = supabase
       .from('pedidos')
       .select(`
         *,
         detalle_pedidos (
           cantidad,
           menus ( nombre ),
-          guarniciones ( nombre )
+          guarniciones ( nombre ),
+          bebidas ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T02:59:59`)
-      .order('created_at', { ascending: false });
+      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+
+    if (filtroTurno !== 'TODOS') {
+      query = query.eq('turno', filtroTurno);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error al cargar reporte:', error);
@@ -67,7 +76,7 @@ export default function ReportesPage() {
   const totalPlatosMonto = pedidos.reduce((acc, p) => acc + p.monto_platos, 0);
   const totalEnviosMonto = pedidos.reduce((acc, p) => acc + p.costo_envio, 0);
 
-  // CONTEO EXCLUSIVO DE PLATOS / MENÚS PRINCIPALES (Ignora bebidas y extras)
+  // CONTEO EXCLUSIVO DE PLATOS / MENÚS PRINCIPALES
   const totalPlatosCant = pedidos.reduce((acc, p) => {
     const cantPlatos = (p.detalle_pedidos || []).reduce((subAcc, d) => {
       return d.menus ? subAcc + d.cantidad : subAcc;
@@ -75,13 +84,22 @@ export default function ReportesPage() {
     return acc + cantPlatos;
   }, 0);
 
+  // CONTEO EXCLUSIVO DE BEBIDAS
+  const totalBebidasCant = pedidos.reduce((acc, p) => {
+    const cantBebidas = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+      return d.bebidas ? subAcc + d.cantidad : subAcc;
+    }, 0);
+    return acc + cantBebidas;
+  }, 0);
+
   const totalEnviosCant = pedidos.filter((p) => p.tipo_entrega === 'ENVIO').length;
   const totalRetirosCant = pedidos.filter((p) => p.tipo_entrega === 'RETIRO').length;
   const totalBarCant = pedidos.filter((p) => p.tipo_entrega === 'BAR').length;
 
-  // Conteo de platos principales y guarniciones
+  // Conteo de platos principales, guarniciones y bebidas
   const resumenPlatos: Record<string, number> = {};
   const resumenGuarniciones: Record<string, number> = {};
+  const resumenBebidas: Record<string, number> = {};
 
   pedidos.forEach((p) => {
     p.detalle_pedidos?.forEach((d) => {
@@ -94,13 +112,18 @@ export default function ReportesPage() {
         const nombreGuarni = d.guarniciones.nombre;
         resumenGuarniciones[nombreGuarni] = (resumenGuarniciones[nombreGuarni] || 0) + d.cantidad;
       }
+
+      if (d.bebidas?.nombre) {
+        const nombreBebida = d.bebidas.nombre;
+        resumenBebidas[nombreBebida] = (resumenBebidas[nombreBebida] || 0) + d.cantidad;
+      }
     });
   });
 
   function exportarReporteCSV() {
     if (pedidos.length === 0) return alert('No hay datos para exportar en este rango.');
 
-    const encabezados = ['Fecha', 'Hora', 'Cliente', 'Tipo Entrega', 'Total Platos ($)', 'Costo Envio ($)', 'Total Pedido ($)'];
+    const encabezados = ['Fecha', 'Hora', 'Turno', 'Cliente', 'Tipo Entrega', 'Total Platos ($)', 'Costo Envio ($)', 'Total Pedido ($)'];
     const filas = pedidos.map((p) => {
       const f = new Date(p.created_at);
       const fechaStr = f.toLocaleDateString('es-AR');
@@ -108,6 +131,7 @@ export default function ReportesPage() {
       return [
         `"${fechaStr}"`,
         `"${horaStr}"`,
+        `"${p.turno || 'MAÑANA'}"`,
         `"${(p.cliente_nombre || '').replace(/"/g, '""')}"`,
         `"${p.tipo_entrega}"`,
         p.monto_platos,
@@ -121,7 +145,7 @@ export default function ReportesPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `reporte_ricosmediodias_${fechaInicio}_al_${fechaFin}.csv`;
+    link.download = `reporte_ricosmediodias_${fechaInicio}_al_${fechaFin}_${filtroTurno}.csv`;
     link.click();
   }
 
@@ -150,8 +174,9 @@ export default function ReportesPage() {
         </div>
       </header>
 
+      {/* FILTROS DE FECHA Y TURNO */}
       <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row items-end justify-between gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
           <div>
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Fecha Desde</label>
             <input
@@ -172,6 +197,24 @@ export default function ReportesPage() {
               className="border-2 border-gray-400 p-2 rounded text-sm font-bold bg-white w-full"
             />
           </div>
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Filtrar por Turno</label>
+            <div className="flex gap-1">
+              {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFiltroTurno(t)}
+                  className={`flex-1 text-xs py-2 rounded font-black border-2 ${
+                    filtroTurno === t
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white border-gray-300 text-black hover:bg-gray-100'
+                  }`}
+                >
+                  {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-2 w-full md:w-auto justify-end">
@@ -180,6 +223,7 @@ export default function ReportesPage() {
               const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
               setFechaInicio(hoyArg);
               setFechaFin(hoyArg);
+              setFiltroTurno('TODOS');
             }}
             className="bg-gray-200 text-gray-900 border-2 border-gray-400 text-xs px-3 py-2 rounded font-bold hover:bg-gray-300"
           >
@@ -194,35 +238,43 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      {/* METRICAS PRINCIPALES */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         {/* TOTAL RECAUDADO */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300 col-span-1 sm:col-span-2 lg:col-span-1">
           <span className="text-xs font-bold text-gray-600 block">Total Recaudado</span>
           <span className="text-2xl font-black text-green-700">{formatearMoneda(totalRecaudado)}</span>
-          <span className="text-xs text-gray-500 block mt-1 font-bold">{pedidos.length} tickets en total</span>
+          <span className="text-xs text-gray-500 block mt-1 font-bold">{pedidos.length} tickets</span>
         </div>
 
         {/* CANTIDAD TOTAL DE PLATOS */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
           <span className="text-xs font-black text-blue-900 block uppercase">Total Platos / Menús</span>
-          <span className="text-2xl font-black text-blue-950">{totalPlatosCant}</span>
-          <span className="text-xs text-blue-800 block mt-1 font-bold">Sin bebidas/extras</span>
+          <span className="text-2xl font-black text-blue-950">{totalPlatosCant} u.</span>
+          <span className="text-xs text-blue-800 block mt-1 font-bold">Platos principales</span>
+        </div>
+
+        {/* CANTIDAD TOTAL DE BEBIDAS */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50">
+          <span className="text-xs font-black text-cyan-900 block uppercase">Total Bebidas / Extras</span>
+          <span className="text-2xl font-black text-cyan-950">{totalBebidasCant} u.</span>
+          <span className="text-xs text-cyan-800 block mt-1 font-bold">Bebidas vendidas</span>
         </div>
 
         {/* VENTAS MONTO PLATOS */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Ventas de Platos ($)</span>
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalPlatosMonto)}</span>
         </div>
 
         {/* MONTO ENVÍOS */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Total en Envíos ($)</span>
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalEnviosMonto)}</span>
         </div>
 
         {/* DESGLOSE CANTIDAD ENTREGAS */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Desglose Entregas</span>
           <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>
             <div>🛵 Envíos: <strong>{totalEnviosCant}</strong></div>
@@ -232,21 +284,22 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* DESGLOSE EN TABLAS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* PLATOS VENDIDOS */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-300">
-          <h2 className="text-lg font-black mb-4" style={styleTextoNegro}>
+        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+          <h2 className="text-base font-black mb-3" style={styleTextoNegro}>
             🍲 Platos Principales Vendidos
           </h2>
 
           {Object.keys(resumenPlatos).length === 0 ? (
-            <p className="text-gray-500 text-sm font-bold text-center py-4">Sin datos de platos.</p>
+            <p className="text-gray-500 text-xs font-bold text-center py-4">Sin datos de platos.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {Object.entries(resumenPlatos).map(([plato, cantidad]) => (
-                <div key={plato} className="p-2.5 bg-gray-50 rounded border border-gray-300 flex justify-between items-center">
-                  <span className="font-bold text-sm" style={styleTextoNegro}>{plato}</span>
-                  <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-full">
+                <div key={plato} className="p-2 bg-gray-50 rounded border border-gray-300 flex justify-between items-center text-xs">
+                  <span className="font-bold" style={styleTextoNegro}>{plato}</span>
+                  <span className="bg-blue-600 text-white font-black px-2 py-0.5 rounded-full">
                     {cantidad} u.
                   </span>
                 </div>
@@ -256,19 +309,41 @@ export default function ReportesPage() {
         </div>
 
         {/* GUARNICIONES VENDIDAS */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-300">
-          <h2 className="text-lg font-black mb-4" style={styleTextoNegro}>
+        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
+          <h2 className="text-base font-black mb-3" style={styleTextoNegro}>
             🥗 Guarniciones Vendidas
           </h2>
 
           {Object.keys(resumenGuarniciones).length === 0 ? (
-            <p className="text-gray-500 text-sm font-bold text-center py-4">Sin datos de guarniciones.</p>
+            <p className="text-gray-500 text-xs font-bold text-center py-4">Sin datos de guarniciones.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {Object.entries(resumenGuarniciones).map(([guarni, cantidad]) => (
-                <div key={guarni} className="p-2.5 bg-gray-50 rounded border border-gray-300 flex justify-between items-center">
-                  <span className="font-bold text-sm" style={styleTextoNegro}>{guarni}</span>
-                  <span className="bg-purple-600 text-white text-xs font-black px-2.5 py-1 rounded-full">
+                <div key={guarni} className="p-2 bg-gray-50 rounded border border-gray-300 flex justify-between items-center text-xs">
+                  <span className="font-bold" style={styleTextoNegro}>{guarni}</span>
+                  <span className="bg-purple-600 text-white font-black px-2 py-0.5 rounded-full">
+                    {cantidad} u.
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* BEBIDAS VENDIDAS */}
+        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50/30">
+          <h2 className="text-base font-black mb-3 text-cyan-950">
+            🥤 Bebidas Vendidas
+          </h2>
+
+          {Object.keys(resumenBebidas).length === 0 ? (
+            <p className="text-gray-500 text-xs font-bold text-center py-4">Sin datos de bebidas.</p>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {Object.entries(resumenBebidas).map(([bebida, cantidad]) => (
+                <div key={bebida} className="p-2 bg-white rounded border border-cyan-200 flex justify-between items-center text-xs">
+                  <span className="font-bold text-cyan-950">{bebida}</span>
+                  <span className="bg-cyan-700 text-white font-black px-2 py-0.5 rounded-full">
                     {cantidad} u.
                   </span>
                 </div>

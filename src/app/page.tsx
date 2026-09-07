@@ -102,6 +102,12 @@ function ContenidoTomaPedidos() {
   const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
   const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
 
+  // Determinar turno actual automáticamente
+  function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
+    const horaActual = new Date().getHours();
+    return (horaActual >= 6 && horaActual < 16) ? 'MAÑANA' : 'NOCHE';
+  }
+
   useEffect(() => {
     async function inicializar() {
       await cargarDatosDelDia();
@@ -564,6 +570,7 @@ function ContenidoTomaPedidos() {
             : "Cliente Envío";
 
     const hoy = new Date().toISOString().split("T")[0];
+    const turnoActual = obtenerTurnoActual();
 
     const detalleDireccion =
       tipoEntrega === "ENVIO" && direccion.trim() !== ""
@@ -620,6 +627,7 @@ function ContenidoTomaPedidos() {
           monto_total: montoTotal,
           horario_solicitado: horario,
           observaciones: obsFinal,
+          turno: turnoActual,
         })
         .eq("id", pedidoEditandoId);
 
@@ -642,6 +650,7 @@ function ContenidoTomaPedidos() {
             horario_solicitado: horario,
             observaciones: obsFinal,
             estado: "PENDIENTE",
+            turno: turnoActual,
           },
         ])
         .select()
@@ -732,9 +741,14 @@ function ContenidoTomaPedidos() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen">
       <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
-          Toma de Pedidos
-        </h1>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
+            Toma de Pedidos
+          </h1>
+          <span className="inline-block bg-blue-100 text-blue-900 text-xs font-black px-2.5 py-0.5 rounded mt-1 border border-blue-300">
+            Turno Actual: {obtenerTurnoActual() === 'MAÑANA' ? '☀️ MAÑANA (07-15hs)' : '🌙 NOCHE (18:30-00hs)'}
+          </span>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/pedidos"
@@ -971,7 +985,7 @@ function ContenidoTomaPedidos() {
                         </div>
                         {menuSeleccionado?.id === m.id && (
                           <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
-                            Seleccionado (tocá para cambiar)
+                            Seleccionado
                           </span>
                         )}
                       </div>
@@ -1341,52 +1355,6 @@ function ContenidoTomaPedidos() {
                                   : `${item.cantidadHuevos} Huevos Fritos`}
                                 )
                               </span>
-                              <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setItems((prev) =>
-                                      prev.map((it, i) => {
-                                        if (i !== idx) return it;
-                                        const nuevaCant = Math.max(
-                                          0,
-                                          it.cantidadHuevos - 1,
-                                        );
-                                        return {
-                                          ...it,
-                                          cantidadHuevos: nuevaCant,
-                                          subtotal: Math.max(
-                                            0,
-                                            it.subtotal - precioHuevo,
-                                          ),
-                                        };
-                                      }),
-                                    );
-                                  }}
-                                  className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
-                                >
-                                  -
-                                </button>
-                                <span>{item.cantidadHuevos}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setItems((prev) =>
-                                      prev.map((it, i) => {
-                                        if (i !== idx) return it;
-                                        return {
-                                          ...it,
-                                          cantidadHuevos: it.cantidadHuevos + 1,
-                                          subtotal: it.subtotal + precioHuevo,
-                                        };
-                                      }),
-                                    );
-                                  }}
-                                  className="px-1.5 py-0.5 bg-white border border-amber-400 rounded hover:bg-amber-100 text-amber-900 font-bold"
-                                >
-                                  +
-                                </button>
-                              </div>
                             </div>
                           )}
                         </>
