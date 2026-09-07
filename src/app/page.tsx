@@ -1151,43 +1151,10 @@ function ContenidoTomaPedidos() {
             )}
           </div>
 
-          {/* SECCIÓN 3: SELECCIÓN DE BEBIDAS */}
+          {/* SECCIÓN 3: AGREGAR GUARNICIÓN EXTRA */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              3. Agregar Bebida / Adicional
-            </h2>
-            <div className="flex gap-2">
-              <select
-                style={styleTextoNegro}
-                value={bebidaSeleccionada?.id || ""}
-                onChange={(e) =>
-                  setBebidaSeleccionada(
-                    bebidas.find((b) => b.id === e.target.value) || null,
-                  )
-                }
-                className="flex-1 border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-              >
-                <option value="">-- Seleccionar Bebida --</option>
-                {bebidas.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nombre} - ${b.precio}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={agregarBebidaAlPedido}
-                className="bg-blue-600 text-white font-extrabold px-4 py-2 rounded text-sm hover:bg-blue-700"
-              >
-                + Agregar
-              </button>
-            </div>
-          </div>
-
-          {/* SECCIÓN 4: AGREGAR GUARNICIÓN EXTRA */}
-          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
-            <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              4. Agregar Guarnición Extra (+{formatearMoneda(precioGuarnicionExtra)})
+              3. Agregar Guarnición Extra (+{formatearMoneda(precioGuarnicionExtra)})
             </h2>
             <div className="flex gap-2">
               <select
@@ -1242,6 +1209,39 @@ function ContenidoTomaPedidos() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS */}
+          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
+            <h2 className="text-lg font-bold" style={styleTextoNegro}>
+              4. Agregar Bebida / Adicional
+            </h2>
+            <div className="flex gap-2">
+              <select
+                style={styleTextoNegro}
+                value={bebidaSeleccionada?.id || ""}
+                onChange={(e) =>
+                  setBebidaSeleccionada(
+                    bebidas.find((b) => b.id === e.target.value) || null,
+                  )
+                }
+                className="flex-1 border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+              >
+                <option value="">-- Seleccionar Bebida --</option>
+                {bebidas.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre} - ${b.precio}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={agregarBebidaAlPedido}
+                className="bg-blue-600 text-white font-extrabold px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                + Agregar
+              </button>
+            </div>
           </div>
         </div>
 
