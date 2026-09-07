@@ -13,6 +13,16 @@ interface PedidoEnvio {
   costo_envio: number;
   observaciones: string;
   cadete: string | null;
+  estado_cadete?: 'EN_VIAJE' | 'RENDIDO';
+  numero_vuelta?: number;
+}
+
+interface VueltaRendida {
+  numeroVuelta: number;
+  montoTotalRendido: number;
+  costoEnviosTotal: number;
+  cantidadPedidos: number;
+  hora: string;
 }
 
 export default function CadetesPage() {
@@ -20,14 +30,43 @@ export default function CadetesPage() {
   const [pedidos, setPedidos] = useState<PedidoEnvio[]>([]);
   const [cargando, setCargando] = useState(false);
 
+  // Nombres con persistencia en localStorage
   const [nombreCadete1, setNombreCadete1] = useState('Cadete 1');
   const [nombreCadete2, setNombreCadete2] = useState('Cadete 2');
   const [editandoCadete1, setEditandoCadete1] = useState(false);
   const [editandoCadete2, setEditandoCadete2] = useState(false);
 
+  // Historial de Vueltas Rendidas del día
+  const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
+  const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
+
   useEffect(() => {
+    // Cargar nombres guardados
+    const c1Guardado = localStorage.getItem('nombreCadete1');
+    const c2Guardado = localStorage.getItem('nombreCadete2');
+    if (c1Guardado) setNombreCadete1(c1Guardado);
+    if (c2Guardado) setNombreCadete2(c2Guardado);
+
+    // Cargar historial de vueltas rendidas del día
+    const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
+    const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
+    if (v1Guardadas) setVueltasCadete1(JSON.parse(v1Guardadas));
+    if (v2Guardadas) setVueltasCadete2(JSON.parse(v2Guardadas));
+
     cargarEnvios();
-  }, []);
+  }, [hoyArg]);
+
+  function guardarNombre1(nuevoNombre: string) {
+    setNombreCadete1(nuevoNombre);
+    localStorage.setItem('nombreCadete1', nuevoNombre);
+    setEditandoCadete1(false);
+  }
+
+  function guardarNombre2(nuevoNombre: string) {
+    setNombreCadete2(nuevoNombre);
+    localStorage.setItem('nombreCadete2', nuevoNombre);
+    setEditandoCadete2(false);
+  }
 
   async function cargarEnvios() {
     setCargando(true);
@@ -52,22 +91,97 @@ export default function CadetesPage() {
 
     if (!error) {
       setPedidos((prev) =>
-        prev.map((p) => (p.id === idPedido ? { ...p, cadete: nombreCadete } : p))
+        prev.map((p) => (p.id === idPedido ? { ...p, cadete: nombreCadete, estado_cadete: 'EN_VIAJE' } : p))
       );
     } else {
       alert('Error al asignar cadete: ' + error.message);
     }
   }
 
+  // Extraer dirección desde el texto de observaciones
+  function obtenerDireccion(obs: string) {
+    if (!obs) return 'Sin dirección especificada';
+    const match = obs.split('|').find((s) => s.toLowerCase().includes('dirección:'));
+    if (match) {
+      return match.replace(/dirección:/i, '').trim();
+    }
+    return obs;
+  }
+
+  // Rendir la vuelta actual de un cadete
+  function rendirVueltaCadete(numeroCadete: 1 | 2) {
+    const nombreCadete = numeroCadete === 1 ? nombreCadete1 : nombreCadete2;
+    const enviosActuales = pedidos.filter(
+      (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${numeroCadete}`) && p.estado_cadete !== 'RENDIDO'
+    );
+
+    if (enviosActuales.length === 0) {
+      alert('No hay pedidos asignados en este momento para rendir.');
+      return;
+    }
+
+    const totalCobrado = enviosActuales.reduce((acc, p) => acc + p.monto_total, 0);
+    const totalEnvios = enviosActuales.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
+    const cajaNeto = totalCobrado - totalEnvios;
+
+    const confirmar = confirm(
+      `Rendición de Vuelta - ${nombreCadete}:\n\n` +
+      `📦 Pedidos: ${enviosActuales.length}\n` +
+      `💵 Total Cobrado: $${totalCobrado.toLocaleString('es-AR')}\n` +
+      `🛵 Pagar a Cadete (Envíos): $${totalEnvios.toLocaleString('es-AR')}\n` +
+      `📥 Dinero Limpio para Caja: $${cajaNeto.toLocaleString('es-AR')}\n\n` +
+      `¿Confirmar que el cadete rinde esta vuelta?`
+    );
+
+    if (!confirmar) return;
+
+    const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
+    const nuevaVuelta: VueltaRendida = {
+      numeroVuelta: historialPrevio.length + 1,
+      montoTotalRendido: totalCobrado,
+      costoEnviosTotal: totalEnvios,
+      cantidadPedidos: enviosActuales.length,
+      hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const nuevoHistorial = [...historialPrevio, nuevaVuelta];
+
+    if (numeroCadete === 1) {
+      setVueltasCadete1(nuevoHistorial);
+      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
+    } else {
+      setVueltasCadete2(nuevoHistorial);
+      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
+    }
+
+    const idsRendidos = enviosActuales.map((p) => p.id);
+    setPedidos((prev) =>
+      prev.map((p) => (idsRendidos.includes(p.id) ? { ...p, estado_cadete: 'RENDIDO' } : p))
+    );
+  }
+
+  // Filtros de pedidos en viaje
   const enviosSinAsignar = pedidos.filter((p) => !p.cadete);
-  const enviosCadete1 = pedidos.filter((p) => p.cadete === nombreCadete1 || p.cadete === 'Cadete 1');
-  const enviosCadete2 = pedidos.filter((p) => p.cadete === nombreCadete2 || p.cadete === 'Cadete 2');
+  const enviosCadete1 = pedidos.filter(
+    (p) => (p.cadete === nombreCadete1 || p.cadete === 'Cadete 1') && p.estado_cadete !== 'RENDIDO'
+  );
+  const enviosCadete2 = pedidos.filter(
+    (p) => (p.cadete === nombreCadete2 || p.cadete === 'Cadete 2') && p.estado_cadete !== 'RENDIDO'
+  );
 
-  const totalEnvios1 = enviosCadete1.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
-  const totalRendir1 = enviosCadete1.reduce((acc, p) => acc + p.monto_total, 0);
+  // Totales de la vuelta actual (En Viaje)
+  const totalEnviosVuelta1 = enviosCadete1.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
+  const totalRendirVuelta1 = enviosCadete1.reduce((acc, p) => acc + p.monto_total, 0);
 
-  const totalEnvios2 = enviosCadete2.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
-  const totalRendir2 = enviosCadete2.reduce((acc, p) => acc + p.monto_total, 0);
+  const totalEnviosVuelta2 = enviosCadete2.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
+  const totalRendirVuelta2 = enviosCadete2.reduce((acc, p) => acc + p.monto_total, 0);
+
+  // Totales acumulados del turno (Cierre total)
+  const acumuladoEnvios1 = vueltasCadete1.reduce((acc, v) => acc + v.costoEnviosTotal, 0);
+  const acumuladoRendido1 = vueltasCadete1.reduce((acc, v) => acc + v.montoTotalRendido, 0);
+
+  const acumuladoEnvios2 = vueltasCadete2.reduce((acc, v) => acc + v.costoEnviosTotal, 0);
+  const acumuladoRendido2 = vueltasCadete2.reduce((acc, v) => acc + v.montoTotalRendido, 0);
 
   const styleTextoNegro = { color: '#000000' };
 
@@ -75,7 +189,7 @@ export default function CadetesPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
-          🛵 Control de Cadetes y Envíos
+          🛵 Control de Cadetes y Vueltas
         </h1>
         <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
           ⬅ Inicio
@@ -83,45 +197,62 @@ export default function CadetesPage() {
       </header>
 
       {/* ENVIOS PENDIENTES */}
-      <div className="bg-white p-5 rounded-lg border-2 border-red-300 space-y-3">
-        <div className="flex justify-between items-center border-b pb-2">
+      <div className="bg-white p-5 rounded-lg border-2 border-red-400 shadow-sm space-y-3">
+        <div className="flex justify-between items-center border-b border-gray-300 pb-2">
           <h2 className="text-lg font-black text-red-700">
             📦 Envíos Pendientes de Salida ({enviosSinAsignar.length})
           </h2>
-          <button onClick={cargarEnvios} className="text-xs bg-gray-200 hover:bg-gray-300 font-bold px-3 py-1 rounded">
+          <button onClick={cargarEnvios} className="text-xs bg-gray-200 hover:bg-gray-300 font-extrabold px-3 py-1.5 rounded text-gray-800">
             🔄 Actualizar
           </button>
         </div>
 
         {cargando ? (
-          <p className="text-xs text-gray-500 font-bold py-2">Cargando envíos...</p>
+          <p className="text-xs text-gray-800 font-bold py-2">Cargando envíos...</p>
         ) : enviosSinAsignar.length === 0 ? (
-          <p className="text-xs text-gray-500 font-bold py-2">No hay envíos pendientes de asignar.</p>
+          <p className="text-xs text-gray-700 font-bold py-2">No hay envíos pendientes de asignar.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {enviosSinAsignar.map((p) => (
-              <div key={p.id} className="p-3 border rounded bg-gray-50 flex justify-between items-center">
-                <div>
-                  <p className="font-extrabold text-sm" style={styleTextoNegro}>{p.cliente_nombre}</p>
-                  <p className="text-xs text-gray-600 font-bold">{p.observaciones || 'Sin observaciones'}</p>
-                  <p className="text-xs font-black text-green-700">Total: ${p.monto_total} (Envío: ${p.costo_envio})</p>
+            {enviosSinAsignar.map((p) => {
+              const direccionTxt = obtenerDireccion(p.observaciones);
+              return (
+                <div key={p.id} className="p-3 border-2 border-red-200 rounded-lg bg-red-50 flex justify-between items-center gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">📍</span>
+                      <p className="font-black text-sm text-red-950 uppercase">
+                        {direccionTxt}
+                      </p>
+                    </div>
+                    <p className="font-bold text-xs text-gray-800">
+                      👤 {p.cliente_nombre || 'Cliente Envío'} {p.cliente_telefono ? `(${p.cliente_telefono})` : ''}
+                    </p>
+                    {p.observaciones && !p.observaciones.toLowerCase().includes('dirección:') && (
+                      <p className="text-xs text-gray-700 font-bold italic">
+                        Obs: {p.observaciones}
+                      </p>
+                    )}
+                    <p className="text-xs font-black text-green-800 pt-0.5">
+                      Total: ${p.monto_total.toLocaleString('es-AR')} (Envío: ${p.costo_envio})
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5 min-w-[110px]">
+                    <button
+                      onClick={() => asignarCadete(p.id, nombreCadete1)}
+                      className="bg-blue-700 text-white text-xs font-black px-3 py-2 rounded hover:bg-blue-800 shadow text-center"
+                    >
+                      + {nombreCadete1}
+                    </button>
+                    <button
+                      onClick={() => asignarCadete(p.id, nombreCadete2)}
+                      className="bg-purple-700 text-white text-xs font-black px-3 py-2 rounded hover:bg-purple-800 shadow text-center"
+                    >
+                      + {nombreCadete2}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => asignarCadete(p.id, nombreCadete1)}
-                    className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-blue-700"
-                  >
-                    + {nombreCadete1}
-                  </button>
-                  <button
-                    onClick={() => asignarCadete(p.id, nombreCadete2)}
-                    className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-purple-700"
-                  >
-                    + {nombreCadete2}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -129,114 +260,242 @@ export default function CadetesPage() {
       {/* CADETES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* CADETE 1 */}
-        <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-4">
-          <div className="flex justify-between items-center border-b pb-2">
+        <div className="bg-white p-5 rounded-lg border-2 border-blue-300 shadow-sm space-y-4">
+          <div className="flex justify-between items-center border-b border-gray-300 pb-3">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🏍️</span>
+              <span className="text-2xl">🏍️</span>
               {editandoCadete1 ? (
                 <div className="flex gap-1">
                   <input
                     type="text"
                     value={nombreCadete1}
                     onChange={(e) => setNombreCadete1(e.target.value)}
-                    className="border-2 border-blue-400 px-2 py-0.5 rounded text-sm font-bold"
+                    className="border-2 border-blue-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
                   />
-                  <button onClick={() => setEditandoCadete1(false)} className="bg-green-600 text-white text-xs px-2 py-1 rounded font-bold">
+                  <button onClick={() => guardarNombre1(nombreCadete1)} className="bg-green-700 text-white text-xs px-2.5 py-1 rounded font-black">
                     ✓
                   </button>
                 </div>
               ) : (
-                <h2 className="text-xl font-black text-blue-900 cursor-pointer" onClick={() => setEditandoCadete1(true)}>
-                  {nombreCadete1} <span className="text-xs text-gray-400 font-normal">✏️</span>
+                <h2 className="text-xl font-black text-blue-900 cursor-pointer flex items-center gap-1" onClick={() => setEditandoCadete1(true)}>
+                  {nombreCadete1} <span className="text-xs text-gray-600 font-bold">✏️ Editar</span>
                 </h2>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-xs font-bold text-gray-500">Pagar envío: <span className="text-blue-900 font-black">${totalEnvios1}</span></p>
-              <p className="text-xs font-bold text-gray-500">Rendir caja: <span className="text-green-700 font-black">${totalRendir1}</span></p>
-            </div>
+
+            <button
+              onClick={() => rendirVueltaCadete(1)}
+              disabled={enviosCadete1.length === 0}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-600 text-white font-black text-xs px-3 py-2 rounded shadow"
+            >
+              ✅ Rendir Vuelta
+            </button>
           </div>
 
+          {/* VUELTA ACTUAL (EN VIAJE) */}
           <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                📍 En Viaje ({enviosCadete1.length} pedidos)
+              </h3>
+              <div className="text-right text-xs font-bold text-gray-800">
+                Pagar Envío: <span className="text-blue-900 font-black">${totalEnviosVuelta1}</span> | Cobrar Caja: <span className="text-green-800 font-black">${totalRendirVuelta1}</span>
+              </div>
+            </div>
+
             {enviosCadete1.length === 0 ? (
-              <p className="text-xs text-gray-400 italic py-2">Sin envíos asignados.</p>
+              <p className="text-xs text-gray-600 font-bold italic py-2 bg-blue-50 p-2 rounded">
+                Sin envíos en este viaje.
+              </p>
             ) : (
-              enviosCadete1.map((p) => (
-                <div key={p.id} className="p-2.5 border rounded bg-blue-50 flex justify-between items-center">
-                  <div>
-                    <p className="font-extrabold text-xs" style={styleTextoNegro}>{p.cliente_nombre}</p>
-                    <p className="text-xs text-gray-700">${p.monto_total} (Envío: ${p.costo_envio})</p>
+              enviosCadete1.map((p) => {
+                const direccionTxt = obtenerDireccion(p.observaciones);
+                return (
+                  <div key={p.id} className="p-2.5 border-2 border-blue-200 rounded bg-blue-50 flex justify-between items-center gap-2">
+                    <div>
+                      <p className="font-extrabold text-xs text-blue-950 uppercase">
+                        📍 {direccionTxt}
+                      </p>
+                      <p className="text-xs font-bold text-gray-800">
+                        👤 {p.cliente_nombre || 'Cliente Envío'}
+                      </p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">
+                        ${p.monto_total} (Envío: ${p.costo_envio})
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => asignarCadete(p.id, nombreCadete2)}
+                        className="text-xs bg-white text-purple-900 border-2 border-purple-400 font-extrabold px-2 py-1 rounded hover:bg-purple-50"
+                      >
+                        ➡️ Pasar a {nombreCadete2}
+                      </button>
+                      <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-700 font-black px-2 py-1 hover:bg-red-100 rounded">
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => asignarCadete(p.id, nombreCadete2)}
-                      className="text-xs bg-white text-purple-800 border border-purple-300 font-bold px-2 py-1 rounded hover:bg-purple-100"
-                    >
-                      ➡️ Pasar a {nombreCadete2}
-                    </button>
-                    <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-600 font-bold px-1.5 py-1">
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
+          </div>
+
+          {/* RESUMEN DE VUELTAS RENDIDAS DEL DÍA */}
+          <div className="pt-3 border-t border-gray-300 space-y-2">
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+              📋 Vueltas Rendidas en el Turno ({vueltasCadete1.length})
+            </h3>
+            {vueltasCadete1.length === 0 ? (
+              <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {vueltasCadete1.map((v, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
+                    <span>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
+                    <span className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TOTAL CIERRE DEL DÍA */}
+            <div className="bg-blue-100 p-3 rounded-lg border border-blue-300 space-y-1 mt-2">
+              <div className="text-xs font-black text-blue-950 uppercase">
+                📊 Cierre Acumulado del Día ({nombreCadete1})
+              </div>
+              <div className="flex justify-between text-xs font-bold text-black">
+                <span>Total Dinero Recaudado:</span>
+                <span className="font-black text-black">${acumuladoRendido1.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between text-xs font-bold text-black">
+                <span>Pagar por Envíos a Cadete:</span>
+                <span className="font-black text-blue-900">${acumuladoEnvios1.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black border-t border-blue-300 pt-1 text-black">
+                <span>Queda en Caja (Neto):</span>
+                <span className="text-green-800">${(acumuladoRendido1 - acumuladoEnvios1).toLocaleString('es-AR')}</span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* CADETE 2 */}
-        <div className="bg-white p-5 rounded-lg border border-gray-300 space-y-4">
-          <div className="flex justify-between items-center border-b pb-2">
+        <div className="bg-white p-5 rounded-lg border-2 border-purple-300 shadow-sm space-y-4">
+          <div className="flex justify-between items-center border-b border-gray-300 pb-3">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🏍️</span>
+              <span className="text-2xl">🏍️</span>
               {editandoCadete2 ? (
                 <div className="flex gap-1">
                   <input
                     type="text"
                     value={nombreCadete2}
                     onChange={(e) => setNombreCadete2(e.target.value)}
-                    className="border-2 border-purple-400 px-2 py-0.5 rounded text-sm font-bold"
+                    className="border-2 border-purple-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
                   />
-                  <button onClick={() => setEditandoCadete2(false)} className="bg-green-600 text-white text-xs px-2 py-1 rounded font-bold">
+                  <button onClick={() => guardarNombre2(nombreCadete2)} className="bg-green-700 text-white text-xs px-2.5 py-1 rounded font-black">
                     ✓
                   </button>
                 </div>
               ) : (
-                <h2 className="text-xl font-black text-purple-900 cursor-pointer" onClick={() => setEditandoCadete2(true)}>
-                  {nombreCadete2} <span className="text-xs text-gray-400 font-normal">✏️</span>
+                <h2 className="text-xl font-black text-purple-900 cursor-pointer flex items-center gap-1" onClick={() => setEditandoCadete2(true)}>
+                  {nombreCadete2} <span className="text-xs text-gray-600 font-bold">✏️ Editar</span>
                 </h2>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-xs font-bold text-gray-500">Pagar envío: <span className="text-purple-900 font-black">${totalEnvios2}</span></p>
-              <p className="text-xs font-bold text-gray-500">Rendir caja: <span className="text-green-700 font-black">${totalRendir2}</span></p>
-            </div>
+
+            <button
+              onClick={() => rendirVueltaCadete(2)}
+              disabled={enviosCadete2.length === 0}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-600 text-white font-black text-xs px-3 py-2 rounded shadow"
+            >
+              ✅ Rendir Vuelta
+            </button>
           </div>
 
+          {/* VUELTA ACTUAL (EN VIAJE) */}
           <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                📍 En Viaje ({enviosCadete2.length} pedidos)
+              </h3>
+              <div className="text-right text-xs font-bold text-gray-800">
+                Pagar Envío: <span className="text-purple-900 font-black">${totalEnviosVuelta2}</span> | Cobrar Caja: <span className="text-green-800 font-black">${totalRendirVuelta2}</span>
+              </div>
+            </div>
+
             {enviosCadete2.length === 0 ? (
-              <p className="text-xs text-gray-400 italic py-2">Sin envíos asignados.</p>
+              <p className="text-xs text-gray-600 font-bold italic py-2 bg-purple-50 p-2 rounded">
+                Sin envíos en este viaje.
+              </p>
             ) : (
-              enviosCadete2.map((p) => (
-                <div key={p.id} className="p-2.5 border rounded bg-purple-50 flex justify-between items-center">
-                  <div>
-                    <p className="font-extrabold text-xs" style={styleTextoNegro}>{p.cliente_nombre}</p>
-                    <p className="text-xs text-gray-700">${p.monto_total} (Envío: ${p.costo_envio})</p>
+              enviosCadete2.map((p) => {
+                const direccionTxt = obtenerDireccion(p.observaciones);
+                return (
+                  <div key={p.id} className="p-2.5 border-2 border-purple-200 rounded bg-purple-50 flex justify-between items-center gap-2">
+                    <div>
+                      <p className="font-extrabold text-xs text-purple-950 uppercase">
+                        📍 {direccionTxt}
+                      </p>
+                      <p className="text-xs font-bold text-gray-800">
+                        👤 {p.cliente_nombre || 'Cliente Envío'}
+                      </p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">
+                        ${p.monto_total} (Envío: ${p.costo_envio})
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => asignarCadete(p.id, nombreCadete1)}
+                        className="text-xs bg-white text-blue-900 border-2 border-blue-400 font-extrabold px-2 py-1 rounded hover:bg-blue-50"
+                      >
+                        ⬅️ Pasar a {nombreCadete1}
+                      </button>
+                      <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-700 font-black px-2 py-1 hover:bg-red-100 rounded">
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => asignarCadete(p.id, nombreCadete1)}
-                      className="text-xs bg-white text-blue-800 border border-blue-300 font-bold px-2 py-1 rounded hover:bg-blue-100"
-                    >
-                      ⬅️ Pasar a {nombreCadete1}
-                    </button>
-                    <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-600 font-bold px-1.5 py-1">
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
+          </div>
+
+          {/* RESUMEN DE VUELTAS RENDIDAS DEL DÍA */}
+          <div className="pt-3 border-t border-gray-300 space-y-2">
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+              📋 Vueltas Rendidas en el Turno ({vueltasCadete2.length})
+            </h3>
+            {vueltasCadete2.length === 0 ? (
+              <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {vueltasCadete2.map((v, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
+                    <span>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
+                    <span className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TOTAL CIERRE DEL DÍA */}
+            <div className="bg-purple-100 p-3 rounded-lg border border-purple-300 space-y-1 mt-2">
+              <div className="text-xs font-black text-purple-950 uppercase">
+                📊 Cierre Acumulado del Día ({nombreCadete2})
+              </div>
+              <div className="flex justify-between text-xs font-bold text-black">
+                <span>Total Dinero Recaudado:</span>
+                <span className="font-black text-black">${acumuladoRendido2.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between text-xs font-bold text-black">
+                <span>Pagar por Envíos a Cadete:</span>
+                <span className="font-black text-purple-900">${acumuladoEnvios2.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black border-t border-purple-300 pt-1 text-black">
+                <span>Queda en Caja (Neto):</span>
+                <span className="text-green-800">${(acumuladoRendido2 - acumuladoEnvios2).toLocaleString('es-AR')}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
