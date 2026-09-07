@@ -9,6 +9,7 @@ interface DetallePedido {
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
+  ingredientes_ensalada?: string;
   menus?: { nombre: string };
   guarniciones?: { nombre: string };
 }
@@ -54,6 +55,7 @@ export default function HistorialPedidosPage() {
           cantidad,
           precio_unitario,
           subtotal,
+          ingredientes_ensalada,
           menus!left ( nombre ),
           guarniciones!left ( nombre )
         )
@@ -86,7 +88,12 @@ export default function HistorialPedidosPage() {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       
       const detalleStr = (p.detalle_pedidos || [])
-        .map((i) => `${i.cantidad}x ${i.menus?.nombre || 'Plato'}${i.guarniciones?.nombre ? ` (+ ${i.guarniciones.nombre})` : ''}`)
+        .map((i) => {
+          let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || 'Plato'}`;
+          if (i.menus?.nombre && i.guarniciones?.nombre) str += ` (+ ${i.guarniciones.nombre})`;
+          if (i.ingredientes_ensalada) str += ` [${i.ingredientes_ensalada}]`;
+          return str;
+        })
         .join('; ');
 
       const obsLimpia = (p.observaciones || '').replace(/"/g, '""');
@@ -129,39 +136,57 @@ export default function HistorialPedidosPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
+    const nombreClienteLimpio = (pedido.cliente_nombre || '').replace(/[^a-zA-Z0-9]/g, '');
+    const idCorto = pedido.id.slice(0, 6);
 
     const itemsHtml = (pedido.detalle_pedidos || [])
-      .map(
-        (i) => `
-        <div style="margin-bottom: 6px;">
-          <div style="font-size: 15px; font-weight: bold;">
-            ${i.cantidad}x ${i.menus?.nombre || '🍳 Huevo Frito / Adicional'}
-          </div>
-          ${i.guarniciones?.nombre ? `<div style="font-size: 13px; font-weight: bold; margin-left: 12px;">+ ${i.guarniciones.nombre}</div>` : ''}
-          <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
-        </div>`
-      )
+      .map((i) => {
+        // Guarnición Extra Suelta
+        if (!i.menus && i.guarniciones) {
+          return `
+            <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">
+                👉 EXTRA: ${i.guarniciones.nombre}
+              </div>
+              ${
+                i.ingredientes_ensalada
+                  ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>`
+                  : ''
+              }
+              <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+            </div>`;
+        }
+
+        // Plato / Menú
+        return `
+          <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+            <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
+              ${i.cantidad}x ${i.menus?.nombre || '🍳 HUEVO FRITO / ADICIONAL'}
+            </div>
+            ${i.guarniciones ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarniciones.nombre}</div>` : ''}
+            ${
+              i.ingredientes_ensalada
+                ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>`
+                : ''
+            }
+            <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+          </div>`;
+      })
       .join('');
 
-    let cabeceraEntrega = '';
-    if (pedido.tipo_entrega === 'ENVIO') {
-      cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-        🛵 ENVÍO
-      </div>`;
-    } else if (pedido.tipo_entrega === 'RETIRO') {
-      cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-        🚶 RETIRA EN LOCAL
-      </div>`;
-    } else {
-      cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-        🍽️ COMER EN BAR
-      </div>`;
-    }
+    // Extraer dirección de observaciones si existe
+    const matchDireccion = pedido.observaciones && pedido.observaciones.includes('Dirección:')
+      ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
+      : '';
+
+    let cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
+      ${pedido.tipo_entrega === 'ENVIO' ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRA EN LOCAL' : '🍽️ COMER EN BAR'}
+    </div>`;
 
     ventanaImpresion.document.write(`
       <html>
         <head>
-          <title>Ticket - RicosMediodias</title>
+          <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
             body { 
@@ -203,8 +228,8 @@ export default function HistorialPedidosPage() {
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
               ${pedido.horario_solicitado ? `
-                <div style="font-size: 11px; text-transform: uppercase;">Hora Entrega:</div>
-                <div style="font-size: 18px; font-weight: 900;">🕒 ${pedido.horario_solicitado} hs</div>
+                <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
+                <div style="font-size: 16px; font-weight: 900;">🕒 ${pedido.horario_solicitado} hs</div>
               ` : `
                 <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
                 <div style="font-size: 14px; font-weight: bold;">Lo antes posible</div>
@@ -213,7 +238,7 @@ export default function HistorialPedidosPage() {
 
             <div style="text-align: right;">
               ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ''}
-              <div style="font-size: 11px; text-transform: uppercase;">Total a pagar:</div>
+              <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
               <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
             </div>
           </div>
@@ -417,15 +442,22 @@ export default function HistorialPedidosPage() {
                   <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
                     {pedido.detalle_pedidos?.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
-                        <span className="font-extrabold" style={styleTextoNegro}>
-                          {item.cantidad}x {item.menus?.nombre || '🍳 Huevo Frito / Adicional'}
-                          {item.guarniciones?.nombre && (
+                        <div className="flex-1">
+                          <span className="font-extrabold" style={styleTextoNegro}>
+                            {item.cantidad}x {item.menus?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
+                          </span>
+                          {item.menus && item.guarniciones?.nombre && (
                             <span className="text-xs font-bold text-gray-600 block pl-3">
                               + {item.guarniciones.nombre}
                             </span>
                           )}
-                        </span>
-                        <span className="font-extrabold" style={styleTextoNegro}>
+                          {item.ingredientes_ensalada && (
+                            <span className="text-xs font-bold text-emerald-800 block pl-3">
+                              🥗 ({item.ingredientes_ensalada})
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-extrabold ml-2" style={styleTextoNegro}>
                           {formatearMoneda(item.subtotal)}
                         </span>
                       </div>
