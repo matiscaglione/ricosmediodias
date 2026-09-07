@@ -27,17 +27,19 @@ interface Pedido {
   observaciones: string;
   estado: string;
   created_at: string;
+  turno?: 'MAÑANA' | 'NOCHE';
   detalle_pedidos?: DetallePedido[];
 }
 
 export default function HistorialPedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     cargarPedidosDelDia();
-  }, []);
+  }, [filtroTurno]);
 
   async function cargarPedidosDelDia() {
     setCargando(true);
@@ -47,7 +49,7 @@ export default function HistorialPedidosPage() {
     const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
     const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('pedidos')
       .select(`
         *,
@@ -63,8 +65,13 @@ export default function HistorialPedidosPage() {
         )
       `)
       .gte('created_at', inicioDia.toISOString())
-      .lte('created_at', finDia.toISOString())
-      .order('created_at', { ascending: false });
+      .lte('created_at', finDia.toISOString());
+
+    if (filtroTurno !== 'TODOS') {
+      query = query.eq('turno', filtroTurno);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error al cargar pedidos:', error.message);
@@ -84,14 +91,14 @@ export default function HistorialPedidosPage() {
       return;
     }
 
-    const encabezados = ['Hora', 'Cliente', 'Telefono', 'Tipo Entrega', 'Detalle Platos', 'Costo Envio', 'Monto Platos', 'Total', 'Observaciones'];
+    const encabezados = ['Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega', 'Detalle Platos', 'Costo Envio', 'Monto Platos', 'Total', 'Observaciones'];
 
     const filas = pedidosFiltrados.map((p) => {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
-          let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || 'Plato'}`;
+          let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || i.bebidas?.nombre || 'Plato'}`;
           if (i.menus?.nombre && i.guarniciones?.nombre) str += ` (+ ${i.guarniciones.nombre})`;
           if (i.ingredientes_ensalada) str += ` [${i.ingredientes_ensalada}]`;
           return str;
@@ -103,6 +110,7 @@ export default function HistorialPedidosPage() {
 
       return [
         `"${hora}"`,
+        `"${p.turno || 'MAÑANA'}"`,
         `"${clienteLimpio}"`,
         `"${p.cliente_telefono || ''}"`,
         `"${p.tipo_entrega}"`,
@@ -122,7 +130,7 @@ export default function HistorialPedidosPage() {
     const fechaHoy = new Date().toISOString().split('T')[0];
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}.csv`);
+    link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}_${filtroTurno}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -372,21 +380,41 @@ export default function HistorialPedidosPage() {
 
       {/* FILTROS Y RESUMEN SEPARADO */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
-            <button
-              key={tipo}
-              onClick={() => setFiltroTipo(tipo)}
-              className={`px-4 py-2 rounded text-xs font-extrabold border-2 transition-colors ${
-                filtroTipo === tipo
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white border-gray-300 hover:bg-gray-100'
-              }`}
-              style={filtroTipo !== tipo ? styleTextoNegro : {}}
-            >
-              {tipo === 'TODOS' ? '📋 Todos' : tipo === 'ENVIO' ? '🛵 Envíos' : tipo === 'RETIRO' ? '🚶 Retiros' : '🍽️ Bar'}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-start sm:items-center">
+          {/* FILTRO TIPO ENTREGA */}
+          <div className="flex flex-wrap gap-1">
+            {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
+              <button
+                key={tipo}
+                onClick={() => setFiltroTipo(tipo)}
+                className={`px-3 py-1.5 rounded text-xs font-extrabold border-2 transition-colors ${
+                  filtroTipo === tipo
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white border-gray-300 hover:bg-gray-100'
+                }`}
+                style={filtroTipo !== tipo ? styleTextoNegro : {}}
+              >
+                {tipo === 'TODOS' ? '📋 Todos' : tipo === 'ENVIO' ? '🛵 Envíos' : tipo === 'RETIRO' ? '🚶 Retiros' : '🍽️ Bar'}
+              </button>
+            ))}
+          </div>
+
+          {/* FILTRO POR TURNO */}
+          <div className="flex gap-1 border-t sm:border-t-0 sm:border-l border-gray-300 pt-2 sm:pt-0 sm:pl-3">
+            {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setFiltroTurno(t)}
+                className={`px-3 py-1.5 rounded text-xs font-black border-2 ${
+                  filtroTurno === t
+                    ? 'bg-purple-700 text-white border-purple-700'
+                    : 'bg-white border-gray-300 text-black hover:bg-gray-100'
+                }`}
+              >
+                {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* CONTADORES DIFERENCIADOS */}
@@ -433,14 +461,18 @@ export default function HistorialPedidosPage() {
                 <div>
                   <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
                     <div>
-                      {/* ETIQUETA Y DIRECCIÓN (SI ES ENVÍO) */}
-                      <div className="mb-1 flex items-center gap-2">
+                      {/* ETIQUETA, TURNO Y DIRECCIÓN */}
+                      <div className="mb-1 flex items-center gap-1.5 flex-wrap">
                         <span className={`text-xs px-2.5 py-1 rounded font-black border inline-block ${
                           pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
                           pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
                           'bg-green-100 text-green-900 border-green-300'
                         }`}>
                           {pedido.tipo_entrega === 'ENVIO' ? '🛵 ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRO' : '🍽️ BAR'}
+                        </span>
+
+                        <span className="text-xs px-2 py-0.5 rounded font-black bg-purple-50 text-purple-900 border border-purple-200">
+                          {pedido.turno === 'NOCHE' ? '🌙 NOCHE' : '☀️ MAÑANA'}
                         </span>
 
                         {/* BADGE CON LA CANTIDAD DE PLATOS DEL TICKET */}

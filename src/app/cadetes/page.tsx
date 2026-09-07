@@ -13,6 +13,7 @@ interface PedidoEnvio {
   costo_envio: number;
   observaciones: string;
   cadete: string | null;
+  turno?: 'MAÑANA' | 'NOCHE';
   estado_cadete?: 'EN_VIAJE' | 'RENDIDO' | null;
   numero_vuelta?: number | null;
 }
@@ -28,6 +29,7 @@ interface VueltaRendida {
 export default function CadetesPage() {
   const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   const [pedidos, setPedidos] = useState<PedidoEnvio[]>([]);
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
   const [cargando, setCargando] = useState(false);
 
   // Nombres con persistencia en localStorage
@@ -47,14 +49,17 @@ export default function CadetesPage() {
     if (c1Guardado) setNombreCadete1(c1Guardado);
     if (c2Guardado) setNombreCadete2(c2Guardado);
 
-    // Cargar historial de vueltas rendidas del día
-    const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
-    const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
-    if (v1Guardadas) setVueltasCadete1(JSON.parse(v1Guardadas));
-    if (v2Guardadas) setVueltasCadete2(JSON.parse(v2Guardadas));
+    // Cargar historial de vueltas rendidas del día/turno
+    const claveV1 = `vueltasCadete1_${hoyArg}_${filtroTurno}`;
+    const claveV2 = `vueltasCadete2_${hoyArg}_${filtroTurno}`;
+    const v1Guardadas = localStorage.getItem(claveV1);
+    const v2Guardadas = localStorage.getItem(claveV2);
+
+    setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
+    setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
 
     cargarEnvios();
-  }, [hoyArg]);
+  }, [hoyArg, filtroTurno]);
 
   function guardarNombre1(nuevoNombre: string) {
     setNombreCadete1(nuevoNombre);
@@ -70,12 +75,17 @@ export default function CadetesPage() {
 
   async function cargarEnvios() {
     setCargando(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('pedidos')
       .select('*')
       .eq('tipo_entrega', 'ENVIO')
-      .gte('created_at', `${hoyArg}T03:00:00`)
-      .order('created_at', { ascending: false });
+      .gte('created_at', `${hoyArg}T03:00:00`);
+
+    if (filtroTurno !== 'TODOS') {
+      query = query.eq('turno', filtroTurno);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (!error && data) {
       setPedidos(data as PedidoEnvio[]);
@@ -169,10 +179,10 @@ export default function CadetesPage() {
 
     if (numeroCadete === 1) {
       setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete1_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
     } else {
       setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete2_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
     }
 
     setPedidos((prev) =>
@@ -223,10 +233,10 @@ export default function CadetesPage() {
 
     if (numeroCadete === 1) {
       setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete1_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
     } else {
       setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
+      localStorage.setItem(`vueltasCadete2_${hoyArg}_${filtroTurno}`, JSON.stringify(nuevoHistorial));
     }
 
     setPedidos((prev) =>
@@ -261,14 +271,37 @@ export default function CadetesPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
-      <header className="flex justify-between items-center">
-        <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
-          🛵 Control de Cadetes y Vueltas
-        </h1>
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
+            🛵 Control de Cadetes y Vueltas
+          </h1>
+          <p className="text-sm font-bold text-gray-700">Asignación y rendición por turnos</p>
+        </div>
         <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
           ⬅ Inicio
         </Link>
       </header>
+
+      {/* FILTRO DE TURNO */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 flex justify-between items-center">
+        <span className="text-xs font-bold" style={styleTextoNegro}>Filtrar Turno:</span>
+        <div className="flex gap-1">
+          {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setFiltroTurno(t)}
+              className={`text-xs px-3 py-1.5 rounded font-black border-2 ${
+                filtroTurno === t
+                  ? 'bg-blue-700 text-white border-blue-700'
+                  : 'bg-white border-gray-300 text-black hover:bg-gray-100'
+              }`}
+            >
+              {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ENVIOS PENDIENTES */}
       <div className="bg-white p-5 rounded-lg border-2 border-red-400 shadow-sm space-y-3">
@@ -443,7 +476,7 @@ export default function CadetesPage() {
             {/* TOTAL CIERRE DEL DÍA */}
             <div className="bg-blue-100 p-3 rounded-lg border border-blue-300 space-y-1 mt-2">
               <div className="text-xs font-black text-blue-950 uppercase">
-                📊 Cierre Acumulado del Día ({nombreCadete1})
+                📊 Cierre Acumulado ({nombreCadete1})
               </div>
               <div className="flex justify-between text-xs font-bold text-black">
                 <span>Total Dinero Recaudado:</span>
@@ -571,7 +604,7 @@ export default function CadetesPage() {
             {/* TOTAL CIERRE DEL DÍA */}
             <div className="bg-purple-100 p-3 rounded-lg border border-purple-300 space-y-1 mt-2">
               <div className="text-xs font-black text-purple-950 uppercase">
-                📊 Cierre Acumulado del Día ({nombreCadete2})
+                📊 Cierre Acumulado ({nombreCadete2})
               </div>
               <div className="flex justify-between text-xs font-bold text-black">
                 <span>Total Dinero Recaudado:</span>

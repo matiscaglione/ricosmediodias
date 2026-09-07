@@ -14,6 +14,7 @@ interface DetallePedido {
 interface Pedido {
   id: string;
   created_at: string;
+  turno?: 'MAÑANA' | 'NOCHE';
   detalle_pedidos: DetallePedido[];
 }
 
@@ -21,12 +22,13 @@ export default function EstadisticasPage() {
   const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
     cargarDatos();
-  }, [fechaInicio, fechaFin]);
+  }, [fechaInicio, fechaFin, filtroTurno]);
 
   async function cargarDatos() {
     setCargando(true);
@@ -35,11 +37,12 @@ export default function EstadisticasPage() {
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('pedidos')
       .select(`
         id,
         created_at,
+        turno,
         detalle_pedidos (
           cantidad,
           menus ( nombre, es_fijo ),
@@ -49,6 +52,12 @@ export default function EstadisticasPage() {
       `)
       .gte('created_at', `${fechaInicio}T03:00:00`)
       .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+
+    if (filtroTurno !== 'TODOS') {
+      query = query.eq('turno', filtroTurno);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setPedidos(data as unknown as Pedido[]);
@@ -120,9 +129,9 @@ export default function EstadisticasPage() {
         </div>
       </header>
 
-      {/* FILTROS DE FECHA */}
+      {/* FILTROS DE FECHA Y TURNO */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 flex flex-wrap gap-4 items-end justify-between">
-        <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-4 items-end">
           <div>
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Desde:</label>
             <input
@@ -143,12 +152,32 @@ export default function EstadisticasPage() {
               className="border-2 border-gray-400 p-2 rounded text-sm font-bold bg-white"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Turno:</label>
+            <div className="flex gap-1">
+              {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFiltroTurno(t)}
+                  className={`text-xs px-3 py-2 rounded font-black border-2 ${
+                    filtroTurno === t
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-white border-gray-300 text-black hover:bg-gray-100'
+                  }`}
+                >
+                  {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <button
           onClick={() => {
             setFechaInicio(hoyArg);
             setFechaFin(hoyArg);
+            setFiltroTurno('TODOS');
           }}
           className="bg-blue-600 text-white font-extrabold text-xs px-3 py-2 rounded hover:bg-blue-700"
         >
