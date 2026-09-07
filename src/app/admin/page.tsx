@@ -62,6 +62,7 @@ export default function AdminPage() {
   const [zonas, setZonas] = useState<ZonaEnvio[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [precioHuevoFrito, setPrecioHuevoFrito] = useState('500');
+  const [precioGuarnicionExtra, setPrecioGuarnicionExtra] = useState<number>(3000);
 
   // Buscador y Filtro para Menús
   const [busquedaMenu, setBusquedaMenu] = useState('');
@@ -125,8 +126,11 @@ export default function AdminPage() {
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').order('created_at', { ascending: true });
     if (zonasData) setZonas(zonasData);
 
-    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito').eq('id', 'general').single();
-if (confData) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
+    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito, precio_guarnicion_extra').eq('id', 'general').single();
+if (confData) {
+  if (confData.precio_huevo_frito) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
+  if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
+}
 
     const hoy = new Date().toISOString().split('T')[0];
     const { data: stockData } = await supabase.from('stock_diario').select('menu_id, cantidad_disponible').eq('fecha', hoy);
@@ -352,6 +356,21 @@ async function guardarPrecioHuevo(e: React.FormEvent) {
 
   if (!error) {
     alert('Precio de huevo frito actualizado correctamente');
+    cargarDatos();
+  } else {
+    alert('Error al guardar precio: ' + error.message);
+  }
+}
+
+async function guardarPrecioGuarnicionExtra(e: React.FormEvent) {
+  e.preventDefault();
+  const valor = parseFloat(String(precioGuarnicionExtra)) || 0;
+  const { error } = await supabase
+    .from('configuracion')
+    .upsert({ id: 'general', precio_guarnicion_extra: valor }, { onConflict: 'id' });
+
+  if (!error) {
+    alert('Precio de guarnición extra actualizado correctamente');
     cargarDatos();
   } else {
     alert('Error al guardar precio: ' + error.message);
@@ -843,6 +862,27 @@ async function guardarPrecioHuevo(e: React.FormEvent) {
       />
     </div>
     <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
+      💾 Guardar Precio
+    </button>
+  </form>
+</div>
+
+{/* SECCIÓN ADICIONALES: GUARNICIÓN EXTRA */}
+<div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+  <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🥗 Precio de Guarnición Extra / Adicional</h2>
+  <form onSubmit={guardarPrecioGuarnicionExtra} className="flex gap-3 items-end bg-purple-50 p-4 rounded-lg border border-purple-200">
+    <div className="flex-1">
+      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio Guarnición Extra ($)</label>
+      <input
+        type="number"
+        step="0.01"
+        style={styleTextoNegro}
+        value={precioGuarnicionExtra}
+        onChange={(e) => setPrecioGuarnicionExtra(Number(e.target.value))}
+        className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+      />
+    </div>
+    <button type="submit" className="bg-purple-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-purple-800">
       💾 Guardar Precio
     </button>
   </form>
