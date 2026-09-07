@@ -67,6 +67,14 @@ export default function ReportesPage() {
   const totalPlatosMonto = pedidos.reduce((acc, p) => acc + p.monto_platos, 0);
   const totalEnviosMonto = pedidos.reduce((acc, p) => acc + p.costo_envio, 0);
 
+  // CONTEO EXCLUSIVO DE PLATOS / MENÚS PRINCIPALES (Ignora bebidas y extras)
+  const totalPlatosCant = pedidos.reduce((acc, p) => {
+    const cantPlatos = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+      return d.menus ? subAcc + d.cantidad : subAcc;
+    }, 0);
+    return acc + cantPlatos;
+  }, 0);
+
   const totalEnviosCant = pedidos.filter((p) => p.tipo_entrega === 'ENVIO').length;
   const totalRetirosCant = pedidos.filter((p) => p.tipo_entrega === 'RETIRO').length;
   const totalBarCant = pedidos.filter((p) => p.tipo_entrega === 'BAR').length;
@@ -77,8 +85,10 @@ export default function ReportesPage() {
 
   pedidos.forEach((p) => {
     p.detalle_pedidos?.forEach((d) => {
-      const nombrePlato = d.menus?.nombre || 'Otro';
-      resumenPlatos[nombrePlato] = (resumenPlatos[nombrePlato] || 0) + d.cantidad;
+      if (d.menus?.nombre) {
+        const nombrePlato = d.menus.nombre;
+        resumenPlatos[nombrePlato] = (resumenPlatos[nombrePlato] || 0) + d.cantidad;
+      }
 
       if (d.guarniciones?.nombre) {
         const nombreGuarni = d.guarniciones.nombre;
@@ -90,7 +100,7 @@ export default function ReportesPage() {
   function exportarReporteCSV() {
     if (pedidos.length === 0) return alert('No hay datos para exportar en este rango.');
 
-    const encabezados = ['Fecha', 'Hora', 'Cliente', 'Tipo Entrega', 'Total Platos', 'Costo Envio', 'Total Pedido'];
+    const encabezados = ['Fecha', 'Hora', 'Cliente', 'Tipo Entrega', 'Total Platos ($)', 'Costo Envio ($)', 'Total Pedido ($)'];
     const filas = pedidos.map((p) => {
       const f = new Date(p.created_at);
       const fechaStr = f.toLocaleDateString('es-AR');
@@ -132,8 +142,8 @@ export default function ReportesPage() {
             📋 Pedidos
           </Link>
           <Link href="/estadisticas" className="bg-amber-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-amber-700">
-  🏆 Ranking
-</Link>
+            🏆 Ranking
+          </Link>
           <Link href="/admin" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
             ⚙️ Admin
           </Link>
@@ -184,23 +194,34 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {/* TOTAL RECAUDADO */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Total Recaudado</span>
           <span className="text-2xl font-black text-green-700">{formatearMoneda(totalRecaudado)}</span>
-          <span className="text-xs text-gray-500 block mt-1 font-bold">{pedidos.length} pedidos en total</span>
+          <span className="text-xs text-gray-500 block mt-1 font-bold">{pedidos.length} tickets en total</span>
         </div>
 
+        {/* CANTIDAD TOTAL DE PLATOS */}
+        <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
+          <span className="text-xs font-black text-blue-900 block uppercase">Total Platos / Menús</span>
+          <span className="text-2xl font-black text-blue-950">{totalPlatosCant}</span>
+          <span className="text-xs text-blue-800 block mt-1 font-bold">Sin bebidas/extras</span>
+        </div>
+
+        {/* VENTAS MONTO PLATOS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
-          <span className="text-xs font-bold text-gray-600 block">Ventas de Platos</span>
+          <span className="text-xs font-bold text-gray-600 block">Ventas de Platos ($)</span>
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalPlatosMonto)}</span>
         </div>
 
+        {/* MONTO ENVÍOS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
-          <span className="text-xs font-bold text-gray-600 block">Total en Envíos</span>
+          <span className="text-xs font-bold text-gray-600 block">Total en Envíos ($)</span>
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalEnviosMonto)}</span>
         </div>
 
+        {/* DESGLOSE CANTIDAD ENTREGAS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Desglose Entregas</span>
           <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>

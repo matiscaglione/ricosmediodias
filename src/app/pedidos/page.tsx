@@ -397,7 +397,7 @@ export default function HistorialPedidosPage() {
           </div>
 
           <div className="bg-blue-50 p-2.5 rounded border border-blue-200 text-center min-w-[120px]">
-            <span className="text-[11px] font-black text-blue-800 block uppercase">Total Platos</span>
+            <span className="text-[11px] font-black text-blue-800 block uppercase">Total Pedidos</span>
             <span className="text-lg font-black text-blue-900">{totalPlatosVendidos}</span>
           </div>
 
