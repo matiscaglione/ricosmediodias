@@ -95,6 +95,7 @@ function ContenidoTomaPedidos() {
   const [cantidad, setCantidad] = useState(1);
 
   const [precioHuevo, setPrecioHuevo] = useState<number>(500);
+  const [cantidadHuevosDuros, setCantidadHuevosDuros] = useState<number>(0);
 
   const searchParams = useSearchParams();
   const idEditarURL = searchParams.get("editar");
@@ -136,7 +137,6 @@ function ContenidoTomaPedidos() {
 
           const textoObs = pedidoData.observaciones || "";
 
-          // 1. Extraer la dirección si era un Envío
           const matchDireccion = textoObs
             .split("|")
             .find((s: string) => s.toLowerCase().includes("dirección:"));
@@ -144,14 +144,12 @@ function ContenidoTomaPedidos() {
             setDireccion(matchDireccion.replace(/dirección:/i, "").trim());
           }
 
-          // 2. Extraer huevos fritos si existían en la nota
           let huevosEncontrados = 0;
           const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
           if (matchHuevos) {
             huevosEncontrados = parseInt(matchHuevos[1], 10);
           }
 
-          // 3. Limpiar las observaciones
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
@@ -164,7 +162,6 @@ function ContenidoTomaPedidos() {
 
           setObservaciones(obsLimpia);
 
-          // 4. Reconstruir los ítems del carrito
           const detalles = pedidoData.detalle_pedidos || [];
           const itemsCargados: ItemPedido[] = detalles
             .filter((det: any) => det.menus || det.menu_id || det.guarniciones || det.bebidas || det.bebida_id)
@@ -308,12 +305,23 @@ function ContenidoTomaPedidos() {
         ? guarnicionSeleccionada.precio_extra
         : 0;
 
-    const costoHuevosTotal = cantidadHuevos * precioHuevo;
+    const costoHuevosFritos = cantidadHuevos * precioHuevo;
+    const costoHuevosDuros = cantidadHuevosDuros * precioHuevo;
+
     const subtotal =
-      (menuSeleccionado.precio + precioGuarnicion) * cantidad + costoHuevosTotal;
+      (menuSeleccionado.precio + precioGuarnicion) * cantidad +
+      costoHuevosFritos +
+      costoHuevosDuros;
 
     const esEnsaladaPrincipal = menuSeleccionado.nombre.toLowerCase().includes("ensalada");
     const llevaIngredientes = guarnicionSeleccionada?.requiere_ingredientes || esEnsaladaPrincipal;
+
+    let listaIngredientes = [...ingredientesElegidos];
+    if (llevaIngredientes && cantidadHuevosDuros > 0) {
+      listaIngredientes.push(
+        `${cantidadHuevosDuros} Huevo${cantidadHuevosDuros > 1 ? "s" : ""} Duro${cantidadHuevosDuros > 1 ? "s" : ""} Extra`
+      );
+    }
 
     setItems([
       ...items,
@@ -327,8 +335,8 @@ function ContenidoTomaPedidos() {
           menuSeleccionado.requiere_salsa && salsaSeleccionada
             ? salsaSeleccionada
             : undefined,
-        ingredientesEnsalada: llevaIngredientes && ingredientesElegidos.length > 0
-          ? ingredientesElegidos
+        ingredientesEnsalada: llevaIngredientes && listaIngredientes.length > 0
+          ? listaIngredientes
           : undefined,
         cantidadHuevos,
         cantidad,
@@ -341,6 +349,7 @@ function ContenidoTomaPedidos() {
     setSalsaSeleccionada(null);
     setIngredientesElegidos([]);
     setCantidadHuevos(0);
+    setCantidadHuevosDuros(0);
     setCantidad(1);
   }
   
@@ -572,7 +581,6 @@ function ContenidoTomaPedidos() {
     let pedidoIdGuardado = pedidoEditandoId;
 
     if (pedidoEditandoId) {
-      // --- MODO EDICIÓN ---
       for (const itemViejo of itemsOriginalesEditar) {
         if (itemViejo.menu) {
           const { data: stockActualData } = await supabase
@@ -620,7 +628,6 @@ function ContenidoTomaPedidos() {
         return;
       }
     } else {
-      // --- MODO CREACIÓN NUEVA ---
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from("pedidos")
         .insert([
@@ -685,7 +692,6 @@ function ContenidoTomaPedidos() {
           .eq("fecha", hoy)
           .eq("menu_id", item.menu.id);
       } else if (item.bebida) {
-        // Guardar bebida en detalle_pedidos
         await supabase.from("detalle_pedidos").insert([
           {
             pedido_id: pedidoIdGuardado,
@@ -696,7 +702,6 @@ function ContenidoTomaPedidos() {
           },
         ]);
       } else if (!item.menu && item.guarnicion) {
-        // Guardar guarnición extra en detalle_pedidos
         await supabase.from("detalle_pedidos").insert([
           {
             pedido_id: pedidoIdGuardado,
@@ -951,6 +956,7 @@ function ContenidoTomaPedidos() {
                           setSalsaSeleccionada(null);
                           setIngredientesElegidos([]);
                           setCantidadHuevos(0);
+                          setCantidadHuevosDuros(0);
                         }
                       }}
                       className={`p-3 rounded-lg border text-left transition-all ${
@@ -1031,6 +1037,7 @@ function ContenidoTomaPedidos() {
                           ) || null;
                         setGuarnicionSeleccionada(g);
                         setIngredientesElegidos([]);
+                        setCantidadHuevosDuros(0);
                       }}
                       className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold disabled:bg-gray-200"
                     >
@@ -1083,7 +1090,7 @@ function ContenidoTomaPedidos() {
                 {/* INGREDIENTES PARA GUARNICIÓN O ENSALADA COMO PLATO */}
                 {(guarnicionSeleccionada?.requiere_ingredientes ||
                   (menuSeleccionado && menuSeleccionado.nombre.toLowerCase().includes("ensalada"))) && (
-                  <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2">
+                  <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-3">
                     <label className="block text-xs font-black text-emerald-900">
                       🥗 Ingredientes para la Ensalada:
                     </label>
@@ -1106,6 +1113,32 @@ function ContenidoTomaPedidos() {
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* CONTROL DE HUEVOS DUROS EXTRA */}
+                    <div className="flex items-center justify-between pt-2 border-t border-emerald-200">
+                      <span className="text-xs font-bold text-emerald-950">
+                        🥚 Huevos duros extra (+{formatearMoneda(precioHuevo)} c/u):
+                      </span>
+                      <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-400">
+                        <button
+                          type="button"
+                          onClick={() => setCantidadHuevosDuros(Math.max(0, cantidadHuevosDuros - 1))}
+                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-black min-w-[16px] text-center" style={styleTextoNegro}>
+                          {cantidadHuevosDuros}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCantidadHuevosDuros(cantidadHuevosDuros + 1)}
+                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
