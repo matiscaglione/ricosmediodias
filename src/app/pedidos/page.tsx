@@ -143,11 +143,20 @@ export default function HistorialPedidosPage() {
 
     const itemsHtml = (pedido.detalle_pedidos || [])
       .map((i) => {
-        // Guarnición Extra Suelta
+        // 1. Si es una Bebida
+        if (i.bebidas) {
+          return `
+            <div style="margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+              <div style="font-size: 16px; font-weight: 900;">🥤 ${i.cantidad}x ${i.bebidas.nombre}</div>
+              <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+            </div>`;
+        }
+
+        // 2. Si es una Guarnición Extra Suelta
         if (!i.menus && i.guarniciones) {
           return `
             <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">
+              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #000;">
                 👉 EXTRA: ${i.guarniciones.nombre}
               </div>
               ${
@@ -159,11 +168,11 @@ export default function HistorialPedidosPage() {
             </div>`;
         }
 
-        // Plato / Menú
+        // 3. Si es un Plato / Menú Principal
         return `
           <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
             <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
-              ${i.cantidad}x ${i.menus?.nombre || '🍳 HUEVO FRITO / ADICIONAL'}
+              ${i.cantidad}x ${i.menus?.nombre || 'PLATO'}
             </div>
             ${i.guarniciones ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarniciones.nombre}</div>` : ''}
             ${
