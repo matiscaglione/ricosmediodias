@@ -90,7 +90,7 @@ export default function ReportesPage() {
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
-    // Cargar Pedidos
+    // Cargar Pedidos respetando el bloque operativo de 03:00 a 02:59
     let queryPedidos = supabase
       .from('pedidos')
       .select(`
@@ -148,8 +148,6 @@ export default function ReportesPage() {
   async function agregarGasto(e: React.FormEvent) {
     e.preventDefault();
     
-    // Si es tipo empleado, el concepto por defecto puede ser el puesto o "Pago a empleado", 
-    // pero aseguramos que no esté vacío.
     const conceptoFinal = nuevoGastoConcepto.trim() || (nuevoGastoTipo === 'EMPLEADO' ? 'Pago a Empleado' : '');
 
     if (!conceptoFinal || !nuevoGastoMonto) {
@@ -275,6 +273,11 @@ export default function ReportesPage() {
       }
     });
   });
+
+  // Ordenar de mayor a menor cantidad vendida
+  const platosOrdenados = Object.entries(resumenPlatos).sort((a, b) => b[1] - a[1]);
+  const guarnicionesOrdenadas = Object.entries(resumenGuarniciones).sort((a, b) => b[1] - a[1]);
+  const bebidasOrdenadas = Object.entries(resumenBebidas).sort((a, b) => b[1] - a[1]);
 
   function exportarReporteCSV() {
     if (pedidos.length === 0) return alert('No hay datos para exportar en este rango.');
@@ -418,22 +421,57 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* TARJETA DESTACADA: MONTO SOLO COMIDA */}
-      <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <span className="text-xs font-black text-emerald-900 uppercase block">
-            🍱 Recaudación Neta Solo Comidas (Platos + Extras)
-          </span>
-          <p className="text-xs text-emerald-800 font-bold">
-            Total Recaudado excluyendo Bebidas ({formatearMoneda(totalBebidasMonto)}) y Envíos ({formatearMoneda(totalEnviosMonto)})
-          </p>
+      {/* MÉTRICAS GENERALES */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300 col-span-1 sm:col-span-2 lg:col-span-1">
+          <span className="text-xs font-bold text-black block">Total Recaudado</span>
+          <span className="text-2xl font-black text-green-700">{formatearMoneda(totalRecaudado)}</span>
+          <span className="text-xs text-black block mt-1 font-bold">{pedidos.length} tickets</span>
         </div>
-        <div className="text-2xl md:text-3xl font-black text-emerald-950 bg-white px-4 py-2 rounded border border-emerald-300 shadow-sm">
-          {formatearMoneda(totalSoloComidaMonto)}
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
+          <span className="text-xs font-black text-blue-900 block uppercase">Total Platos / Menús</span>
+          <span className="text-2xl font-black text-blue-950">{totalPlatosCant} u.</span>
+          <span className="text-xs text-blue-800 block mt-1 font-bold">Platos principales</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50">
+          <span className="text-xs font-black text-cyan-900 block uppercase">🥤 Total Bebidas</span>
+          <span className="text-2xl font-black text-cyan-950">{totalBebidasCant} u.</span>
+          <span className="text-xs text-cyan-800 block mt-1 font-bold">{formatearMoneda(totalBebidasMonto)}</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50">
+          <span className="text-xs font-black text-purple-900 block uppercase">🍳 Total Extras</span>
+          <span className="text-2xl font-black text-purple-950">
+            {pedidos.reduce((acc, p) => acc + (p.detalle_pedidos || []).filter((d) => !d.menu_id && d.guarnicion_id).reduce((s, d) => s + d.cantidad, 0), 0)} u.
+          </span>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
+          <span className="text-xs font-bold text-black block">Total en Envíos ($)</span>
+          <span className="text-xl font-black" style={styleTextoNegro}>
+            {formatearMoneda(totalEnviosMonto)}
+          </span>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
+          <span className="text-xs font-bold text-black block">Desglose Entregas</span>
+          <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>
+            <div>
+              🛵 Envíos: <strong>{totalEnviosCant}</strong>
+            </div>
+            <div>
+              🚶 Retiros: <strong>{totalRetirosCant}</strong>
+            </div>
+            <div>
+              🍽️ Bar: <strong>{totalBarCant}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* CIERRE DE CAJA POR MÉTODO DE PAGO */}
+      {/* CIERRE DE CAJA POR MÉTODO DE PAGO (MOVIDO AQUÍ) */}
       <div className="bg-white p-5 rounded-lg border-2 border-amber-300 shadow-sm space-y-3">
         <h2 className="text-lg font-black text-amber-950">💵 Cierre por Método de Pago</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -581,68 +619,33 @@ export default function ReportesPage() {
         )}
       </div>
 
-      {/* MÉTRICAS GENERALES */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300 col-span-1 sm:col-span-2 lg:col-span-1">
-          <span className="text-xs font-bold text-black block">Total Recaudado</span>
-          <span className="text-2xl font-black text-green-700">{formatearMoneda(totalRecaudado)}</span>
-          <span className="text-xs text-black block mt-1 font-bold">{pedidos.length} tickets</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
-          <span className="text-xs font-black text-blue-900 block uppercase">Total Platos / Menús</span>
-          <span className="text-2xl font-black text-blue-950">{totalPlatosCant} u.</span>
-          <span className="text-xs text-blue-800 block mt-1 font-bold">Platos principales</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50">
-          <span className="text-xs font-black text-cyan-900 block uppercase">🥤 Total Bebidas</span>
-          <span className="text-2xl font-black text-cyan-950">{totalBebidasCant} u.</span>
-          <span className="text-xs text-cyan-800 block mt-1 font-bold">{formatearMoneda(totalBebidasMonto)}</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50">
-          <span className="text-xs font-black text-purple-900 block uppercase">🍳 Total Extras</span>
-          <span className="text-2xl font-black text-purple-950">
-            {pedidos.reduce((acc, p) => acc + (p.detalle_pedidos || []).filter((d) => !d.menu_id && d.guarnicion_id).reduce((s, d) => s + d.cantidad, 0), 0)} u.
+      {/* TARJETA DESTACADA: MONTO SOLO COMIDA */}
+      <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <span className="text-xs font-black text-emerald-900 uppercase block">
+            🍱 Recaudación Neta Solo Comidas (Platos + Extras)
           </span>
+          <p className="text-xs text-emerald-800 font-bold">
+            Total Recaudado excluyendo Bebidas ({formatearMoneda(totalBebidasMonto)}) y Envíos ({formatearMoneda(totalEnviosMonto)})
+          </p>
         </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
-          <span className="text-xs font-bold text-black block">Total en Envíos ($)</span>
-          <span className="text-xl font-black" style={styleTextoNegro}>
-            {formatearMoneda(totalEnviosMonto)}
-          </span>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
-          <span className="text-xs font-bold text-black block">Desglose Entregas</span>
-          <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>
-            <div>
-              🛵 Envíos: <strong>{totalEnviosCant}</strong>
-            </div>
-            <div>
-              🚶 Retiros: <strong>{totalRetirosCant}</strong>
-            </div>
-            <div>
-              🍽️ Bar: <strong>{totalBarCant}</strong>
-            </div>
-          </div>
+        <div className="text-2xl md:text-3xl font-black text-emerald-950 bg-white px-4 py-2 rounded border border-emerald-300 shadow-sm">
+          {formatearMoneda(totalSoloComidaMonto)}
         </div>
       </div>
 
-      {/* DESGLOSE EN TABLAS */}
+      {/* DESGLOSE EN TABLAS (ORDENADAS DE MAYOR A MENOR) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
           <h2 className="text-base font-black mb-3" style={styleTextoNegro}>
             🍲 Platos Principales Vendidos
           </h2>
 
-          {Object.keys(resumenPlatos).length === 0 ? (
+          {platosOrdenados.length === 0 ? (
             <p className="text-black text-xs font-bold text-center py-4">Sin datos de platos.</p>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {Object.entries(resumenPlatos).map(([plato, cantidad]) => (
+              {platosOrdenados.map(([plato, cantidad]) => (
                 <div key={plato} className="p-2 bg-gray-50 rounded border border-gray-300 flex justify-between items-center text-xs">
                   <span className="font-bold" style={styleTextoNegro}>
                     {plato}
@@ -661,11 +664,11 @@ export default function ReportesPage() {
             🥗 Guarniciones y Extras
           </h2>
 
-          {Object.keys(resumenGuarniciones).length === 0 ? (
+          {guarnicionesOrdenadas.length === 0 ? (
             <p className="text-black text-xs font-bold text-center py-4">Sin datos de guarniciones.</p>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {Object.entries(resumenGuarniciones).map(([guarni, cantidad]) => (
+              {guarnicionesOrdenadas.map(([guarni, cantidad]) => (
                 <div key={guarni} className="p-2 bg-white rounded border border-purple-200 flex justify-between items-center text-xs">
                   <span className="font-bold text-purple-950">{guarni}</span>
                   <span className="bg-purple-600 text-white font-black px-2 py-0.5 rounded-full">
@@ -682,11 +685,11 @@ export default function ReportesPage() {
             🥤 Bebidas Vendidas
           </h2>
 
-          {Object.keys(resumenBebidas).length === 0 ? (
+          {bebidasOrdenadas.length === 0 ? (
             <p className="text-black text-xs font-bold text-center py-4">Sin datos de bebidas.</p>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {Object.entries(resumenBebidas).map(([bebida, cantidad]) => (
+              {bebidasOrdenadas.map(([bebida, cantidad]) => (
                 <div key={bebida} className="p-2 bg-white rounded border border-cyan-200 flex justify-between items-center text-xs">
                   <span className="font-bold text-cyan-950">{bebida}</span>
                   <span className="bg-cyan-700 text-white font-black px-2 py-0.5 rounded-full">
