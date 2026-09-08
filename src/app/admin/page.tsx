@@ -49,11 +49,6 @@ interface ZonaEnvio {
 }
 
 export default function AdminPage() {
-  const CLAVE_CORRECTA = 'Matias$4925107';
-  const [claveIngresada, setClaveIngresada] = useState('');
-  const [autenticado, setAutenticado] = useState(false);
-  const [errorClave, setErrorClave] = useState(false);
-
   const [menus, setMenus] = useState<Menu[]>([]);
   const [bebidas, setBebidas] = useState<Bebida[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
@@ -84,29 +79,17 @@ export default function AdminPage() {
   const [nuevaBebidaNombre, setNuevaBebidaNombre] = useState('');
   const [nuevaBebidaPrecio, setNuevaBebidaPrecio] = useState('');
   const [nuevaGuarniNombre, setNuevaGuarniNombre] = useState('');
-  const [nuevaGuarniPrecio, setNuevaGuarniPrecio] = useState('0');
+  const [nuevaGuarniPrecio, setNuevaGuarniPrecio] =('0');
   const [nuevaGuarniRequiereIng, setNuevaGuarniRequiereIng] = useState(false);
   const [nuevoIngredienteNombre, setNuevoIngredienteNombre] = useState('');
   const [nuevaSalsaNombre, setNuevaSalsaNombre] = useState('');
   const [nuevaZonaNombre, setNuevaZonaNombre] = useState('');
   const [nuevaZonaPrecio, setNuevaZonaPrecio] = useState('');
 
+  // Se cargan los datos directamente al entrar
   useEffect(() => {
-    if (autenticado) {
-      cargarDatos();
-    }
-  }, [autenticado]);
-
-  function verificarClave(e: React.FormEvent) {
-    e.preventDefault();
-    if (claveIngresada === CLAVE_CORRECTA) {
-      setAutenticado(true);
-      setErrorClave(false);
-    } else {
-      setErrorClave(true);
-      setClaveIngresada('');
-    }
-  }
+    cargarDatos();
+  }, []);
 
   async function cargarDatos() {
     const { data: menusData } = await supabase.from('menus').select('*').order('created_at', { ascending: true });
@@ -404,53 +387,21 @@ export default function AdminPage() {
 
   const styleTextoNegro = { color: '#000000' };
 
-  if (!autenticado) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white p-8 rounded-xl shadow-md border-2 border-gray-300 max-w-md w-full text-center">
-          <div className="text-4xl mb-2">🔒</div>
-          <h1 className="text-2xl font-black mb-2" style={styleTextoNegro}>Acceso Administrador</h1>
-          <p className="text-xs text-gray-600 font-bold mb-6">Ingresá la contraseña para gestionar la app.</p>
-
-          <form onSubmit={verificarClave} className="space-y-4">
-            <input
-              type="password"
-              style={styleTextoNegro}
-              value={claveIngresada}
-              onChange={(e) => setClaveIngresada(e.target.value)}
-              placeholder="Ingresar Clave"
-              className="w-full border-2 border-gray-400 p-3 rounded-lg text-center font-black text-lg focus:outline-none"
-              autoFocus
-            />
-
-            {errorClave && (
-              <p className="text-xs text-red-600 font-extrabold bg-red-50 p-2 rounded border border-red-200">
-                ⚠️ Clave incorrecta.
-              </p>
-            )}
-
-            <button type="submit" className="w-full bg-black text-white font-extrabold py-3 rounded-lg hover:bg-gray-800 transition-colors">
-              Ingresar
-            </button>
-          </form>
-
-          <div className="mt-6 border-t pt-4">
-            <Link href="/" className="text-xs font-bold text-gray-600 hover:text-black">
-              ⬅ Volver a Toma de Pedidos
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 max-w-5xl mx-auto font-sans bg-gray-100 min-h-screen space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-black" style={styleTextoNegro}>Panel de Administración</h1>
         <div className="flex gap-2">
-          <button onClick={() => setAutenticado(false)} className="bg-gray-300 text-gray-800 text-sm px-3 py-2 rounded font-bold hover:bg-gray-400">
-            🔒 Salir
+          {/* BOTÓN PARA CERRAR SESIÓN EN EL DISPOSITIVO */}
+          <button
+            onClick={() => {
+              localStorage.removeItem('clave_acceso_ricos');
+              window.location.reload();
+            }}
+            className="bg-red-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-red-700 transition-colors"
+            title="Cerrar sesión en este dispositivo"
+          >
+            🔒 Cerrar Sesión
           </button>
           <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
             ⬅ Toma de Pedidos
