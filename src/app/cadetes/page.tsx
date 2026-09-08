@@ -34,28 +34,23 @@ export default function CadetesPage() {
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
   const [cargando, setCargando] = useState(false);
 
-  // Nombres con persistencia en localStorage
+  // Nombres sincronizados con Supabase
   const [nombreCadete1, setNombreCadete1] = useState('Cadete 1');
   const [nombreCadete2, setNombreCadete2] = useState('Cadete 2');
   const [editandoCadete1, setEditandoCadete1] = useState(false);
   const [editandoCadete2, setEditandoCadete2] = useState(false);
 
-  // Historial de Vueltas Rendidas del día
+  // Historial de Vueltas Rendidas del día (guardadas en localStorage por fecha/turno)
   const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
   const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
 
   useEffect(() => {
-    const c1Guardado = localStorage.getItem('nombreCadete1');
-    const c2Guardado = localStorage.getItem('nombreCadete2');
-    if (c1Guardado) setNombreCadete1(c1Guardado);
-    if (c2Guardado) setNombreCadete2(c2Guardado);
+    cargarConfiguracionYEnvios();
 
     const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
     const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
     setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
     setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
-
-    cargarEnvios();
 
     // Escuchar cambios en tiempo real
     const canal = supabase
@@ -74,20 +69,24 @@ export default function CadetesPage() {
     };
   }, [hoyArg, filtroTurno]);
 
-  function guardarNombre1(nuevoNombre: string) {
-    setNombreCadete1(nuevoNombre);
-    localStorage.setItem('nombreCadete1', nuevoNombre);
-    setEditandoCadete1(false);
-  }
+  async function cargarConfiguracionYEnvios() {
+    setCargando(true);
+    // Cargar nombres de cadetes desde Supabase
+    const { data: confData } = await supabase
+      .from('configuracion')
+      .select('nombre_cadete_1, nombre_cadete_2')
+      .eq('id', 'general')
+      .single();
 
-  function guardarNombre2(nuevoNombre: string) {
-    setNombreCadete2(nuevoNombre);
-    localStorage.setItem('nombreCadete2', nuevoNombre);
-    setEditandoCadete2(false);
+    if (confData) {
+      if (confData.nombre_cadete_1) setNombreCadete1(confData.nombre_cadete_1);
+      if (confData.nombre_cadete_2) setNombreCadete2(confData.nombre_cadete_2);
+    }
+
+    await cargarEnvios();
   }
 
   async function cargarEnvios() {
-    setCargando(true);
     let query = supabase
       .from('pedidos')
       .select('*')
@@ -104,6 +103,22 @@ export default function CadetesPage() {
       setPedidos(data as PedidoEnvio[]);
     }
     setCargando(false);
+  }
+
+  async function guardarNombre1(nuevoNombre: string) {
+    setNombreCadete1(nuevoNombre);
+    setEditandoCadete1(false);
+    await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', nombre_cadete_1: nuevoNombre }, { onConflict: 'id' });
+  }
+
+  async function guardarNombre2(nuevoNombre: string) {
+    setNombreCadete2(nuevoNombre);
+    setEditandoCadete2(false);
+    await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', nombre_cadete_2: nuevoNombre }, { onConflict: 'id' });
   }
 
   async function asignarCadete(idPedido: string, nombreCadete: string | null) {
