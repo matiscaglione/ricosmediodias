@@ -76,9 +76,9 @@ export default function HistorialPedidosPage() {
   async function cargarPedidos() {
     setCargando(true);
     
-    // Configurar el rango completo del día desde las 00:00:00 del "Desde" hasta las 23:59:59 del "Hasta"
-    const inicioStr = `${fechaDesde}T00:00:00.000Z`;
-    const finStr = `${fechaHasta}T23:59:59.999Z`;
+    // Armamos el rango respetando el día calendario local sin forzar UTC (quitando la 'Z')
+    const inicioStr = `${fechaDesde}T00:00:00`;
+    const finStr = `${fechaHasta}T23:59:59`;
 
     let query = supabase
       .from('pedidos')
