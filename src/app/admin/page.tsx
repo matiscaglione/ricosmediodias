@@ -83,9 +83,11 @@ export default function AdminPage() {
   const [busquedaMenu, setBusquedaMenu] = useState('');
   const [filtroMenuTipo, setFiltroMenuTipo] = useState<'TODOS' | 'FIJO' | 'DIA' | 'SALSA' | 'GUARNICION'>('TODOS');
 
-  // Estado para Edición de Menú y Bebida
+  // Estados para Edición
   const [menuEditando, setMenuEditando] = useState<Menu | null>(null);
   const [bebidaEditando, setBebidaEditando] = useState<Bebida | null>(null);
+  const [empresaEditando, setEmpresaEditando] = useState<Empresa | null>(null);
+  const [empleadoEditando, setEmpleadoEditando] = useState<Empleado | null>(null);
 
   // Form Nuevo Menú
   const [nuevoNombre, setNuevoNombre] = useState('');
@@ -408,6 +410,26 @@ export default function AdminPage() {
     }
   }
 
+  async function guardarEdicionEmpresa() {
+    if (!empresaEditando || !empresaEditando.nombre.trim()) return;
+
+    const { error } = await supabase
+      .from('empresas')
+      .update({
+        nombre: empresaEditando.nombre.trim(),
+        cuit: empresaEditando.cuit?.trim() || null,
+        telefono: empresaEditando.telefono?.trim() || null,
+      })
+      .eq('id', empresaEditando.id);
+
+    if (error) {
+      alert("Error actualizando empresa: " + error.message);
+    } else {
+      setEmpresaEditando(null);
+      cargarDatos();
+    }
+  }
+
   async function toggleActivaEmpresa(id: string, estadoActual: boolean) {
     const { error } = await supabase.from('empresas').update({ activa: !estadoActual }).eq('id', id);
     if (error) alert("Error cambiando estado de empresa: " + error.message);
@@ -446,6 +468,25 @@ export default function AdminPage() {
     } else {
       setNuevoEmpleadoNombre('');
       setNuevoEmpleadoPuesto('');
+      cargarDatos();
+    }
+  }
+
+  async function guardarEdicionEmpleado() {
+    if (!empleadoEditando || !empleadoEditando.nombre.trim()) return;
+
+    const { error } = await supabase
+      .from('empleados')
+      .update({
+        nombre: empleadoEditando.nombre.trim(),
+        puesto: empleadoEditando.puesto?.trim() || null,
+      })
+      .eq('id', empleadoEditando.id);
+
+    if (error) {
+      alert("Error actualizando empleado: " + error.message);
+    } else {
+      setEmpleadoEditando(null);
       cargarDatos();
     }
   }
@@ -821,6 +862,7 @@ export default function AdminPage() {
                     className="border p-1 text-sm font-bold w-1/4"
                   />
                   <button onClick={guardarEdicionBebida} className="bg-green-600 text-white text-xs font-bold px-2 rounded">💾</button>
+                  <button onClick={() => setBebidaEditando(null)} className="bg-gray-400 text-white text-xs font-bold px-2 rounded">✕</button>
                 </div>
               ) : (
                 <>
@@ -997,19 +1039,76 @@ export default function AdminPage() {
           <button type="submit" className="bg-indigo-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-indigo-800">+ Agregar Empresa</button>
         </form>
 
-        <div className="flex flex-wrap gap-2">
-          {empresas.map((emp) => (
-            <div key={emp.id} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded">
-              <div>
-                <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
-                {emp.cuit && <span className="text-xs font-bold text-gray-600">CUIT: {emp.cuit}</span>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {empresas.map((emp) => {
+            const esEditando = empresaEditando?.id === emp.id;
+
+            return (
+              <div key={emp.id} className="p-3 border border-indigo-200 bg-indigo-50 rounded-lg">
+                {esEditando ? (
+                  <div className="space-y-2 bg-white p-3 rounded border border-indigo-300">
+                    <h4 className="text-xs font-black text-indigo-900 uppercase">Editando Empresa</h4>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700">Nombre *</label>
+                      <input
+                        type="text"
+                        value={empresaEditando.nombre}
+                        onChange={(e) => setEmpresaEditando({ ...empresaEditando, nombre: e.target.value })}
+                        className="w-full border border-gray-400 p-1 rounded text-xs font-bold text-black"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700">CUIT</label>
+                        <input
+                          type="text"
+                          value={empresaEditando.cuit || ''}
+                          onChange={(e) => setEmpresaEditando({ ...empresaEditando, cuit: e.target.value })}
+                          className="w-full border border-gray-400 p-1 rounded text-xs font-bold text-black"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700">Teléfono</label>
+                        <input
+                          type="text"
+                          value={empresaEditando.telefono || ''}
+                          onChange={(e) => setEmpresaEditando({ ...empresaEditando, telefono: e.target.value })}
+                          className="w-full border border-gray-400 p-1 rounded text-xs font-bold text-black"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={guardarEdicionEmpresa} className="flex-1 bg-emerald-700 text-white font-extrabold text-xs py-1.5 rounded hover:bg-emerald-800">
+                        💾 Guardar
+                      </button>
+                      <button onClick={() => setEmpresaEditando(null)} className="bg-gray-400 text-white font-bold text-xs px-3 rounded hover:bg-gray-500">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
+                      <div className="text-xs font-bold text-gray-600 flex gap-2">
+                        {emp.cuit && <span>CUIT: {emp.cuit}</span>}
+                        {emp.telefono && <span>Tel: {emp.telefono}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEmpresaEditando(emp)} className="text-xs bg-blue-100 text-blue-900 font-bold px-2 py-1 rounded hover:bg-blue-200">
+                        ✏️ Editar
+                      </button>
+                      <button onClick={() => toggleActivaEmpresa(emp.id, emp.activa)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
+                        {emp.activa ? 'Activa' : 'Inactiva'}
+                      </button>
+                      <button onClick={() => eliminarEmpresa(emp.id)} className="text-red-600 font-bold text-xs px-1">✕</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button onClick={() => toggleActivaEmpresa(emp.id, emp.activa)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
-                {emp.activa ? 'Activa' : 'Inactiva'}
-              </button>
-              <button onClick={() => eliminarEmpresa(emp.id)} className="text-red-600 font-bold text-xs ml-1">✕</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -1028,19 +1127,62 @@ export default function AdminPage() {
           <button type="submit" className="bg-amber-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-800">+ Agregar Empleado</button>
         </form>
 
-        <div className="flex flex-wrap gap-2">
-          {empleados.map((emp) => (
-            <div key={emp.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-2.5 rounded">
-              <div>
-                <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
-                {emp.puesto && <span className="text-xs font-bold text-gray-600">{emp.puesto}</span>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {empleados.map((emp) => {
+            const esEditando = empleadoEditando?.id === emp.id;
+
+            return (
+              <div key={emp.id} className="p-3 border border-amber-200 bg-amber-50 rounded-lg">
+                {esEditando ? (
+                  <div className="space-y-2 bg-white p-3 rounded border border-amber-300">
+                    <h4 className="text-xs font-black text-amber-900 uppercase">Editando Empleado</h4>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700">Nombre *</label>
+                      <input
+                        type="text"
+                        value={empleadoEditando.nombre}
+                        onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, nombre: e.target.value })}
+                        className="w-full border border-gray-400 p-1 rounded text-xs font-bold text-black"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700">Puesto / Rol</label>
+                      <input
+                        type="text"
+                        value={empleadoEditando.puesto || ''}
+                        onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, puesto: e.target.value })}
+                        className="w-full border border-gray-400 p-1 rounded text-xs font-bold text-black"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={guardarEdicionEmpleado} className="flex-1 bg-emerald-700 text-white font-extrabold text-xs py-1.5 rounded hover:bg-emerald-800">
+                        💾 Guardar
+                      </button>
+                      <button onClick={() => setEmpleadoEditando(null)} className="bg-gray-400 text-white font-bold text-xs px-3 rounded hover:bg-gray-500">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
+                      {emp.puesto && <span className="text-xs font-bold text-gray-600">{emp.puesto}</span>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEmpleadoEditando(emp)} className="text-xs bg-blue-100 text-blue-900 font-bold px-2 py-1 rounded hover:bg-blue-200">
+                        ✏️ Editar
+                      </button>
+                      <button onClick={() => toggleActivoEmpleado(emp.id, emp.activo)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activo ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
+                        {emp.activo ? 'Activo' : 'Inactivo'}
+                      </button>
+                      <button onClick={() => eliminarEmpleado(emp.id)} className="text-red-600 font-bold text-xs px-1">✕</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button onClick={() => toggleActivoEmpleado(emp.id, emp.activo)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activo ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
-                {emp.activo ? 'Activo' : 'Inactivo'}
-              </button>
-              <button onClick={() => eliminarEmpleado(emp.id)} className="text-red-600 font-bold text-xs ml-1">✕</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
