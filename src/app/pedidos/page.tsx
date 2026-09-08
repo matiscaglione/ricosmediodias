@@ -75,10 +75,9 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
   async function cargarPedidos() {
     setCargando(true);
     
-    // Mismo criterio exacto que Cierre de Caja (de 03:00 AM del día de inicio hasta las 02:59:59 del día posterior al fin)
-    const fFin = new Date(`${fechaHasta}T00:00:00`);
-    fFin.setDate(fFin.getDate() + 1);
-    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
+    // Filtro estricto por día calendario exacto (medianoche a medianoche local)
+    const inicioStr = `${fechaDesde}T00:00:00`;
+    const finStr = `${fechaHasta}T23:59:59`;
 
     let query = supabase
       .from('pedidos')
@@ -97,8 +96,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', `${fechaDesde}T03:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+      .gte('created_at', inicioStr)
+      .lte('created_at', finStr);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -114,7 +113,6 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
     }
     setCargando(false);
   }
-
   // CAMBIAR TURNO RÁPIDO HACIENDO CLIC EN LA ETIQUETA
   async function toggleTurnoPedido(id: string, turnoActual?: 'MAÑANA' | 'NOCHE') {
     const nuevoTurno = turnoActual === 'NOCHE' ? 'MAÑANA' : 'NOCHE';
