@@ -48,6 +48,8 @@ interface ItemPedido {
   guarnicion?: Guarnicion;
   salsa?: Salsa;
   ingredientesEnsalada?: string[];
+  agregadosTexto?: string;
+  precioAgregados?: number;
   cantidadHuevos: number;
   cantidad: number;
   subtotal: number;
@@ -85,6 +87,12 @@ function ContenidoTomaPedidos() {
   const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
+  
+  // Nuevos estados para Agregados/Modificaciones del Plato y Cantidad de Bebidas con botones +/-
+  const [agregadosTexto, setAgregadosTexto] = useState("");
+  const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
+  const [cantidadBebida, setCantidadBebida] = useState<number>(1);
+
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
@@ -213,7 +221,6 @@ function ContenidoTomaPedidos() {
     }
     setStockMap(mapa);
 
-    // Carga la configuración (incluye el recargo editable)
     const { data: confData } = await supabase
       .from("configuracion")
       .select("precio_huevo_frito, precio_guarnicion_extra, recargo_tarjeta_porc")
@@ -306,9 +313,10 @@ function ContenidoTomaPedidos() {
 
     const costoHuevosFritos = cantidadHuevos * precioHuevo;
     const costoHuevosDuros = cantidadHuevosDuros * precioHuevo;
+    const extraAgregados = Number(precioAgregadosExtra) || 0;
 
     const subtotal =
-      (menuSeleccionado.precio + precioGuarnicion) * cantidad +
+      (menuSeleccionado.precio + precioGuarnicion + extraAgregados) * cantidad +
       costoHuevosFritos +
       costoHuevosDuros;
 
@@ -337,6 +345,8 @@ function ContenidoTomaPedidos() {
         ingredientesEnsalada: llevaIngredientes && listaIngredientes.length > 0
           ? listaIngredientes
           : undefined,
+        agregadosTexto: agregadosTexto.trim() ? agregadosTexto.trim() : undefined,
+        precioAgregados: extraAgregados > 0 ? extraAgregados : undefined,
         cantidadHuevos,
         cantidad,
         subtotal,
@@ -347,6 +357,8 @@ function ContenidoTomaPedidos() {
     setGuarnicionSeleccionada(null);
     setSalsaSeleccionada(null);
     setIngredientesElegidos([]);
+    setAgregadosTexto("");
+    setPrecioAgregadosExtra(0);
     setCantidadHuevos(0);
     setCantidadHuevosDuros(0);
     setCantidad(1);
@@ -355,17 +367,19 @@ function ContenidoTomaPedidos() {
   function agregarBebidaAlPedido() {
     if (!bebidaSeleccionada) return;
 
+    const cantBeb = Math.max(1, cantidadBebida);
     setItems([
       ...items,
       {
         bebida: bebidaSeleccionada,
         cantidadHuevos: 0,
-        cantidad: 1,
-        subtotal: bebidaSeleccionada.precio,
+        cantidad: cantBeb,
+        subtotal: bebidaSeleccionada.precio * cantBeb,
       },
     ]);
 
     setBebidaSeleccionada(null);
+    setCantidadBebida(1);
   }
 
   function agregarGuarnicionExtraAlPedido() {
@@ -393,7 +407,6 @@ function ContenidoTomaPedidos() {
   const montoPlatos = items.reduce((acc, item) => acc + item.subtotal, 0);
   const costoEnvio = tipoEntrega === "ENVIO" && zonaSeleccionada ? zonaSeleccionada.precio : 0;
   
-  // Cálculo de Totales y Recargos por Tarjeta
   const subtotalSinRecargo = montoPlatos + costoEnvio;
   const montoRecargoTarjeta = metodoPago === "TARJETA" ? Math.round(subtotalSinRecargo * (recargoTarjetaPorc / 100)) : 0;
   const montoTotal = subtotalSinRecargo + montoRecargoTarjeta;
@@ -485,6 +498,7 @@ function ContenidoTomaPedidos() {
   </div>
   ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
   ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
+  ${i.agregadosTexto ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; color: #000;">📝 MODIF: ${i.agregadosTexto}</div>` : ""}
   ${
     i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
       ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientesEnsalada.join(", ")})</div>`
@@ -826,13 +840,11 @@ function ContenidoTomaPedidos() {
               ))}
             </div>
 
-            {/* SELECCIÓN DE MÉTODO DE PAGO */}
             <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg space-y-2">
               <div className="flex justify-between items-center">
                 <label className="block text-xs font-black text-amber-950">
                   💳 Método de Pago:
                 </label>
-                {/* Permite ajustar temporalmente el recargo en vivo si hace falta */}
                 <div className="flex items-center gap-1 text-xs font-bold text-amber-950">
                   <span>Recargo Tarjeta:</span>
                   <input
@@ -1036,6 +1048,8 @@ function ContenidoTomaPedidos() {
                           setGuarnicionSeleccionada(null);
                           setSalsaSeleccionada(null);
                           setIngredientesElegidos([]);
+                          setAgregadosTexto("");
+                          setPrecioAgregadosExtra(0);
                           setCantidadHuevos(0);
                           setCantidadHuevosDuros(0);
                         }
@@ -1139,6 +1153,7 @@ function ContenidoTomaPedidos() {
                     </select>
                   </div>
 
+                  {/* NUEVO: CANTIDAD DE VIANDAS CON RECUADRO - / + */}
                   <div>
                     <label
                       className="block text-xs font-bold mb-1"
@@ -1146,25 +1161,52 @@ function ContenidoTomaPedidos() {
                     >
                       Cantidad Platos
                     </label>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded border-2 border-gray-400 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                      >
+                        -
+                      </button>
+                      <span className="text-sm font-black min-w-[20px] text-center" style={styleTextoNegro}>
+                        {cantidad}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCantidad(cantidad + 1)}
+                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* NUEVO: AGREGADOS / MODIFICACIONES AL PLATO */}
+                <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg space-y-2">
+                  <label className="block text-xs font-black text-amber-950">
+                    ✏️ Agregados / Modificaciones al Plato (ej: c/ queso, napolitana sin salsa, bandeja separada):
+                  </label>
+                  <div className="flex gap-2">
                     <input
-                      type="number"
-                      min="1"
-                      style={styleTextoNegro}
-                      value={cantidad === 0 ? "" : cantidad}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "") {
-                          setCantidad(0);
-                        } else {
-                          const parsed = parseInt(val, 10);
-                          setCantidad(isNaN(parsed) ? 1 : Math.max(1, parsed));
-                        }
-                      }}
-                      onBlur={() => {
-                        if (cantidad === 0) setCantidad(1);
-                      }}
-                      className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                      type="text"
+                      value={agregadosTexto}
+                      onChange={(e) => setAgregadosTexto(e.target.value)}
+                      placeholder="Ej: con queso / sin salsa / en bandeja separada"
+                      className="flex-1 border border-amber-400 p-2 rounded text-xs bg-white font-bold text-black"
                     />
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-amber-950">Precio Extra $:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={precioAgregadosExtra === 0 ? "" : precioAgregadosExtra}
+                        onChange={(e) => setPrecioAgregadosExtra(Number(e.target.value))}
+                        placeholder="0"
+                        className="w-20 border border-amber-400 p-2 rounded text-xs bg-white font-bold text-black text-center"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1321,12 +1363,12 @@ function ContenidoTomaPedidos() {
             )}
           </div>
 
-          {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS */}
+          {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS CON RECUADRO - / + */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
               4. Agregar Bebida
             </h2>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-3 items-center">
               <select
                 style={styleTextoNegro}
                 value={bebidaSeleccionada?.id || ""}
@@ -1335,7 +1377,7 @@ function ContenidoTomaPedidos() {
                     bebidas.find((b) => b.id === e.target.value) || null,
                   )
                 }
-                className="flex-1 border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+                className="flex-1 w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
               >
                 <option value="">-- Seleccionar Bebida --</option>
                 {bebidas.map((b) => (
@@ -1344,13 +1386,36 @@ function ContenidoTomaPedidos() {
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={agregarBebidaAlPedido}
-                className="bg-blue-600 text-white font-extrabold px-4 py-2 rounded text-sm hover:bg-blue-700"
-              >
-                + Agregar
-              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded border-2 border-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBebida(Math.max(1, cantidadBebida - 1))}
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                  >
+                    -
+                  </button>
+                  <span className="text-xs font-black min-w-[16px] text-center" style={styleTextoNegro}>
+                    {cantidadBebida}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBebida(cantidadBebida + 1)}
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={agregarBebidaAlPedido}
+                  className="bg-blue-600 text-white font-extrabold px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap"
+                >
+                  + Agregar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1402,6 +1467,11 @@ function ContenidoTomaPedidos() {
                           {item.guarnicion && (
                             <div className="text-xs font-bold text-gray-700">
                               + {item.guarnicion.nombre}
+                            </div>
+                          )}
+                          {item.agregadosTexto && (
+                            <div className="text-xs font-black text-amber-900">
+                              📝 {item.agregadosTexto} {item.precioAgregados ? `(+${formatearMoneda(item.precioAgregados)})` : ""}
                             </div>
                           )}
                           {item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
