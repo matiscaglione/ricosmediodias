@@ -44,6 +44,7 @@ export default function HistorialPedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
+  const [busquedaTexto, setBusquedaTexto] = useState<string>('');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -299,9 +300,41 @@ export default function HistorialPedidosPage() {
     ventanaImpresion.document.close();
   }
 
+  // Lógica de Filtrado Completa (Tipo, Turno y Buscador de Texto)
   const pedidosFiltrados = pedidos.filter((p) => {
-    if (filtroTipo === 'TODOS') return true;
-    return p.tipo_entrega === filtroTipo;
+    // 1. Filtro Tipo Entrega
+    if (filtroTipo !== 'TODOS' && p.tipo_entrega !== filtroTipo) {
+      return false;
+    }
+
+    // 2. Buscador de Texto Libre
+    if (!busquedaTexto.trim()) return true;
+
+    const query = busquedaTexto.toLowerCase().trim();
+
+    const nombreMatch = (p.cliente_nombre || '').toLowerCase().includes(query);
+    const telefonoMatch = (p.cliente_telefono || '').toLowerCase().includes(query);
+    const obsMatch = (p.observaciones || '').toLowerCase().includes(query);
+
+    const itemsMatch = (p.detalle_pedidos || []).some((item) => {
+      const menuNom = (item.menus?.nombre || '').toLowerCase();
+      const guarNom = (item.guarniciones?.nombre || '').toLowerCase();
+      const bebNom = (item.bebidas?.nombre || '').toLowerCase();
+      const agrMenu = (item.agregado_menu || '').toLowerCase();
+      const agrGuar = (item.agregado_guarnicion || '').toLowerCase();
+      const ensalada = (item.ingredientes_ensalada || '').toLowerCase();
+
+      return (
+        menuNom.includes(query) ||
+        guarNom.includes(query) ||
+        bebNom.includes(query) ||
+        agrMenu.includes(query) ||
+        agrGuar.includes(query) ||
+        ensalada.includes(query)
+      );
+    });
+
+    return nombreMatch || telefonoMatch || obsMatch || itemsMatch;
   });
 
   const totalRecaudado = pedidosFiltrados.reduce((acc, p) => acc + p.monto_total, 0);
@@ -402,9 +435,53 @@ export default function HistorialPedidosPage() {
         </div>
       </header>
 
-      {/* FILTROS Y RESUMEN SEPARADO */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-start sm:items-center">
+      {/* FILTROS, BUSCADOR Y RESUMEN */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+          
+          {/* BUSCADOR DE TEXTO EN TIEMPO REAL */}
+          <div className="flex-1">
+            <div className="relative">
+              <input
+                type="text"
+                value={busquedaTexto}
+                onChange={(e) => setBusquedaTexto(e.target.value)}
+                placeholder="🔍 Buscar por dirección, cliente, teléfono, plato o nota..."
+                className="w-full border-2 border-gray-400 p-2.5 pl-3 pr-8 rounded-lg text-sm font-bold text-black bg-gray-50 focus:bg-white focus:border-blue-600 outline-none"
+              />
+              {busquedaTexto && (
+                <button
+                  type="button"
+                  onClick={() => setBusquedaTexto('')}
+                  className="absolute right-2.5 top-2.5 text-gray-500 font-extrabold hover:text-black text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* CONTADORES Y TOTALES */}
+          <div className="flex flex-wrap gap-3 justify-end">
+            <div className="bg-gray-50 p-2 rounded border border-gray-200 text-center min-w-[90px]">
+              <span className="text-[10px] font-bold text-gray-600 block uppercase">Tickets</span>
+              <span className="text-base font-black text-black">{pedidosFiltrados.length}</span>
+            </div>
+
+            <div className="bg-blue-50 p-2 rounded border border-blue-200 text-center min-w-[100px]">
+              <span className="text-[10px] font-black text-blue-800 block uppercase">Total Pedidos</span>
+              <span className="text-base font-black text-blue-900">{totalPlatosVendidos}</span>
+            </div>
+
+            <div className="bg-green-50 p-2 rounded border border-green-200 text-center min-w-[120px]">
+              <span className="text-[10px] font-black text-green-800 block uppercase">Recaudado</span>
+              <span className="text-base font-black text-green-900">{formatearMoneda(totalRecaudado)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTONES DE FILTRO */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-1">
             {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
               <button
@@ -422,7 +499,7 @@ export default function HistorialPedidosPage() {
             ))}
           </div>
 
-          <div className="flex gap-1 border-t sm:border-t-0 sm:border-l border-gray-300 pt-2 sm:pt-0 sm:pl-3">
+          <div className="flex gap-1">
             {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
               <button
                 key={t}
@@ -438,30 +515,14 @@ export default function HistorialPedidosPage() {
             ))}
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-3 w-full md:w-auto justify-end">
-          <div className="bg-gray-50 p-2.5 rounded border border-gray-200 text-center min-w-[110px]">
-            <span className="text-[11px] font-bold text-gray-600 block uppercase">Tickets</span>
-            <span className="text-lg font-black text-black">{pedidosFiltrados.length}</span>
-          </div>
-
-          <div className="bg-blue-50 p-2.5 rounded border border-blue-200 text-center min-w-[120px]">
-            <span className="text-[11px] font-black text-blue-800 block uppercase">Total Pedidos</span>
-            <span className="text-lg font-black text-blue-900">{totalPlatosVendidos}</span>
-          </div>
-
-          <div className="bg-green-50 p-2.5 rounded border border-green-200 text-center min-w-[140px]">
-            <span className="text-[11px] font-black text-green-800 block uppercase">Total Recaudado</span>
-            <span className="text-lg font-black text-green-900">{formatearMoneda(totalRecaudado)}</span>
-          </div>
-        </div>
       </div>
 
+      {/* LISTADO DE PEDIDOS */}
       {cargando ? (
         <div className="text-center py-12 font-extrabold text-gray-600">Cargando pedidos...</div>
       ) : pedidosFiltrados.length === 0 ? (
         <div className="bg-white p-8 text-center rounded-lg border border-gray-300 font-bold text-gray-600">
-          No hay pedidos registrados para el filtro seleccionado.
+          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el filtro seleccionado.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -477,9 +538,9 @@ export default function HistorialPedidosPage() {
             return (
               <div key={pedido.id} className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300 flex flex-col justify-between">
                 <div>
-                  <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
-                    <div>
-                      <div className="mb-1 flex items-center gap-1.5 flex-wrap">
+                  <div className="border-b border-gray-200 pb-3 mb-3">
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`text-xs px-2.5 py-1 rounded font-black border inline-block ${
                           pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
                           pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
@@ -497,14 +558,33 @@ export default function HistorialPedidosPage() {
                         </span>
                       </div>
 
-                      {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
-                        <p className="text-xs font-black text-purple-950 mt-1">
-                          📍 {direccionDetalle}
-                        </p>
-                      )}
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-gray-500 block">
+                          {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                        </span>
+                        {pedido.horario_solicitado && (
+                          <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">
+                            🕒 {pedido.horario_solicitado} hs
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                      <h2 className="text-lg font-black mt-1" style={styleTextoNegro}>
-                        {pedido.tipo_entrega === 'BAR'
+                    {/* CAJA DESTACADA DE DIRECCIÓN EN CASO DE ENVÍO */}
+                    {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
+                      <div className="p-2.5 bg-purple-100 border-2 border-purple-400 rounded-lg mb-2">
+                        <span className="text-[10px] font-black uppercase text-purple-900 block">
+                          📍 Dirección de Envío:
+                        </span>
+                        <span className="text-base font-black text-black block leading-tight">
+                          {direccionDetalle}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center mt-1">
+                      <h2 className="text-base font-black text-gray-900">
+                        👤 {pedido.tipo_entrega === 'BAR'
                           ? `Bar${pedido.cliente_nombre && pedido.cliente_nombre !== 'Cliente Bar' ? ` - ${pedido.cliente_nombre}` : ''}`
                           : pedido.tipo_entrega === 'RETIRO'
                           ? `Retiro${pedido.cliente_nombre && pedido.cliente_nombre !== 'Retira Mostrador' ? ` - ${pedido.cliente_nombre}` : ''}`
@@ -512,22 +592,12 @@ export default function HistorialPedidosPage() {
                       </h2>
 
                       {pedido.cliente_telefono && (
-                        <p className="text-xs font-bold text-gray-700 mt-0.5">📞 {pedido.cliente_telefono}</p>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-gray-500 block">
-                        {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
-                      </span>
-                      {pedido.horario_solicitado && (
-                        <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-1">
-                          🕒 {pedido.horario_solicitado} hs
-                        </span>
+                        <p className="text-xs font-bold text-gray-700">📞 {pedido.cliente_telefono}</p>
                       )}
                     </div>
                   </div>
 
+                  {/* CAJA DE MÉTODO Y ESTADO DE PAGO */}
                   <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 space-y-2 mb-3">
                     <div className="flex justify-between items-center">
                       <select
@@ -553,6 +623,7 @@ export default function HistorialPedidosPage() {
                     </div>
                   </div>
 
+                  {/* DETALLE DE ITEMS */}
                   <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
                     {pedido.detalle_pedidos?.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
@@ -590,6 +661,7 @@ export default function HistorialPedidosPage() {
                   </div>
                 </div>
 
+                {/* PIE DE TARJETA Y REIMPRESIÓN */}
                 <div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
                   <div>
                     <span className="text-xs font-bold text-gray-500 block">Total:</span>
