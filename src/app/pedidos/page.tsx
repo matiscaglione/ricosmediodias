@@ -41,8 +41,7 @@ export default function HistorialPedidosPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  const hoyFechaStr = new Date().toISOString().split('T')[0];
-
+const hoyFechaStr = new Date().toLocaleDateString('es-CA');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
