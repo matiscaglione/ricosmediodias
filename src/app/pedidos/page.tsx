@@ -10,6 +10,8 @@ interface DetallePedido {
   precio_unitario: number;
   subtotal: number;
   ingredientes_ensalada?: string;
+  agregado_menu?: string;
+  agregado_guarnicion?: string;
   menus?: { nombre: string };
   guarniciones?: { nombre: string };
   bebidas?: { nombre: string };
@@ -41,14 +43,12 @@ export default function HistorialPedidosPage() {
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
-  // Inicializa automáticamente con el turno que corresponda según la hora actual
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     cargarPedidosDelDia();
 
-    // Escuchar cambios en tiempo real
     const canal = supabase
       .channel('cambios-pedidos-historial')
       .on(
@@ -82,6 +82,8 @@ export default function HistorialPedidosPage() {
           precio_unitario,
           subtotal,
           ingredientes_ensalada,
+          agregado_menu,
+          agregado_guarnicion,
           menus!left ( nombre ),
           guarniciones!left ( nombre ),
           bebidas!left ( nombre )
@@ -141,18 +143,9 @@ export default function HistorialPedidosPage() {
     }
 
     const encabezados = [
-      'Hora',
-      'Turno',
-      'Cliente',
-      'Telefono',
-      'Tipo Entrega',
-      'Metodo Pago',
-      'Estado Pago',
-      'Detalle Platos',
-      'Costo Envio',
-      'Monto Platos',
-      'Total',
-      'Observaciones'
+      'Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega',
+      'Metodo Pago', 'Estado Pago', 'Detalle Platos', 'Costo Envio',
+      'Monto Platos', 'Total', 'Observaciones'
     ];
 
     const filas = pedidosFiltrados.map((p) => {
@@ -161,8 +154,10 @@ export default function HistorialPedidosPage() {
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
           let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || i.bebidas?.nombre || 'Plato'}`;
+          if (i.agregado_menu) str += ` (${i.agregado_menu})`;
           if (i.menus?.nombre && i.guarniciones?.nombre) str += ` (+ ${i.guarniciones.nombre})`;
-          if (i.ingredientes_ensalada) str += ` [${i.ingredientes_ensalada}]`;
+          if (i.agregado_guarnicion) str += ` [Guarnición: ${i.agregado_guarnicion}]`;
+          if (i.ingredientes_ensalada) str += ` [Ensalada: ${i.ingredientes_ensalada}]`;
           return str;
         })
         .join('; ');
@@ -187,7 +182,6 @@ export default function HistorialPedidosPage() {
     });
 
     const contenidoCSV = '\uFEFF' + [encabezados.join(','), ...filas].join('\n');
-
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -229,11 +223,8 @@ export default function HistorialPedidosPage() {
               <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #000;">
                 👉 EXTRA: ${i.guarniciones.nombre}
               </div>
-              ${
-                i.ingredientes_ensalada
-                  ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>`
-                  : ''
-              }
+              ${i.agregado_guarnicion ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px;">📝 (${i.agregado_guarnicion})</div>` : ''}
+              ${i.ingredientes_ensalada ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>` : ''}
               <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
@@ -241,14 +232,10 @@ export default function HistorialPedidosPage() {
         return `
           <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
             <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
-              ${i.cantidad}x ${i.menus?.nombre || 'PLATO'}
+              ${i.cantidad}x ${i.menus?.nombre || 'PLATO'} ${i.agregado_menu ? `(${i.agregado_menu})` : ''}
             </div>
-            ${i.guarniciones ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarniciones.nombre}</div>` : ''}
-            ${
-              i.ingredientes_ensalada
-                ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>`
-                : ''
-            }
+            ${i.guarniciones ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarniciones.nombre} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ''}</div>` : ''}
+            ${i.ingredientes_ensalada ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>` : ''}
             <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
           </div>`;
       })
@@ -272,67 +259,40 @@ export default function HistorialPedidosPage() {
           <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            body { 
-              font-family: 'Courier New', Courier, monospace; 
-              width: 270px; 
-              padding: 8px; 
-              margin: 0 auto; 
-              font-size: 13px; 
-              color: #000;
-            }
+            body { font-family: 'Courier New', Courier, monospace; width: 270px; padding: 8px; margin: 0 auto; font-size: 13px; color: #000; }
             .center { text-align: center; }
             .line { border-bottom: 2px solid #000; margin: 6px 0; }
           </style>
         </head>
         <body>
           <div class="center">
-            <h1 style="margin:0; font-size: 22px; font-weight: 900; letter-spacing: -1px;">RicosMediodias</h1>
+            <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
             <p style="margin:2px 0; font-size: 10px;">${fechaHora} (REIMPRESIÓN)</p>
           </div>
-          
           <div class="line"></div>
-
           ${cabeceraEntrega}
           ${etiquetaPago}
-          
           <div style="font-size: 14px; margin-bottom: 4px;">
             <strong>Cliente:</strong> ${pedido.cliente_nombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ''}
           </div>
-
           ${pedido.observaciones ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; margin-top: 4px;">Obs: ${pedido.observaciones}</div>` : ''}
-
           <div class="line"></div>
-
-          <div style="margin: 8px 0;">
-            ${itemsHtml}
-          </div>
-
+          <div style="margin: 8px 0;">${itemsHtml}</div>
           <div class="line"></div>
-
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
+          <div style="display: flex; justify-between; align-items: flex-end; margin-top: 8px;">
             <div>
-              ${pedido.horario_solicitado ? `
-                <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-                <div style="font-size: 16px; font-weight: 900;">🕒 ${pedido.horario_solicitado} hs</div>
-              ` : `
-                <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-                <div style="font-size: 14px; font-weight: bold;">Lo antes posible</div>
-              `}
+              <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
+              <div style="font-size: 16px; font-weight: 900;">${pedido.horario_solicitado ? `🕒 ${pedido.horario_solicitado} hs` : 'Lo antes posible'}</div>
             </div>
-
             <div style="text-align: right;">
               ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ''}
               <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
               <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
             </div>
           </div>
-
           <div class="line" style="margin-top: 10px;"></div>
           <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold;">¡Gracias por tu compra!</p>
-
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
+          <script>window.onload = function() { window.print(); window.close(); }</script>
         </body>
       </html>
     `);
@@ -445,7 +405,6 @@ export default function HistorialPedidosPage() {
       {/* FILTROS Y RESUMEN SEPARADO */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-start sm:items-center">
-          {/* FILTRO TIPO ENTREGA */}
           <div className="flex flex-wrap gap-1">
             {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
               <button
@@ -463,7 +422,6 @@ export default function HistorialPedidosPage() {
             ))}
           </div>
 
-          {/* FILTRO POR TURNO */}
           <div className="flex gap-1 border-t sm:border-t-0 sm:border-l border-gray-300 pt-2 sm:pt-0 sm:pl-3">
             {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
               <button
@@ -481,7 +439,6 @@ export default function HistorialPedidosPage() {
           </div>
         </div>
 
-        {/* CONTADORES DIFERENCIADOS */}
         <div className="flex flex-wrap gap-3 w-full md:w-auto justify-end">
           <div className="bg-gray-50 p-2.5 rounded border border-gray-200 text-center min-w-[110px]">
             <span className="text-[11px] font-bold text-gray-600 block uppercase">Tickets</span>
@@ -500,7 +457,6 @@ export default function HistorialPedidosPage() {
         </div>
       </div>
 
-      {/* LISTADO DE PEDIDOS */}
       {cargando ? (
         <div className="text-center py-12 font-extrabold text-gray-600">Cargando pedidos...</div>
       ) : pedidosFiltrados.length === 0 ? (
@@ -572,7 +528,6 @@ export default function HistorialPedidosPage() {
                     </div>
                   </div>
 
-                  {/* CAJA DE MÉTODO Y ESTADO DE PAGO */}
                   <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 space-y-2 mb-3">
                     <div className="flex justify-between items-center">
                       <select
@@ -598,17 +553,22 @@ export default function HistorialPedidosPage() {
                     </div>
                   </div>
 
-                  {/* DETALLE DE ITEMS */}
                   <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
                     {pedido.detalle_pedidos?.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
                         <div className="flex-1">
                           <span className="font-extrabold" style={styleTextoNegro}>
                             {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
+                            {item.agregado_menu && <span className="text-blue-900 font-bold ml-1">({item.agregado_menu})</span>}
                           </span>
                           {item.menus && item.guarniciones?.nombre && (
                             <span className="text-xs font-bold text-gray-600 block pl-3">
-                              + {item.guarniciones.nombre}
+                              + {item.guarniciones.nombre} {item.agregado_guarnicion && <span className="text-amber-900 font-bold">({item.agregado_guarnicion})</span>}
+                            </span>
+                          )}
+                          {!item.menus && item.guarniciones && item.agregado_guarnicion && (
+                            <span className="text-xs font-bold text-amber-900 block pl-3">
+                              📝 ({item.agregado_guarnicion})
                             </span>
                           )}
                           {item.ingredientes_ensalada && (
@@ -630,7 +590,6 @@ export default function HistorialPedidosPage() {
                   </div>
                 </div>
 
-                {/* PIE DE TARJETA Y REIMPRESIÓN */}
                 <div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
                   <div>
                     <span className="text-xs font-bold text-gray-500 block">Total:</span>
