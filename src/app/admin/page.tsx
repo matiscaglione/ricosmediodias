@@ -79,7 +79,7 @@ export default function AdminPage() {
   const [nuevaBebidaNombre, setNuevaBebidaNombre] = useState('');
   const [nuevaBebidaPrecio, setNuevaBebidaPrecio] = useState('');
   const [nuevaGuarniNombre, setNuevaGuarniNombre] = useState('');
-  const [nuevaGuarniPrecio, setNuevaGuarniPrecio] =('0');
+  const [nuevaGuarniPrecio, setNuevaGuarniPrecio] = useState('0');
   const [nuevaGuarniRequiereIng, setNuevaGuarniRequiereIng] = useState(false);
   const [nuevoIngredienteNombre, setNuevoIngredienteNombre] = useState('');
   const [nuevaSalsaNombre, setNuevaSalsaNombre] = useState('');
