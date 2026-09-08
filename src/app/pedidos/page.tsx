@@ -41,6 +41,10 @@ export default function HistorialPedidosPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
+  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const [fechaInicio, setFechaInicio] = useState(hoyArg);
+  const [fechaFin, setFechaFin] = useState(hoyArg);
+
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
@@ -48,7 +52,7 @@ export default function HistorialPedidosPage() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    cargarPedidosDelDia();
+    cargarPedidosRango();
 
     const canal = supabase
       .channel('cambios-pedidos-historial')
@@ -56,7 +60,7 @@ export default function HistorialPedidosPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos' },
         () => {
-          cargarPedidosDelDia();
+          cargarPedidosRango();
         }
       )
       .subscribe();
@@ -64,15 +68,15 @@ export default function HistorialPedidosPage() {
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [filtroTurno]);
+  }, [fechaInicio, fechaFin, filtroTurno]);
 
-  async function cargarPedidosDelDia() {
+  async function cargarPedidosRango() {
     setCargando(true);
     
-    // Filtro estricto exclusivo para el día de hoy (hora local Argentina)
-    const ahora = new Date();
-    const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
-    const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+    // Cálculo exacto del bloque operativo (03:00 AM del primer día a 02:59 AM posterior al último día)
+    const fFin = new Date(`${fechaFin}T00:00:00`);
+    fFin.setDate(fFin.getDate() + 1);
+    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
     let query = supabase
       .from('pedidos')
@@ -91,8 +95,8 @@ export default function HistorialPedidosPage() {
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', inicioDia.toISOString())
-      .lte('created_at', finDia.toISOString());
+      .gte('created_at', `${fechaInicio}T03:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -204,10 +208,9 @@ export default function HistorialPedidosPage() {
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const fechaHoy = new Date().toISOString().split('T')[0];
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}_${filtroTurno}.csv`);
+    link.setAttribute('download', `pedidos_ricosmediodias_${fechaInicio}_al_${fechaFin}_${filtroTurno}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -415,7 +418,7 @@ export default function HistorialPedidosPage() {
       if (errPedido) throw errPedido;
 
       alert("Pedido eliminado correctamente y stock actualizado.");
-      await cargarPedidosDelDia();
+      await cargarPedidosRango();
     } catch (error: any) {
       console.error("Error al eliminar el pedido:", error);
       alert("Error al eliminar el pedido: " + (error.message || error));
@@ -429,8 +432,8 @@ export default function HistorialPedidosPage() {
       {/* ENCABEZADO */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Pedidos del Día</h1>
-          <p className="text-sm font-bold text-gray-700">Historial y reimpresión de tickets</p>
+          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Historial de Pedidos</h1>
+          <p className="text-sm font-bold text-gray-700">Resumen y reimpresión de tickets por rango de fecha</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -439,6 +442,9 @@ export default function HistorialPedidosPage() {
           >
             📊 Descargar Excel (CSV)
           </button>
+          <Link href="/reportes" className="bg-amber-600 text-white text-sm px-3 py-2 rounded font-extrabold hover:bg-amber-700">
+            📈 Reportes
+          </Link>
           <Link href="/" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-extrabold hover:bg-blue-700">
             ➕ Tomar Pedido
           </Link>
@@ -451,8 +457,48 @@ export default function HistorialPedidosPage() {
         </div>
       </header>
 
-      {/* FILTROS, BUSCADOR Y RESUMEN (SIN RANGO DE FECHAS) */}
+      {/* FILTROS DE FECHA, TURNO Y BUSCADOR */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col gap-4">
+        
+        {/* SELECTORES DE FECHA Y BOTÓN HOY */}
+        <div className="flex flex-col sm:flex-row items-end justify-between gap-4 pb-3 border-b border-gray-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full sm:w-auto">
+            <div>
+              <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Fecha Desde</label>
+              <input
+                type="date"
+                style={styleTextoNegro}
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="border-2 border-gray-400 p-2 rounded text-sm font-bold bg-white w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Fecha Hasta</label>
+              <input
+                type="date"
+                style={styleTextoNegro}
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="border-2 border-gray-400 p-2 rounded text-sm font-bold bg-white w-full"
+              />
+            </div>
+          </div>
+          <div>
+            <button
+              onClick={() => {
+                const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+                setFechaInicio(hoyArg);
+                setFechaFin(hoyArg);
+                setFiltroTurno(obtenerTurnoActual());
+              }}
+              className="bg-gray-200 text-black border-2 border-gray-400 text-xs px-4 py-2 rounded font-bold hover:bg-gray-300 w-full sm:w-auto"
+            >
+              📅 Hoy
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
           
           {/* BUSCADOR DE TEXTO EN TIEMPO REAL */}
@@ -496,7 +542,7 @@ export default function HistorialPedidosPage() {
           </div>
         </div>
 
-        {/* BOTONES DE FILTRO */}
+        {/* BOTONES DE FILTRO TIPO Y TURNO */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-1">
             {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
@@ -538,7 +584,7 @@ export default function HistorialPedidosPage() {
         <div className="text-center py-12 font-extrabold text-gray-600">Cargando pedidos...</div>
       ) : pedidosFiltrados.length === 0 ? (
         <div className="bg-white p-8 text-center rounded-lg border border-gray-300 font-bold text-gray-600">
-          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el filtro seleccionado.'}
+          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el rango y filtro seleccionado.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -581,7 +627,7 @@ export default function HistorialPedidosPage() {
 
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-500 block">
-                          {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                          {new Date(pedido.created_at).toLocaleDateString('es-AR')} - {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
                         </span>
                         {pedido.horario_solicitado && (
                           <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">
