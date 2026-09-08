@@ -114,7 +114,6 @@ export default function AdminPage() {
   const [nuevoEmpleadoNombre, setNuevoEmpleadoNombre] = useState('');
   const [nuevoEmpleadoPuesto, setNuevoEmpleadoPuesto] = useState('');
 
-  // Se cargan los datos directamente al entrar
   useEffect(() => {
     cargarDatos();
   }, []);
@@ -141,10 +140,12 @@ export default function AdminPage() {
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').order('created_at', { ascending: true });
     if (zonasData) setZonas(zonasData);
 
-    const { data: empData } = await supabase.from('empresas').select('*').order('nombre', { ascending: true });
+    const { data: empData, error: errEmp } = await supabase.from('empresas').select('*').order('nombre', { ascending: true });
+    if (errEmp) console.error("Error cargando empresas:", errEmp);
     if (empData) setEmpresas(empData);
 
-    const { data: emplData } = await supabase.from('empleados').select('*').order('nombre', { ascending: true });
+    const { data: emplData, error: errEmpl } = await supabase.from('empleados').select('*').order('nombre', { ascending: true });
+    if (errEmpl) console.error("Error cargando empleados:", errEmpl);
     if (emplData) setEmpleados(emplData);
 
     const { data: confData } = await supabase
@@ -197,6 +198,8 @@ export default function AdminPage() {
       setNuevoLlevaGuarnicion(false);
       setNuevoRequiereSalsa(false);
       cargarDatos();
+    } else {
+      alert("Error agregando menú: " + error.message);
     }
   }
 
@@ -381,18 +384,33 @@ export default function AdminPage() {
   // --- SECCIÓN 7: EMPRESAS ---
   async function agregarEmpresa(e: React.FormEvent) {
     e.preventDefault();
-    if (!nuevaEmpresaNombre) return;
-    await supabase.from('empresas').insert([
-      { nombre: nuevaEmpresaNombre, cuit: nuevaEmpresaCuit, telefono: nuevaEmpresaTelefono, activa: true },
+    if (!nuevaEmpresaNombre.trim()) {
+      alert("Por favor ingresá el nombre de la empresa");
+      return;
+    }
+
+    const { error } = await supabase.from('empresas').insert([
+      { 
+        nombre: nuevaEmpresaNombre.trim(), 
+        cuit: nuevaEmpresaCuit.trim() || null, 
+        telefono: nuevaEmpresaTelefono.trim() || null, 
+        activa: true 
+      },
     ]);
-    setNuevaEmpresaNombre('');
-    setNuevaEmpresaCuit('');
-    setNuevaEmpresaTelefono('');
-    cargarDatos();
+
+    if (error) {
+      alert("Error al guardar empresa: " + error.message);
+    } else {
+      setNuevaEmpresaNombre('');
+      setNuevaEmpresaCuit('');
+      setNuevaEmpresaTelefono('');
+      cargarDatos();
+    }
   }
 
   async function toggleActivaEmpresa(id: string, estadoActual: boolean) {
-    await supabase.from('empresas').update({ activa: !estadoActual }).eq('id', id);
+    const { error } = await supabase.from('empresas').update({ activa: !estadoActual }).eq('id', id);
+    if (error) alert("Error cambiando estado de empresa: " + error.message);
     cargarDatos();
   }
 
@@ -410,23 +428,38 @@ export default function AdminPage() {
   // --- SECCIÓN 8: EMPLEADOS ---
   async function agregarEmpleado(e: React.FormEvent) {
     e.preventDefault();
-    if (!nuevoEmpleadoNombre) return;
-    await supabase.from('empleados').insert([
-      { nombre: nuevoEmpleadoNombre, puesto: nuevoEmpleadoPuesto, activo: true },
+    if (!nuevoEmpleadoNombre.trim()) {
+      alert("Por favor ingresá el nombre del empleado");
+      return;
+    }
+
+    const { error } = await supabase.from('empleados').insert([
+      { 
+        nombre: nuevoEmpleadoNombre.trim(), 
+        puesto: nuevoEmpleadoPuesto.trim() || null, 
+        activo: true 
+      },
     ]);
-    setNuevoEmpleadoNombre('');
-    setNuevoEmpleadoPuesto('');
-    cargarDatos();
+
+    if (error) {
+      alert("Error al guardar empleado: " + error.message);
+    } else {
+      setNuevoEmpleadoNombre('');
+      setNuevoEmpleadoPuesto('');
+      cargarDatos();
+    }
   }
 
   async function toggleActivoEmpleado(id: string, estadoActual: boolean) {
-    await supabase.from('empleados').update({ activo: !estadoActual }).eq('id', id);
+    const { error } = await supabase.from('empleados').update({ activo: !estadoActual }).eq('id', id);
+    if (error) alert("Error cambiando estado del empleado: " + error.message);
     cargarDatos();
   }
 
   async function eliminarEmpleado(id: string) {
     if (confirm('¿Seguro que querés eliminar este empleado?')) {
-      await supabase.from('empleados').delete().eq('id', id);
+      const { error } = await supabase.from('empleados').delete().eq('id', id);
+      if (error) alert("Error eliminando empleado: " + error.message);
       cargarDatos();
     }
   }
@@ -950,7 +983,7 @@ export default function AdminPage() {
         <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>7. Empresas / Clientes Corporativos</h2>
         <form onSubmit={agregarEmpresa} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
           <div>
-            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empresa</label>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empresa *</label>
             <input type="text" style={styleTextoNegro} value={nuevaEmpresaNombre} onChange={(e) => setNuevaEmpresaNombre(e.target.value)} placeholder="Ej: Tech Corp" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
           </div>
           <div>
@@ -985,7 +1018,7 @@ export default function AdminPage() {
         <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>8. Gestión de Empleados (Rendición de Gastos)</h2>
         <form onSubmit={agregarEmpleado} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
           <div>
-            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empleado</label>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empleado *</label>
             <input type="text" style={styleTextoNegro} value={nuevoEmpleadoNombre} onChange={(e) => setNuevoEmpleadoNombre(e.target.value)} placeholder="Ej: Juan Pérez" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
           </div>
           <div>
