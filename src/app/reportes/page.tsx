@@ -504,6 +504,21 @@ export default function ReportesPage() {
         </div>
       </div>
 
+      {/* TARJETA DESTACADA: MONTO SOLO COMIDA */}
+      <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <span className="text-xs font-black text-emerald-900 uppercase block">
+            🍱 Recaudación Neta Solo Comidas (Platos + Extras)
+          </span>
+          <p className="text-xs text-emerald-800 font-bold">
+            Total Recaudado excluyendo Bebidas ({formatearMoneda(totalBebidasMonto)}) y Envíos ({formatearMoneda(totalEnviosMonto)})
+          </p>
+        </div>
+        <div className="text-2xl md:text-3xl font-black text-emerald-950 bg-white px-4 py-2 rounded border border-emerald-300 shadow-sm">
+          {formatearMoneda(totalSoloComidaMonto)}
+        </div>
+      </div>
+
       {/* SECCIÓN DE RENDICIÓN DE CUENTAS / SALIDAS DE CAJA */}
       <div className="bg-white p-5 rounded-lg border-2 border-red-300 shadow-sm space-y-4">
         <div className="flex justify-between items-center">
@@ -619,20 +634,7 @@ export default function ReportesPage() {
         )}
       </div>
 
-      {/* TARJETA DESTACADA: MONTO SOLO COMIDA */}
-      <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <span className="text-xs font-black text-emerald-900 uppercase block">
-            🍱 Recaudación Neta Solo Comidas (Platos + Extras)
-          </span>
-          <p className="text-xs text-emerald-800 font-bold">
-            Total Recaudado excluyendo Bebidas ({formatearMoneda(totalBebidasMonto)}) y Envíos ({formatearMoneda(totalEnviosMonto)})
-          </p>
-        </div>
-        <div className="text-2xl md:text-3xl font-black text-emerald-950 bg-white px-4 py-2 rounded border border-emerald-300 shadow-sm">
-          {formatearMoneda(totalSoloComidaMonto)}
-        </div>
-      </div>
+      
 
       {/* DESGLOSE EN TABLAS (ORDENADAS DE MAYOR A MENOR) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
