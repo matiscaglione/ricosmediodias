@@ -23,6 +23,8 @@ interface PedidoEnvio {
 interface VueltaRendida {
   numeroVuelta: number;
   montoTotalRendido: number;
+  totalEfectivo: number;
+  totalOtrosPagos: number;
   costoEnviosTotal: number;
   cantidadPedidos: number;
   hora: string;
@@ -40,7 +42,7 @@ export default function CadetesPage() {
   const [editandoCadete1, setEditandoCadete1] = useState(false);
   const [editandoCadete2, setEditandoCadete2] = useState(false);
 
-  // Historial de Vueltas Rendidas del día (guardadas en localStorage por fecha/turno)
+  // Historial de Vueltas Rendidas del día
   const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
   const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
 
@@ -71,7 +73,6 @@ export default function CadetesPage() {
 
   async function cargarConfiguracionYEnvios() {
     setCargando(true);
-    // Cargar nombres de cadetes desde Supabase
     const { data: confData } = await supabase
       .from('configuracion')
       .select('nombre_cadete_1, nombre_cadete_2')
@@ -165,20 +166,15 @@ export default function CadetesPage() {
       .filter((p) => (p.metodo_pago || 'EFECTIVO') === 'EFECTIVO')
       .reduce((acc, p) => acc + p.monto_total, 0);
 
+    const totalOtros = totalCobrado - totalEfectivoACobrar;
     const totalEnvios = enviosActuales.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
-    const cajaNeto = totalEfectivoACobrar - totalEnvios;
 
     const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
     const numeroNuevaVuelta = historialPrevio.length + 1;
 
     const confirmar = confirm(
-      `Rendición de Vuelta #${numeroNuevaVuelta} - ${nombreCadete}:\n\n` +
-      `📦 Pedidos totales: ${enviosActuales.length}\n` +
-      `💵 Total Pedidos (Suma General): $${totalCobrado.toLocaleString('es-AR')}\n` +
-      `💵 Cobrar Efectivo al Cadete: $${totalEfectivoACobrar.toLocaleString('es-AR')}\n` +
-      `🛵 Pagar a Cadete (Envíos): $${totalEnvios.toLocaleString('es-AR')}\n` +
-      `📥 Dinero Limpio para Caja (Efectivo - Envíos): $${cajaNeto.toLocaleString('es-AR')}\n\n` +
-      `¿Confirmar que el cadete rinde esta vuelta?`
+      `¿Confirmar la Rendición de la Vuelta #${numeroNuevaVuelta} para ${nombreCadete}?\n\n` +
+      `📦 Pedidos: ${enviosActuales.length} | 💵 Total: $${totalCobrado.toLocaleString('es-AR')}`
     );
 
     if (!confirmar) return;
@@ -200,6 +196,8 @@ export default function CadetesPage() {
     const nuevaVuelta: VueltaRendida = {
       numeroVuelta: numeroNuevaVuelta,
       montoTotalRendido: totalCobrado,
+      totalEfectivo: totalEfectivoACobrar,
+      totalOtrosPagos: totalOtros,
       costoEnviosTotal: totalEnvios,
       cantidadPedidos: enviosActuales.length,
       hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
@@ -482,19 +480,24 @@ export default function CadetesPage() {
             {vueltasCadete1.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
             ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {vueltasCadete1.map((v) => (
-                  <div key={v.numeroVuelta} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
-                    <div>
-                      <div>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</div>
-                      <div className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</div>
+                  <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border-2 border-gray-300 font-bold text-black space-y-1.5 shadow-sm">
+                    <div className="flex justify-between items-center border-b pb-1">
+                      <span className="font-black text-blue-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
+                      <button
+                        onClick={() => reabrirVuelta(1, v.numeroVuelta)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded shadow"
+                      >
+                        🔓 Corregir
+                      </button>
                     </div>
-                    <button
-                      onClick={() => reabrirVuelta(1, v.numeroVuelta)}
-                      className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] px-2 py-1 rounded shadow"
-                    >
-                      🔓 Corregir
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-700">
+                      <div>Total General: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
+                      <div>Efectivo: <span className="font-black text-green-800">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
+                      <div>Transf/Card: <span className="font-black text-purple-800">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
+                      <div>Envíos Cadete: <span className="font-black text-blue-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -612,19 +615,24 @@ export default function CadetesPage() {
             {vueltasCadete2.length === 0 ? (
               <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
             ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {vueltasCadete2.map((v) => (
-                  <div key={v.numeroVuelta} className="flex justify-between items-center text-xs p-2 bg-gray-100 rounded border border-gray-300 font-bold text-black">
-                    <div>
-                      <div>Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</div>
-                      <div className="text-green-800 font-black">+${v.montoTotalRendido} (Envío: ${v.costoEnviosTotal})</div>
+                  <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border-2 border-gray-300 font-bold text-black space-y-1.5 shadow-sm">
+                    <div className="flex justify-between items-center border-b pb-1">
+                      <span className="font-black text-purple-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
+                      <button
+                        onClick={() => reabrirVuelta(2, v.numeroVuelta)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded shadow"
+                      >
+                        🔓 Corregir
+                      </button>
                     </div>
-                    <button
-                      onClick={() => reabrirVuelta(2, v.numeroVuelta)}
-                      className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] px-2 py-1 rounded shadow"
-                    >
-                      🔓 Corregir
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-700">
+                      <div>Total General: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
+                      <div>Efectivo: <span className="font-black text-green-800">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
+                      <div>Transf/Card: <span className="font-black text-purple-800">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
+                      <div>Envíos Cadete: <span className="font-black text-purple-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
+                    </div>
                   </div>
                 ))}
               </div>
