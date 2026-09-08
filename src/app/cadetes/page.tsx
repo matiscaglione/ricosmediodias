@@ -31,9 +31,14 @@ interface VueltaRendida {
 }
 
 export default function CadetesPage() {
+  function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
+    const horaActual = new Date().getHours();
+    return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
+  }
+
   const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   const [pedidos, setPedidos] = useState<PedidoEnvio[]>([]);
-  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
   const [cargando, setCargando] = useState(false);
 
   // Nombres sincronizados con Supabase
@@ -238,7 +243,6 @@ export default function CadetesPage() {
       return;
     }
 
-    // Actualizamos localmente tras el éxito en Supabase
     cargarEnvios();
   }
 
