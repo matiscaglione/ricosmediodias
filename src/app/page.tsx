@@ -48,7 +48,8 @@ interface ItemPedido {
   guarnicion?: Guarnicion;
   salsa?: Salsa;
   ingredientesEnsalada?: string[];
-  agregadosTexto?: string;
+  agregadoMenuTexto?: string;
+  agregadoGuarnicionTexto?: string;
   precioAgregados?: number;
   cantidadHuevos: number;
   cantidad: number;
@@ -70,7 +71,6 @@ function ContenidoTomaPedidos() {
   const [items, setItems] = useState<ItemPedido[]>([]);
   const [tipoEntrega, setTipoEntrega] = useState<"RETIRO" | "ENVIO" | "BAR">("RETIRO");
   
-  // Estados para Método y Estado de Pago
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TRANSFERENCIA" | "TARJETA">("EFECTIVO");
   const [pagoConfirmado, setPagoConfirmado] = useState<boolean>(false);
   const [recargoTarjetaPorc, setRecargoTarjetaPorc] = useState<number>(10);
@@ -88,8 +88,9 @@ function ContenidoTomaPedidos() {
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   
-  // Nuevos estados para Agregados/Modificaciones del Plato y Cantidad de Bebidas con botones +/-
-  const [agregadosTexto, setAgregadosTexto] = useState("");
+  // Modificadores separados para Menú y Guarnición
+  const [agregadoMenuTexto, setAgregadoMenuTexto] = useState("");
+  const [agregadoGuarnicionTexto, setAgregadoGuarnicionTexto] = useState("");
   const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
   const [cantidadBebida, setCantidadBebida] = useState<number>(1);
 
@@ -345,7 +346,8 @@ function ContenidoTomaPedidos() {
         ingredientesEnsalada: llevaIngredientes && listaIngredientes.length > 0
           ? listaIngredientes
           : undefined,
-        agregadosTexto: agregadosTexto.trim() ? agregadosTexto.trim() : undefined,
+        agregadoMenuTexto: agregadoMenuTexto.trim() ? agregadoMenuTexto.trim() : undefined,
+        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim() ? agregadoGuarnicionTexto.trim() : undefined,
         precioAgregados: extraAgregados > 0 ? extraAgregados : undefined,
         cantidadHuevos,
         cantidad,
@@ -357,7 +359,8 @@ function ContenidoTomaPedidos() {
     setGuarnicionSeleccionada(null);
     setSalsaSeleccionada(null);
     setIngredientesElegidos([]);
-    setAgregadosTexto("");
+    setAgregadoMenuTexto("");
+    setAgregadoGuarnicionTexto("");
     setPrecioAgregadosExtra(0);
     setCantidadHuevos(0);
     setCantidadHuevosDuros(0);
@@ -390,6 +393,7 @@ function ContenidoTomaPedidos() {
       {
         guarnicion: guarnicionExtraElegida,
         ingredientesEnsalada: guarnicionExtraElegida.requiere_ingredientes ? ingredientesElegidos : undefined,
+        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim() ? agregadoGuarnicionTexto.trim() : undefined,
         cantidadHuevos: 0,
         cantidad: 1,
         subtotal: precioGuarnicionExtra,
@@ -397,6 +401,7 @@ function ContenidoTomaPedidos() {
     ]);
 
     setGuarnicionExtraElegida(null);
+    setAgregadoGuarnicionTexto("");
     setIngredientesElegidos([]);
   }
 
@@ -482,6 +487,7 @@ function ContenidoTomaPedidos() {
               <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #000;">
                 👉 EXTRA: ${i.guarnicion.nombre}
               </div>
+              ${i.agregadoGuarnicionTexto ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; color: #000;">📝 (${i.agregadoGuarnicionTexto})</div>` : ""}
               ${
                 i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
                   ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientesEnsalada.join(", ")})</div>`
@@ -494,11 +500,10 @@ function ContenidoTomaPedidos() {
         return `
 <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
   <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
-    ${i.cantidad}x ${i.menu?.nombre}
+    ${i.cantidad}x ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""}
   </div>
   ${i.salsa ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">🍝 SALSA: ${i.salsa.nombre}</div>` : ""}
-  ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarnicion.nombre}</div>` : ""}
-  ${i.agregadosTexto ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px; color: #000;">📝 MODIF: ${i.agregadosTexto}</div>` : ""}
+  ${i.guarnicion ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarnicion.nombre} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}</div>` : ""}
   ${
     i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0
       ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientesEnsalada.join(", ")})</div>`
@@ -998,14 +1003,14 @@ function ContenidoTomaPedidos() {
                 className="block text-xs font-bold mb-1"
                 style={styleTextoNegro}
               >
-                Observaciones
+                Observaciones General
               </label>
               <input
                 type="text"
                 style={styleTextoNegro}
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Ej: Sin cebolla, paga con transferencia"
+                placeholder="Ej: Sin cubiertos, timbre roto"
                 className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
               />
             </div>
@@ -1048,7 +1053,8 @@ function ContenidoTomaPedidos() {
                           setGuarnicionSeleccionada(null);
                           setSalsaSeleccionada(null);
                           setIngredientesElegidos([]);
-                          setAgregadosTexto("");
+                          setAgregadoMenuTexto("");
+                          setAgregadoGuarnicionTexto("");
                           setPrecioAgregadosExtra(0);
                           setCantidadHuevos(0);
                           setCantidadHuevosDuros(0);
@@ -1086,6 +1092,20 @@ function ContenidoTomaPedidos() {
                 <h3 className="font-bold text-sm" style={styleTextoNegro}>
                   Opciones para: {menuSeleccionado.nombre}
                 </h3>
+
+                {/* MODIFICADOR 1: DEL MENÚ / CARNE */}
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
+                  <label className="block text-xs font-bold text-blue-950">
+                    🥩 Detalle / Modificación del Menú (ej: c/ queso, napolitana sin salsa, jugoso):
+                  </label>
+                  <input
+                    type="text"
+                    value={agregadoMenuTexto}
+                    onChange={(e) => setAgregadoMenuTexto(e.target.value)}
+                    placeholder="Ej: c/ queso, sin salsa, a la napolitana"
+                    className="w-full border border-blue-300 p-1.5 rounded text-xs bg-white font-bold text-black"
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {menuSeleccionado.requiere_salsa && (
@@ -1153,7 +1173,6 @@ function ContenidoTomaPedidos() {
                     </select>
                   </div>
 
-                  {/* NUEVO: CANTIDAD DE VIANDAS CON RECUADRO - / + */}
                   <div>
                     <label
                       className="block text-xs font-bold mb-1"
@@ -1183,31 +1202,35 @@ function ContenidoTomaPedidos() {
                   </div>
                 </div>
 
-                {/* NUEVO: AGREGADOS / MODIFICACIONES AL PLATO */}
-                <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg space-y-2">
-                  <label className="block text-xs font-black text-amber-950">
-                    ✏️ Agregados / Modificaciones al Plato (ej: c/ queso, napolitana sin salsa, bandeja separada):
-                  </label>
-                  <div className="flex gap-2">
+                {/* MODIFICADOR 2: DE LA GUARNICIÓN */}
+                {menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
+                    <label className="block text-xs font-bold text-amber-950">
+                      🍟 Aclaración Guarnición (ej: en bandeja separada, sin sal):
+                    </label>
                     <input
                       type="text"
-                      value={agregadosTexto}
-                      onChange={(e) => setAgregadosTexto(e.target.value)}
-                      placeholder="Ej: con queso / sin salsa / en bandeja separada"
-                      className="flex-1 border border-amber-400 p-2 rounded text-xs bg-white font-bold text-black"
+                      value={agregadoGuarnicionTexto}
+                      onChange={(e) => setAgregadoGuarnicionTexto(e.target.value)}
+                      placeholder="Ej: en bandeja separada, bien frito"
+                      className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
                     />
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-amber-950">Precio Extra $:</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={precioAgregadosExtra === 0 ? "" : precioAgregadosExtra}
-                        onChange={(e) => setPrecioAgregadosExtra(Number(e.target.value))}
-                        placeholder="0"
-                        className="w-20 border border-amber-400 p-2 rounded text-xs bg-white font-bold text-black text-center"
-                      />
-                    </div>
                   </div>
+                )}
+
+                {/* COBRO EXTRA DE AGREGADOS */}
+                <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
+                  <span className="text-xs font-bold text-gray-800">
+                    💰 Precio Extra Cobrado por Agregados ($):
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={precioAgregadosExtra === 0 ? "" : precioAgregadosExtra}
+                    onChange={(e) => setPrecioAgregadosExtra(Number(e.target.value))}
+                    placeholder="$ 0"
+                    className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center"
+                  />
                 </div>
 
                 {(guarnicionSeleccionada?.requiere_ingredientes ||
@@ -1336,6 +1359,18 @@ function ContenidoTomaPedidos() {
               </button>
             </div>
 
+            {guarnicionExtraElegida && (
+              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg mt-2">
+                <input
+                  type="text"
+                  value={agregadoGuarnicionTexto}
+                  onChange={(e) => setAgregadoGuarnicionTexto(e.target.value)}
+                  placeholder="Aclaración extra (ej: en bandeja separada)"
+                  className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
+                />
+              </div>
+            )}
+
             {guarnicionExtraElegida?.requiere_ingredientes && (
               <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-2 mt-2">
                 <label className="block text-xs font-black text-emerald-900">
@@ -1363,7 +1398,7 @@ function ContenidoTomaPedidos() {
             )}
           </div>
 
-          {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS CON RECUADRO - / + */}
+          {/* SECCIÓN 4: SELECCIÓN DE BEBIDAS */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
               4. Agregar Bebida
@@ -1446,7 +1481,7 @@ function ContenidoTomaPedidos() {
                       ) : !item.menu && item.guarnicion ? (
                         <div>
                           <div className="font-extrabold text-purple-900">
-                            👉 Extra: {item.guarnicion.nombre}
+                            👉 Extra: {item.guarnicion.nombre} {item.agregadoGuarnicionTexto ? `(${item.agregadoGuarnicionTexto})` : ""}
                           </div>
                           {item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
                             <span className="block text-xs font-bold text-emerald-800">
@@ -1457,7 +1492,7 @@ function ContenidoTomaPedidos() {
                       ) : (
                         <>
                           <div className="font-extrabold" style={styleTextoNegro}>
-                            {item.cantidad}x {item.menu?.nombre}
+                            {item.cantidad}x {item.menu?.nombre} {item.agregadoMenuTexto ? <span className="text-blue-900 font-bold">({item.agregadoMenuTexto})</span> : ""}
                           </div>
                           {item.salsa && (
                             <div className="text-xs font-black text-red-800">
@@ -1466,14 +1501,14 @@ function ContenidoTomaPedidos() {
                           )}
                           {item.guarnicion && (
                             <div className="text-xs font-bold text-gray-700">
-                              + {item.guarnicion.nombre}
+                              + {item.guarnicion.nombre} {item.agregadoGuarnicionTexto ? <span className="text-amber-900 font-bold">({item.agregadoGuarnicionTexto})</span> : ""}
                             </div>
                           )}
-                          {item.agregadosTexto && (
-                            <div className="text-xs font-black text-amber-900">
-                              📝 {item.agregadosTexto} {item.precioAgregados ? `(+${formatearMoneda(item.precioAgregados)})` : ""}
+                          {item.precioAgregados && item.precioAgregados > 0 ? (
+                            <div className="text-[11px] font-black text-green-800">
+                              💵 Agregado Extra: +{formatearMoneda(item.precioAgregados)}
                             </div>
-                          )}
+                          ) : null}
                           {item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
                             <span className="block text-xs font-bold text-emerald-800">
                               🥗 ({item.ingredientesEnsalada.join(", ")})
