@@ -426,7 +426,7 @@ export default function HistorialPedidosPage() {
     } catch (error: any) {
       console.error("Error al eliminar el pedido:", error);
       alert("Error al eliminar el pedido: " + (error.message || error));
-    } fontinally {
+    } finally {
       setCargando(false);
     }
   }
