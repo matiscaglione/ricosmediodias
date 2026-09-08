@@ -75,9 +75,12 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
   async function cargarPedidos() {
     setCargando(true);
     
-    // Filtro estricto por día calendario exacto (medianoche a medianoche local)
-    const inicioStr = `${fechaDesde}T00:00:00`;
-    const finStr = `${fechaHasta}T23:59:59`;
+    // Creamos los objetos de fecha tomando estrictamente el inicio y fin del día local
+    const [anioInicio, mesInicio, diaInicio] = fechaDesde.split('-').map(Number);
+    const [anioFin, mesFin, diaFin] = fechaHasta.split('-').map(Number);
+
+    const inicioLocal = new Date(anioInicio, mesInicio - 1, diaInicio, 0, 0, 0, 0);
+    const finLocal = new Date(anioFin, mesFin - 1, diaFin, 23, 59, 59, 999);
 
     let query = supabase
       .from('pedidos')
@@ -96,8 +99,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', inicioStr)
-      .lte('created_at', finStr);
+      .gte('created_at', inicioLocal.toISOString())
+      .lte('created_at', finLocal.toISOString());
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
