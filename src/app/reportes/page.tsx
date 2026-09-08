@@ -147,7 +147,15 @@ export default function ReportesPage() {
 
   async function agregarGasto(e: React.FormEvent) {
     e.preventDefault();
-    if (!nuevoGastoConcepto || !nuevoGastoMonto) return;
+    
+    // Si es tipo empleado, el concepto por defecto puede ser el puesto o "Pago a empleado", 
+    // pero aseguramos que no esté vacío.
+    const conceptoFinal = nuevoGastoConcepto.trim() || (nuevoGastoTipo === 'EMPLEADO' ? 'Pago a Empleado' : '');
+
+    if (!conceptoFinal || !nuevoGastoMonto) {
+      alert('Por favor completá el concepto y el monto.');
+      return;
+    }
 
     const montoNum = parseFloat(nuevoGastoMonto) || 0;
 
@@ -155,7 +163,7 @@ export default function ReportesPage() {
       {
         fecha: fechaInicio,
         turno: filtroTurno === 'TODOS' ? obtenerTurnoActual() : filtroTurno,
-        concepto: nuevoGastoConcepto,
+        concepto: conceptoFinal,
         tipo: nuevoGastoTipo,
         monto: montoNum,
         empleado_id: nuevoGastoTipo === 'EMPLEADO' && nuevoGastoEmpleadoId ? nuevoGastoEmpleadoId : null,
@@ -468,12 +476,15 @@ export default function ReportesPage() {
           </div>
         </div>
 
-        <form onSubmit={agregarGasto} className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-red-50/50 p-3 rounded-lg border border-red-200 items-end">
+        <form onSubmit={agregarGasto} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-red-50/50 p-3 rounded-lg border border-red-200 items-end">
           <div>
             <label className="block text-xs font-bold mb-1 text-black">Tipo de Salida</label>
             <select
               value={nuevoGastoTipo}
-              onChange={(e) => setNuevoGastoTipo(e.target.value as any)}
+              onChange={(e) => {
+                setNuevoGastoTipo(e.target.value as any);
+                setNuevoGastoEmpleadoId('');
+              }}
               className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black"
             >
               <option value="VARIOS">⚙️ Varios / Insumos</option>
@@ -485,7 +496,7 @@ export default function ReportesPage() {
 
           {nuevoGastoTipo === 'EMPLEADO' ? (
             <div>
-              <label className="block text-xs font-bold mb-1 text-black">Empleado</label>
+              <label className="block text-xs font-bold mb-1 text-black">Seleccionar Empleado</label>
               <select
                 value={nuevoGastoEmpleadoId}
                 onChange={(e) => setNuevoGastoEmpleadoId(e.target.value)}
@@ -500,27 +511,27 @@ export default function ReportesPage() {
               </select>
             </div>
           ) : (
-            <div className="sm:col-span-1">
+            <div>
               <label className="block text-xs font-bold mb-1 text-black">Concepto / Detalle</label>
               <input
                 type="text"
                 value={nuevoGastoConcepto}
                 onChange={(e) => setNuevoGastoConcepto(e.target.value)}
                 placeholder="Ej: Pago gaseosas, Panadería..."
-                className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-black"
+                className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
               />
             </div>
           )}
 
           {nuevoGastoTipo === 'EMPLEADO' && (
             <div>
-              <label className="block text-xs font-bold mb-1 text-black">Concepto</label>
+              <label className="block text-xs font-bold mb-1 text-black">Detalle / Concepto</label>
               <input
                 type="text"
                 value={nuevoGastoConcepto}
                 onChange={(e) => setNuevoGastoConcepto(e.target.value)}
-                placeholder="Ej: Jornal del día"
-                className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-black"
+                placeholder="Ej: Jornal del día o Adelanto"
+                className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
               />
             </div>
           )}
@@ -533,16 +544,18 @@ export default function ReportesPage() {
               value={nuevoGastoMonto}
               onChange={(e) => setNuevoGastoMonto(e.target.value)}
               placeholder="0"
-              className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-black"
+              className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
             />
           </div>
 
-          <button
-            type="submit"
-            className="bg-red-700 text-white font-extrabold text-xs py-2.5 px-3 rounded hover:bg-red-800"
-          >
-            + Registrar Salida
-          </button>
+          <div className="sm:col-span-4 flex justify-end">
+            <button
+              type="submit"
+              className="bg-red-700 text-white font-extrabold text-xs py-2.5 px-4 rounded hover:bg-red-800 shadow"
+            >
+              + Registrar Salida
+            </button>
+          </div>
         </form>
 
         {gastos.length > 0 && (
