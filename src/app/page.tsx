@@ -73,18 +73,22 @@ function ContenidoTomaPedidos() {
   const [empresaSeleccionadaId, setEmpresaSeleccionadaId] = useState<string>("");
 
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
-  
   const [busquedaTextoMenu, setBusquedaTextoMenu] = useState<string>("");
 
   const [precioGuarnicionExtra, setPrecioGuarnicionExtra] = useState<number>(3000);
   const [guarnicionExtraElegida, setGuarnicionExtraElegida] = useState<Guarnicion | null>(null);
-  
+
   const [items, setItems] = useState<ItemPedido[]>([]);
   const [tipoEntrega, setTipoEntrega] = useState<"RETIRO" | "ENVIO" | "BAR">("RETIRO");
-  
+
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TRANSFERENCIA" | "TARJETA">("EFECTIVO");
   const [pagoConfirmado, setPagoConfirmado] = useState<boolean>(false);
   const [recargoTarjetaPorc, setRecargoTarjetaPorc] = useState<number>(10);
+
+  // FECHA DEL PEDIDO (Por defecto HOY, extensible a días anteriores)
+  const [fechaPedido, setFechaPedido] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
 
   const [zonaSeleccionada, setZonaSeleccionada] = useState<ZonaEnvio | null>(null);
   const [direccion, setDireccion] = useState("");
@@ -98,7 +102,7 @@ function ContenidoTomaPedidos() {
   const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
-  
+
   const [agregadoMenuTexto, setAgregadoMenuTexto] = useState("");
   const [agregadoGuarnicionTexto, setAgregadoGuarnicionTexto] = useState("");
   const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
@@ -113,11 +117,12 @@ function ContenidoTomaPedidos() {
   const searchParams = useSearchParams();
   const idEditarURL = searchParams.get("editar");
   const [pedidoEditandoId, setPedidoEditandoId] = useState<string | null>(null);
+  const [turnoOriginalEditando, setTurnoOriginalEditando] = useState<string | null>(null);
   const [itemsOriginalesEditar, setItemsOriginalesEditar] = useState<any[]>([]);
 
-  function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
+  function obtenerTurnoActual(): "MAÑANA" | "NOCHE" {
     const horaActual = new Date().getHours();
-    return (horaActual >= 6 && horaActual < 16) ? 'MAÑANA' : 'NOCHE';
+    return horaActual >= 6 && horaActual < 16 ? "MAÑANA" : "NOCHE";
   }
 
   useEffect(() => {
@@ -150,12 +155,17 @@ function ContenidoTomaPedidos() {
 
         if (pedidoData) {
           setPedidoEditandoId(pedidoData.id);
+          setTurnoOriginalEditando(pedidoData.turno || null);
           setClienteNombre(pedidoData.cliente_nombre || "");
           setClienteTelefono(pedidoData.cliente_telefono || "");
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
+          if (pedidoData.created_at) {
+            setFechaPedido(pedidoData.created_at.split("T")[0]);
+          }
           if (pedidoData.metodo_pago) setMetodoPago(pedidoData.metodo_pago);
-          if (pedidoData.pago_confirmado !== undefined) setPagoConfirmado(pedidoData.pago_confirmado);
+          if (pedidoData.pago_confirmado !== undefined)
+            setPagoConfirmado(pedidoData.pago_confirmado);
           if (pedidoData.empresa_id) setEmpresaSeleccionadaId(pedidoData.empresa_id);
 
           const textoObs = pedidoData.observaciones || "";
@@ -179,7 +189,7 @@ function ContenidoTomaPedidos() {
             .filter(
               (s: string) =>
                 !s.toLowerCase().includes("huevo") &&
-                !s.toLowerCase().includes("dirección:"),
+                !s.toLowerCase().includes("dirección:")
             )
             .join(" | ");
 
@@ -187,12 +197,22 @@ function ContenidoTomaPedidos() {
 
           const detalles = pedidoData.detalle_pedidos || [];
           const itemsCargados: ItemPedido[] = detalles
-            .filter((det: any) => det.menus || det.menu_id || det.guarniciones || det.bebidas || det.bebida_id)
+            .filter(
+              (det: any) =>
+                det.menus ||
+                det.menu_id ||
+                det.guarniciones ||
+                det.bebidas ||
+                det.bebida_id
+            )
             .map((det: any, index: number) => {
               const cantH = index === 0 ? huevosEncontrados : 0;
-              
-              const ingsArray = det.ingredientes_ensalada 
-                ? det.ingredientes_ensalada.split(",").map((s: string) => s.trim()).filter(Boolean)
+
+              const ingsArray = det.ingredientes_ensalada
+                ? det.ingredientes_ensalada
+                    .split(",")
+                    .map((s: string) => s.trim())
+                    .filter(Boolean)
                 : undefined;
 
               return {
@@ -215,7 +235,7 @@ function ContenidoTomaPedidos() {
     }
 
     inicializar();
-  }, [idEditarURL, precioHuevo]);
+  }, [idEditarURL]);
 
   async function cargarDatosDelDia() {
     const hoy = new Date().toISOString().split("T")[0];
@@ -244,9 +264,14 @@ function ContenidoTomaPedidos() {
       .single();
 
     if (confData) {
-      if (confData.precio_huevo_frito) setPrecioHuevo(Number(confData.precio_huevo_frito));
-      if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
-      if (confData.recargo_tarjeta_porc !== undefined && confData.recargo_tarjeta_porc !== null) {
+      if (confData.precio_huevo_frito)
+        setPrecioHuevo(Number(confData.precio_huevo_frito));
+      if (confData.precio_guarnicion_extra)
+        setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
+      if (
+        confData.recargo_tarjeta_porc !== undefined &&
+        confData.recargo_tarjeta_porc !== null
+      ) {
         setRecargoTarjetaPorc(Number(confData.recargo_tarjeta_porc));
       }
     }
@@ -327,7 +352,9 @@ function ContenidoTomaPedidos() {
       .reduce((acc, item) => acc + item.cantidad, 0);
 
     if (cantidad + cantidadYaEnCarrito > stockDisponible) {
-      alert(`¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`);
+      alert(
+        `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`
+      );
       return;
     }
 
@@ -345,8 +372,11 @@ function ContenidoTomaPedidos() {
       costoHuevosFritos +
       costoHuevosDuros;
 
-    const esEnsaladaPrincipal = menuSeleccionado.nombre.toLowerCase().includes("ensalada");
-    const llevaIngredientes = guarnicionSeleccionada?.requiere_ingredientes || esEnsaladaPrincipal;
+    const esEnsaladaPrincipal = menuSeleccionado.nombre
+      .toLowerCase()
+      .includes("ensalada");
+    const llevaIngredientes =
+      guarnicionSeleccionada?.requiere_ingredientes || esEnsaladaPrincipal;
 
     let listaIngredientes = [...ingredientesElegidos];
     if (llevaIngredientes && cantidadHuevosDuros > 0) {
@@ -367,11 +397,16 @@ function ContenidoTomaPedidos() {
           menuSeleccionado.requiere_salsa && salsaSeleccionada
             ? salsaSeleccionada
             : undefined,
-        ingredientesEnsalada: llevaIngredientes && listaIngredientes.length > 0
-          ? listaIngredientes
+        ingredientesEnsalada:
+          llevaIngredientes && listaIngredientes.length > 0
+            ? listaIngredientes
+            : undefined,
+        agregadoMenuTexto: agregadoMenuTexto.trim()
+          ? agregadoMenuTexto.trim()
           : undefined,
-        agregadoMenuTexto: agregadoMenuTexto.trim() ? agregadoMenuTexto.trim() : undefined,
-        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim() ? agregadoGuarnicionTexto.trim() : undefined,
+        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim()
+          ? agregadoGuarnicionTexto.trim()
+          : undefined,
         precioAgregados: extraAgregados > 0 ? extraAgregados : undefined,
         cantidadHuevos,
         cantidad,
@@ -390,7 +425,7 @@ function ContenidoTomaPedidos() {
     setCantidadHuevosDuros(0);
     setCantidad(1);
   }
-  
+
   function agregarBebidaAlPedido() {
     if (!bebidaSeleccionada) return;
 
@@ -416,8 +451,12 @@ function ContenidoTomaPedidos() {
       ...items,
       {
         guarnicion: guarnicionExtraElegida,
-        ingredientesEnsalada: guarnicionExtraElegida.requiere_ingredientes ? ingredientesElegidos : undefined,
-        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim() ? agregadoGuarnicionTexto.trim() : undefined,
+        ingredientesEnsalada: guarnicionExtraElegida.requiere_ingredientes
+          ? ingredientesElegidos
+          : undefined,
+        agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim()
+          ? agregadoGuarnicionTexto.trim()
+          : undefined,
         cantidadHuevos: 0,
         cantidad: 1,
         subtotal: precioGuarnicionExtra,
@@ -434,13 +473,18 @@ function ContenidoTomaPedidos() {
   }
 
   const montoPlatos = items.reduce((acc, item) => acc + item.subtotal, 0);
-  const costoEnvio = tipoEntrega === "ENVIO" && zonaSeleccionada ? zonaSeleccionada.precio : 0;
-  
+  const costoEnvio =
+    tipoEntrega === "ENVIO" && zonaSeleccionada ? zonaSeleccionada.precio : 0;
+
   const subtotalSinRecargo = montoPlatos + costoEnvio;
-  const montoRecargoTarjeta = metodoPago === "TARJETA" ? Math.round(subtotalSinRecargo * (recargoTarjetaPorc / 100)) : 0;
+  const montoRecargoTarjeta =
+    metodoPago === "TARJETA"
+      ? Math.round(subtotalSinRecargo * (recargoTarjetaPorc / 100))
+      : 0;
   const montoTotal = subtotalSinRecargo + montoRecargoTarjeta;
 
-  const formatearMoneda = (monto: number) => "$ " + monto.toLocaleString("es-AR");
+  const formatearMoneda = (monto: number) =>
+    "$ " + (monto || 0).toLocaleString("es-AR");
 
   const menusFiltrados = menus.filter((m) =>
     m.nombre.toLowerCase().includes(busquedaTextoMenu.toLowerCase().trim())
@@ -459,7 +503,7 @@ function ContenidoTomaPedidos() {
     const htmlBebidas = bebidasEnCarrito
       .map(
         (i) =>
-          `<div style="font-size: 16px; font-weight: 900; margin-bottom: 4px;">🥤 ${i.cantidad}x ${i.bebida?.nombre}</div>`,
+          `<div style="font-size: 16px; font-weight: 900; margin-bottom: 4px;">🥤 ${i.cantidad}x ${i.bebida?.nombre}</div>`
       )
       .join("");
 
@@ -617,8 +661,15 @@ function ContenidoTomaPedidos() {
             ? "Retira Mostrador"
             : "Cliente Envío";
 
-    const hoy = new Date().toISOString().split("T")[0];
-    const turnoActual = obtenerTurnoActual();
+    // MANTIENE EL TURNO ORIGINAL SI SE ESTÁ EDITANDO, DE LO CONTRARIO CALCULA EL ACTUAL
+    const turnoFinal = pedidoEditandoId && turnoOriginalEditando
+      ? turnoOriginalEditando
+      : obtenerTurnoActual();
+
+    // CALCULA O CONSERVA LA FECHA Y HORA DE CREACIÓN
+    const ahoraIso = new Date().toISOString();
+    const horaActualStr = ahoraIso.split("T")[1];
+    const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}`;
 
     const detalleDireccion =
       tipoEntrega === "ENVIO" && direccion.trim() !== ""
@@ -641,7 +692,7 @@ function ContenidoTomaPedidos() {
           const { data: stockActualData } = await supabase
             .from("stock_diario")
             .select("cantidad_disponible")
-            .eq("fecha", hoy)
+            .eq("fecha", fechaPedido)
             .eq("menu_id", itemViejo.menu.id)
             .single();
 
@@ -652,7 +703,7 @@ function ContenidoTomaPedidos() {
                 cantidad_disponible:
                   stockActualData.cantidad_disponible + itemViejo.cantidad,
               })
-              .eq("fecha", hoy)
+              .eq("fecha", fechaPedido)
               .eq("menu_id", itemViejo.menu.id);
           }
         }
@@ -675,7 +726,8 @@ function ContenidoTomaPedidos() {
           monto_total: montoTotal,
           horario_solicitado: horario,
           observaciones: obsFinal,
-          turno: turnoActual,
+          turno: turnoFinal,
+          created_at: fechaCreacionFinal,
           metodo_pago: metodoPago,
           pago_confirmado: pagoConfirmado,
           empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
@@ -701,7 +753,8 @@ function ContenidoTomaPedidos() {
             horario_solicitado: horario,
             observaciones: obsFinal,
             estado: "PENDIENTE",
-            turno: turnoActual,
+            turno: turnoFinal,
+            created_at: fechaCreacionFinal,
             metodo_pago: metodoPago,
             pago_confirmado: pagoConfirmado,
             empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
@@ -729,9 +782,10 @@ function ContenidoTomaPedidos() {
               cantidad: item.cantidad,
               precio_unitario: item.menu.precio,
               subtotal: item.subtotal,
-              ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
-                ? item.ingredientesEnsalada.join(", ") 
-                : null,
+              ingredientes_ensalada:
+                item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
+                  ? item.ingredientesEnsalada.join(", ")
+                  : null,
               agregado_menu: item.agregadoMenuTexto || null,
               agregado_guarnicion: item.agregadoGuarnicionTexto || null,
             },
@@ -744,7 +798,7 @@ function ContenidoTomaPedidos() {
         const { data: stockActualData } = await supabase
           .from("stock_diario")
           .select("cantidad_disponible")
-          .eq("fecha", hoy)
+          .eq("fecha", fechaPedido)
           .eq("menu_id", item.menu.id)
           .single();
 
@@ -754,7 +808,7 @@ function ContenidoTomaPedidos() {
         await supabase
           .from("stock_diario")
           .update({ cantidad_disponible: nuevoStock })
-          .eq("fecha", hoy)
+          .eq("fecha", fechaPedido)
           .eq("menu_id", item.menu.id);
       } else if (item.bebida) {
         await supabase.from("detalle_pedidos").insert([
@@ -778,9 +832,10 @@ function ContenidoTomaPedidos() {
             cantidad: item.cantidad,
             precio_unitario: precioGuarnicionExtra,
             subtotal: item.subtotal,
-            ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
-              ? item.ingredientesEnsalada.join(", ") 
-              : null,
+            ingredientes_ensalada:
+              item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
+                ? item.ingredientesEnsalada.join(", ")
+                : null,
             agregado_guarnicion: item.agregadoGuarnicionTexto || null,
           },
         ]);
@@ -792,12 +847,14 @@ function ContenidoTomaPedidos() {
     setItems([]);
     setItemsOriginalesEditar([]);
     setPedidoEditandoId(null);
+    setTurnoOriginalEditando(null);
     setClienteNombre("");
     setClienteTelefono("");
     setDireccion("");
     setHorario("");
     setObservaciones("");
     setEmpresaSeleccionadaId("");
+    setFechaPedido(new Date().toISOString().split("T")[0]);
     setMetodoPago("EFECTIVO");
     setPagoConfirmado(false);
     cargarDatosDelDia();
@@ -813,7 +870,10 @@ function ContenidoTomaPedidos() {
             Toma de Pedidos
           </h1>
           <span className="inline-block bg-blue-100 text-blue-900 text-xs font-black px-2.5 py-0.5 rounded mt-1 border border-blue-300">
-            Turno Actual: {obtenerTurnoActual() === 'MAÑANA' ? '☀️ MAÑANA (07-15hs)' : '🌙 NOCHE (18:30-00hs)'}
+            Turno Actual:{" "}
+            {obtenerTurnoActual() === "MAÑANA"
+              ? "☀️ MAÑANA (07-15hs)"
+              : "🌙 NOCHE (18:30-00hs)"}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -860,9 +920,23 @@ function ContenidoTomaPedidos() {
         <div className="lg:col-span-2 space-y-6">
           {/* SECCIÓN 1: TIPO DE ENTREGA, FORMA DE PAGO Y CLIENTE */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-4">
-            <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              1. Tipo de Entrega y Método de Pago
-            </h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold" style={styleTextoNegro}>
+                1. Tipo de Entrega y Método de Pago
+              </h2>
+              {/* SELECTOR DE FECHA DEL PEDIDO */}
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded border border-gray-300">
+                <span className="text-xs font-extrabold text-gray-700">
+                  📅 Fecha:
+                </span>
+                <input
+                  type="date"
+                  value={fechaPedido}
+                  onChange={(e) => setFechaPedido(e.target.value)}
+                  className="text-xs font-black p-1 bg-white border border-gray-400 rounded text-black"
+                />
+              </div>
+            </div>
 
             <div className="flex gap-2">
               {(["RETIRO", "ENVIO", "BAR"] as const).map((tipo) => (
@@ -1125,7 +1199,9 @@ function ContenidoTomaPedidos() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 {menusFiltrados
-                  .filter((m) => !menuSeleccionado || menuSeleccionado.id === m.id)
+                  .filter(
+                    (m) => !menuSeleccionado || menuSeleccionado.id === m.id
+                  )
                   .map((m) => (
                     <button
                       key={m.id}
@@ -1152,7 +1228,10 @@ function ContenidoTomaPedidos() {
                       }`}
                     >
                       <div className="flex justify-between items-start">
-                        <div className="font-extrabold text-base" style={styleTextoNegro}>
+                        <div
+                          className="font-extrabold text-base"
+                          style={styleTextoNegro}
+                        >
                           {m.nombre}
                         </div>
                         {menuSeleccionado?.id === m.id && (
@@ -1161,7 +1240,10 @@ function ContenidoTomaPedidos() {
                           </span>
                         )}
                       </div>
-                      <div className="text-sm font-bold mt-1" style={styleTextoNegro}>
+                      <div
+                        className="text-sm font-bold mt-1"
+                        style={styleTextoNegro}
+                      >
                         {formatearMoneda(m.precio)}
                       </div>
                       <div className="text-xs text-blue-700 font-bold mt-1">
@@ -1203,7 +1285,7 @@ function ContenidoTomaPedidos() {
                         value={salsaSeleccionada?.id || ""}
                         onChange={(e) =>
                           setSalsaSeleccionada(
-                            salsas.find((s) => s.id === e.target.value) || null,
+                            salsas.find((s) => s.id === e.target.value) || null
                           )
                         }
                         className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold"
@@ -1233,7 +1315,7 @@ function ContenidoTomaPedidos() {
                       onChange={(e) => {
                         const g =
                           guarniciones.find(
-                            (guar) => guar.id === e.target.value,
+                            (guar) => guar.id === e.target.value
                           ) || null;
                         setGuarnicionSeleccionada(g);
                         setIngredientesElegidos([]);
@@ -1273,7 +1355,10 @@ function ContenidoTomaPedidos() {
                       >
                         -
                       </button>
-                      <span className="text-sm font-black min-w-[20px] text-center" style={styleTextoNegro}>
+                      <span
+                        className="text-sm font-black min-w-[20px] text-center"
+                        style={styleTextoNegro}
+                      >
                         {cantidad}
                       </span>
                       <button
@@ -1288,20 +1373,23 @@ function ContenidoTomaPedidos() {
                 </div>
 
                 {/* MODIFICADOR 2: DE LA GUARNICIÓN */}
-                {menuSeleccionado.lleva_guarnicion && guarnicionSeleccionada && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
-                    <label className="block text-xs font-bold text-amber-950">
-                      🍟 Aclaración Guarnición (ej: en bandeja separada, sin sal):
-                    </label>
-                    <input
-                      type="text"
-                      value={agregadoGuarnicionTexto}
-                      onChange={(e) => setAgregadoGuarnicionTexto(e.target.value)}
-                      placeholder="Ej: en bandeja separada, bien frito"
-                      className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
-                    />
-                  </div>
-                )}
+                {menuSeleccionado.lleva_guarnicion &&
+                  guarnicionSeleccionada && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
+                      <label className="block text-xs font-bold text-amber-950">
+                        🍟 Aclaración Guarnición (ej: en bandeja separada, sin sal):
+                      </label>
+                      <input
+                        type="text"
+                        value={agregadoGuarnicionTexto}
+                        onChange={(e) =>
+                          setAgregadoGuarnicionTexto(e.target.value)
+                        }
+                        placeholder="Ej: en bandeja separada, bien frito"
+                        className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
+                      />
+                    </div>
+                  )}
 
                 {/* COBRO EXTRA DE AGREGADOS */}
                 <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
@@ -1311,22 +1399,31 @@ function ContenidoTomaPedidos() {
                   <input
                     type="number"
                     min="0"
-                    value={precioAgregadosExtra === 0 ? "" : precioAgregadosExtra}
-                    onChange={(e) => setPrecioAgregadosExtra(Number(e.target.value))}
+                    value={
+                      precioAgregadosExtra === 0 ? "" : precioAgregadosExtra
+                    }
+                    onChange={(e) =>
+                      setPrecioAgregadosExtra(Number(e.target.value))
+                    }
                     placeholder="$ 0"
                     className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center"
                   />
                 </div>
 
                 {(guarnicionSeleccionada?.requiere_ingredientes ||
-                  (menuSeleccionado && menuSeleccionado.nombre.toLowerCase().includes("ensalada"))) && (
+                  (menuSeleccionado &&
+                    menuSeleccionado.nombre
+                      .toLowerCase()
+                      .includes("ensalada"))) && (
                   <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-3">
                     <label className="block text-xs font-black text-emerald-900">
                       🥗 Ingredientes para la Ensalada:
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {ingredientes.map((ing) => {
-                        const seleccionada = ingredientesElegidos.includes(ing.nombre);
+                        const seleccionada = ingredientesElegidos.includes(
+                          ing.nombre
+                        );
                         return (
                           <button
                             type="button"
@@ -1352,17 +1449,26 @@ function ContenidoTomaPedidos() {
                       <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-400">
                         <button
                           type="button"
-                          onClick={() => setCantidadHuevosDuros(Math.max(0, cantidadHuevosDuros - 1))}
+                          onClick={() =>
+                            setCantidadHuevosDuros(
+                              Math.max(0, cantidadHuevosDuros - 1)
+                            )
+                          }
                           className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
                         >
                           -
                         </button>
-                        <span className="text-xs font-black min-w-[16px] text-center" style={styleTextoNegro}>
+                        <span
+                          className="text-xs font-black min-w-[16px] text-center"
+                          style={styleTextoNegro}
+                        >
                           {cantidadHuevosDuros}
                         </span>
                         <button
                           type="button"
-                          onClick={() => setCantidadHuevosDuros(cantidadHuevosDuros + 1)}
+                          onClick={() =>
+                            setCantidadHuevosDuros(cantidadHuevosDuros + 1)
+                          }
                           className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
                         >
                           +
@@ -1470,7 +1576,9 @@ function ContenidoTomaPedidos() {
                         key={ing.id}
                         onClick={() => toggleIngrediente(ing.nombre)}
                         className={`px-3 py-1 rounded text-xs font-bold border ${
-                          seleccionada ? "bg-emerald-700 text-white" : "bg-white text-gray-800"
+                          seleccionada
+                            ? "bg-emerald-700 text-white"
+                            : "bg-white text-gray-800"
                         }`}
                       >
                         {seleccionada ? "✓ " : "+ "}
@@ -1494,7 +1602,7 @@ function ContenidoTomaPedidos() {
                 value={bebidaSeleccionada?.id || ""}
                 onChange={(e) =>
                   setBebidaSeleccionada(
-                    bebidas.find((b) => b.id === e.target.value) || null,
+                    bebidas.find((b) => b.id === e.target.value) || null
                   )
                 }
                 className="flex-1 w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
@@ -1511,12 +1619,17 @@ function ContenidoTomaPedidos() {
                 <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded border-2 border-gray-400">
                   <button
                     type="button"
-                    onClick={() => setCantidadBebida(Math.max(1, cantidadBebida - 1))}
+                    onClick={() =>
+                      setCantidadBebida(Math.max(1, cantidadBebida - 1))
+                    }
                     className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
                   >
                     -
                   </button>
-                  <span className="text-xs font-black min-w-[16px] text-center" style={styleTextoNegro}>
+                  <span
+                    className="text-xs font-black min-w-[16px] text-center"
+                    style={styleTextoNegro}
+                  >
                     {cantidadBebida}
                   </span>
                   <button
@@ -1566,18 +1679,29 @@ function ContenidoTomaPedidos() {
                       ) : !item.menu && item.guarnicion ? (
                         <div>
                           <div className="font-extrabold text-purple-900">
-                            👉 Extra: {item.guarnicion.nombre} {item.agregadoGuarnicionTexto ? `(${item.agregadoGuarnicionTexto})` : ""}
+                            👉 Extra: {item.guarnicion.nombre}{" "}
+                            {item.agregadoGuarnicionTexto
+                              ? `(${item.agregadoGuarnicionTexto})`
+                              : ""}
                           </div>
-                          {item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
-                            <span className="block text-xs font-bold text-emerald-800">
-                              🥗 ({item.ingredientesEnsalada.join(", ")})
-                            </span>
-                          )}
+                          {item.ingredientesEnsalada &&
+                            item.ingredientesEnsalada.length > 0 && (
+                              <span className="block text-xs font-bold text-emerald-800">
+                                🥗 ({item.ingredientesEnsalada.join(", ")})
+                              </span>
+                            )}
                         </div>
                       ) : (
                         <>
                           <div className="font-extrabold" style={styleTextoNegro}>
-                            {item.cantidad}x {item.menu?.nombre} {item.agregadoMenuTexto ? <span className="text-blue-900 font-bold">({item.agregadoMenuTexto})</span> : ""}
+                            {item.cantidad}x {item.menu?.nombre}{" "}
+                            {item.agregadoMenuTexto ? (
+                              <span className="text-blue-900 font-bold">
+                                ({item.agregadoMenuTexto})
+                              </span>
+                            ) : (
+                              ""
+                            )}
                           </div>
                           {item.salsa && (
                             <div className="text-xs font-black text-red-800">
@@ -1586,19 +1710,28 @@ function ContenidoTomaPedidos() {
                           )}
                           {item.guarnicion && (
                             <div className="text-xs font-bold text-gray-700">
-                              + {item.guarnicion.nombre} {item.agregadoGuarnicionTexto ? <span className="text-amber-900 font-bold">({item.agregadoGuarnicionTexto})</span> : ""}
+                              + {item.guarnicion.nombre}{" "}
+                              {item.agregadoGuarnicionTexto ? (
+                                <span className="text-amber-900 font-bold">
+                                  ({item.agregadoGuarnicionTexto})
+                                </span>
+                              ) : (
+                                ""
+                              )}
                             </div>
                           )}
                           {item.precioAgregados && item.precioAgregados > 0 ? (
                             <div className="text-[11px] font-black text-green-800">
-                              💵 Agregado Extra: +{formatearMoneda(item.precioAgregados)}
+                              💵 Agregado Extra: +
+                              {formatearMoneda(item.precioAgregados)}
                             </div>
                           ) : null}
-                          {item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 && (
-                            <span className="block text-xs font-bold text-emerald-800">
-                              🥗 ({item.ingredientesEnsalada.join(", ")})
-                            </span>
-                          )}
+                          {item.ingredientesEnsalada &&
+                            item.ingredientesEnsalada.length > 0 && (
+                              <span className="block text-xs font-bold text-emerald-800">
+                                🥗 ({item.ingredientesEnsalada.join(", ")})
+                              </span>
+                            )}
                           {item.cantidadHuevos > 0 && (
                             <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
                               <span>
@@ -1671,6 +1804,7 @@ function ContenidoTomaPedidos() {
                   href="/"
                   onClick={() => {
                     setPedidoEditandoId(null);
+                    setTurnoOriginalEditando(null);
                     setItems([]);
                     setItemsOriginalesEditar([]);
                   }}
