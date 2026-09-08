@@ -88,7 +88,6 @@ function ContenidoTomaPedidos() {
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   
-  // Modificadores separados para Menú y Guarnición
   const [agregadoMenuTexto, setAgregadoMenuTexto] = useState("");
   const [agregadoGuarnicionTexto, setAgregadoGuarnicionTexto] = useState("");
   const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
@@ -128,6 +127,8 @@ function ContenidoTomaPedidos() {
               precio_unitario,
               subtotal,
               ingredientes_ensalada,
+              agregado_menu,
+              agregado_guarnicion,
               menus (*),
               guarniciones (*),
               bebidas (*)
@@ -190,6 +191,8 @@ function ContenidoTomaPedidos() {
                 cantidadHuevos: cantH,
                 subtotal: det.subtotal,
                 ingredientesEnsalada: ingsArray,
+                agregadoMenuTexto: det.agregado_menu || undefined,
+                agregadoGuarnicionTexto: det.agregado_guarnicion || undefined,
               };
             });
 
@@ -553,7 +556,7 @@ function ContenidoTomaPedidos() {
           <div class="line"></div>
           <div style="margin: 8px 0;">${itemsHtml}</div>
           <div class="line"></div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
+          <div style="display: flex; justify-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
               <div style="font-size: 16px; font-weight: 900;">${horario ? `🕒 ${horario} hs` : "Lo antes posible"}</div>
@@ -702,6 +705,8 @@ function ContenidoTomaPedidos() {
               ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
                 ? item.ingredientesEnsalada.join(", ") 
                 : null,
+              agregado_menu: item.agregadoMenuTexto || null,
+              agregado_guarnicion: item.agregadoGuarnicionTexto || null,
             },
           ]);
 
@@ -749,6 +754,7 @@ function ContenidoTomaPedidos() {
             ingredientes_ensalada: item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0 
               ? item.ingredientesEnsalada.join(", ") 
               : null,
+            agregado_guarnicion: item.agregadoGuarnicionTexto || null,
           },
         ]);
       }
