@@ -43,6 +43,11 @@ interface ZonaEnvio {
   precio: number;
 }
 
+interface Empresa {
+  id: string;
+  nombre: string;
+}
+
 interface ItemPedido {
   menu?: Menu;
   bebida?: Bebida;
@@ -64,6 +69,9 @@ function ContenidoTomaPedidos() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [salsas, setSalsas] = useState<Salsa[]>([]);
   const [zonasEnvio, setZonasEnvio] = useState<ZonaEnvio[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [empresaSeleccionadaId, setEmpresaSeleccionadaId] = useState<string>("");
+
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   
   const [busquedaTextoMenu, setBusquedaTextoMenu] = useState<string>("");
@@ -148,6 +156,7 @@ function ContenidoTomaPedidos() {
           setHorario(pedidoData.horario_solicitado || "");
           if (pedidoData.metodo_pago) setMetodoPago(pedidoData.metodo_pago);
           if (pedidoData.pago_confirmado !== undefined) setPagoConfirmado(pedidoData.pago_confirmado);
+          if (pedidoData.empresa_id) setEmpresaSeleccionadaId(pedidoData.empresa_id);
 
           const textoObs = pedidoData.observaciones || "";
 
@@ -287,6 +296,13 @@ function ContenidoTomaPedidos() {
       setZonasEnvio(zonasData);
       if (zonasData.length > 0) setZonaSeleccionada(zonasData[0]);
     }
+
+    const { data: empData } = await supabase
+      .from("empresas")
+      .select("id, nombre")
+      .eq("activa", true)
+      .order("nombre", { ascending: true });
+    if (empData) setEmpresas(empData);
   }
 
   function toggleIngrediente(nombreIng: string) {
@@ -662,6 +678,7 @@ function ContenidoTomaPedidos() {
           turno: turnoActual,
           metodo_pago: metodoPago,
           pago_confirmado: pagoConfirmado,
+          empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
         })
         .eq("id", pedidoEditandoId);
 
@@ -687,6 +704,7 @@ function ContenidoTomaPedidos() {
             turno: turnoActual,
             metodo_pago: metodoPago,
             pago_confirmado: pagoConfirmado,
+            empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
           },
         ])
         .select()
@@ -779,6 +797,7 @@ function ContenidoTomaPedidos() {
     setDireccion("");
     setHorario("");
     setObservaciones("");
+    setEmpresaSeleccionadaId("");
     setMetodoPago("EFECTIVO");
     setPagoConfirmado(false);
     cargarDatosDelDia();
@@ -803,6 +822,12 @@ function ContenidoTomaPedidos() {
             className="bg-purple-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-purple-800"
           >
             📋 Pedidos
+          </Link>
+          <Link
+            href="/empresas"
+            className="bg-indigo-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-indigo-800"
+          >
+            🏢 Empresas
           </Link>
           <Link
             href="/cadetes"
@@ -871,7 +896,7 @@ function ContenidoTomaPedidos() {
                     type="number"
                     value={recargoTarjetaPorc}
                     onChange={(e) => setRecargoTarjetaPorc(Number(e.target.value))}
-                    className="w-12 p-0.5 border border-amber-400 rounded text-center text-xs font-bold bg-white text-black"
+                    className="w-12 p-0.5 border border-amber-400 rounded text-center text-xs font-bold bg-white"
                   />
                   <span>%</span>
                 </div>
@@ -926,7 +951,7 @@ function ContenidoTomaPedidos() {
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}
                     placeholder="Ej: Av. San Martín 1234"
-                    className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black placeholder:text-black"
+                    className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
                   />
                 </div>
 
@@ -960,6 +985,25 @@ function ContenidoTomaPedidos() {
               </div>
             )}
 
+            {/* ASOCIAR EMPRESA (CUENTA CORRIENTE) */}
+            <div className="p-3 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
+              <label className="block text-xs font-extrabold text-indigo-950 mb-1">
+                🏢 Asociar a Empresa / Cuenta Corriente (Opcional):
+              </label>
+              <select
+                value={empresaSeleccionadaId}
+                onChange={(e) => setEmpresaSeleccionadaId(e.target.value)}
+                className="w-full border-2 border-indigo-300 p-2 rounded text-xs font-bold bg-white text-black"
+              >
+                <option value="">-- Consumidor Final / Sin Empresa --</option>
+                {empresas.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    🏢 {emp.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label
@@ -974,7 +1018,7 @@ function ContenidoTomaPedidos() {
                   value={clienteNombre}
                   onChange={(e) => setClienteNombre(e.target.value)}
                   placeholder="Ej: Juan Pérez"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black placeholder:text-black"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
                 />
               </div>
 
@@ -991,7 +1035,7 @@ function ContenidoTomaPedidos() {
                   value={clienteTelefono}
                   onChange={(e) => setClienteTelefono(e.target.value)}
                   placeholder="Ej: 341 123456"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black placeholder:text-black"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
                 />
               </div>
 
@@ -1008,7 +1052,7 @@ function ContenidoTomaPedidos() {
                   value={horario}
                   onChange={(e) => setHorario(e.target.value)}
                   placeholder="Ej: 13:30 hs"
-                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black placeholder:text-black"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
                 />
               </div>
             </div>
@@ -1026,7 +1070,7 @@ function ContenidoTomaPedidos() {
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
                 placeholder="Ej: Sin cubiertos, timbre roto"
-                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black placeholder:text-black"
+                className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
               />
             </div>
           </div>
@@ -1048,7 +1092,7 @@ function ContenidoTomaPedidos() {
               )}
             </div>
 
-            {/* BUSCADOR DE MENÚS (TEXTO Y PLACEHOLDER EN NEGRO) */}
+            {/* BUSCADOR DE MENÚS */}
             {!menuSeleccionado && (
               <div className="relative mb-3">
                 <input
@@ -1056,13 +1100,13 @@ function ContenidoTomaPedidos() {
                   value={busquedaTextoMenu}
                   onChange={(e) => setBusquedaTextoMenu(e.target.value)}
                   placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
-                  className="w-full border-2 border-gray-400 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none text-black placeholder:text-black"
+                  className="w-full border-2 border-gray-300 text-gray-800 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
                 />
                 {busquedaTextoMenu && (
                   <button
                     type="button"
                     onClick={() => setBusquedaTextoMenu("")}
-                    className="absolute right-2.5 top-2 text-black font-extrabold text-xs"
+                    className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
                   >
                     ✕
                   </button>
@@ -1075,7 +1119,7 @@ function ContenidoTomaPedidos() {
                 No hay menús con stock cargado para hoy.
               </p>
             ) : menusFiltrados.length === 0 ? (
-              <p className="text-black text-xs font-bold py-2">
+              <p className="text-gray-500 text-xs font-bold py-2">
                 No se encontraron menús que coincidan con "{busquedaTextoMenu}".
               </p>
             ) : (
@@ -1144,7 +1188,7 @@ function ContenidoTomaPedidos() {
                     value={agregadoMenuTexto}
                     onChange={(e) => setAgregadoMenuTexto(e.target.value)}
                     placeholder="Ej: c/ queso, sin salsa, a la napolitana"
-                    className="w-full border border-blue-300 p-1.5 rounded text-xs bg-white font-bold text-black placeholder:text-black"
+                    className="w-full border border-blue-300 p-1.5 rounded text-xs bg-white font-bold text-black"
                   />
                 </div>
 
@@ -1162,7 +1206,7 @@ function ContenidoTomaPedidos() {
                             salsas.find((s) => s.id === e.target.value) || null,
                           )
                         }
-                        className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold text-black"
+                        className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold"
                       >
                         <option value="">-- Elegir Salsa --</option>
                         {salsas.map((s) => (
@@ -1195,7 +1239,7 @@ function ContenidoTomaPedidos() {
                         setIngredientesElegidos([]);
                         setCantidadHuevosDuros(0);
                       }}
-                      className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold disabled:bg-gray-200 text-black"
+                      className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold disabled:bg-gray-200"
                     >
                       <option value="">
                         {menuSeleccionado.lleva_guarnicion
@@ -1225,7 +1269,7 @@ function ContenidoTomaPedidos() {
                       <button
                         type="button"
                         onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                        className="text-xs font-black text-black px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
                       >
                         -
                       </button>
@@ -1235,7 +1279,7 @@ function ContenidoTomaPedidos() {
                       <button
                         type="button"
                         onClick={() => setCantidad(cantidad + 1)}
-                        className="text-xs font-black text-black px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
                       >
                         +
                       </button>
@@ -1254,14 +1298,14 @@ function ContenidoTomaPedidos() {
                       value={agregadoGuarnicionTexto}
                       onChange={(e) => setAgregadoGuarnicionTexto(e.target.value)}
                       placeholder="Ej: en bandeja separada, bien frito"
-                      className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black placeholder:text-black"
+                      className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
                     />
                   </div>
                 )}
 
                 {/* COBRO EXTRA DE AGREGADOS */}
                 <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
-                  <span className="text-xs font-bold text-black">
+                  <span className="text-xs font-bold text-gray-800">
                     💰 Precio Extra Cobrado por Agregados ($):
                   </span>
                   <input
@@ -1270,7 +1314,7 @@ function ContenidoTomaPedidos() {
                     value={precioAgregadosExtra === 0 ? "" : precioAgregadosExtra}
                     onChange={(e) => setPrecioAgregadosExtra(Number(e.target.value))}
                     placeholder="$ 0"
-                    className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center placeholder:text-black"
+                    className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center"
                   />
                 </div>
 
@@ -1291,7 +1335,7 @@ function ContenidoTomaPedidos() {
                             className={`px-3 py-1 rounded text-xs font-bold border ${
                               seleccionada
                                 ? "bg-emerald-700 text-white"
-                                : "bg-white text-black"
+                                : "bg-white text-gray-800"
                             }`}
                           >
                             {seleccionada ? "✓ " : "+ "}
@@ -1309,7 +1353,7 @@ function ContenidoTomaPedidos() {
                         <button
                           type="button"
                           onClick={() => setCantidadHuevosDuros(Math.max(0, cantidadHuevosDuros - 1))}
-                          className="text-xs font-black text-black px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
                         >
                           -
                         </button>
@@ -1319,7 +1363,7 @@ function ContenidoTomaPedidos() {
                         <button
                           type="button"
                           onClick={() => setCantidadHuevosDuros(cantidadHuevosDuros + 1)}
-                          className="text-xs font-black text-black px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
                         >
                           +
                         </button>
@@ -1329,7 +1373,7 @@ function ContenidoTomaPedidos() {
                 )}
 
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                  <span className="text-xs font-bold text-black">
+                  <span className="text-xs font-bold text-gray-800">
                     🍳 Huevos fritos extra:
                   </span>
                   <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded border border-gray-300">
@@ -1338,12 +1382,12 @@ function ContenidoTomaPedidos() {
                       onClick={() =>
                         setCantidadHuevos(Math.max(0, cantidadHuevos - 1))
                       }
-                      className="text-xs font-black text-black px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
+                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
                       -
                     </button>
                     <span
-                      className="text-xs font-black text-black min-w-[16px] text-center"
+                      className="text-xs font-black text-gray-800 min-w-[16px] text-center"
                       style={styleTextoNegro}
                     >
                       {cantidadHuevos}
@@ -1351,7 +1395,7 @@ function ContenidoTomaPedidos() {
                     <button
                       type="button"
                       onClick={() => setCantidadHuevos(cantidadHuevos + 1)}
-                      className="text-xs font-black text-black px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
+                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
                       +
                     </button>
@@ -1382,7 +1426,7 @@ function ContenidoTomaPedidos() {
                     guarniciones.find((g) => g.id === e.target.value) || null
                   )
                 }
-                className="flex-1 border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black"
+                className="flex-1 border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
               >
                 <option value="">-- Seleccionar Guarnición Extra --</option>
                 {guarniciones.map((g) => (
@@ -1407,7 +1451,7 @@ function ContenidoTomaPedidos() {
                   value={agregadoGuarnicionTexto}
                   onChange={(e) => setAgregadoGuarnicionTexto(e.target.value)}
                   placeholder="Aclaración extra (ej: en bandeja separada)"
-                  className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black placeholder:text-black"
+                  className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
                 />
               </div>
             )}
@@ -1426,7 +1470,7 @@ function ContenidoTomaPedidos() {
                         key={ing.id}
                         onClick={() => toggleIngrediente(ing.nombre)}
                         className={`px-3 py-1 rounded text-xs font-bold border ${
-                          seleccionada ? "bg-emerald-700 text-white" : "bg-white text-black"
+                          seleccionada ? "bg-emerald-700 text-white" : "bg-white text-gray-800"
                         }`}
                       >
                         {seleccionada ? "✓ " : "+ "}
@@ -1453,7 +1497,7 @@ function ContenidoTomaPedidos() {
                     bebidas.find((b) => b.id === e.target.value) || null,
                   )
                 }
-                className="flex-1 w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold text-black"
+                className="flex-1 w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
               >
                 <option value="">-- Seleccionar Bebida --</option>
                 {bebidas.map((b) => (
@@ -1468,7 +1512,7 @@ function ContenidoTomaPedidos() {
                   <button
                     type="button"
                     onClick={() => setCantidadBebida(Math.max(1, cantidadBebida - 1))}
-                    className="text-xs font-black text-black px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
                   >
                     -
                   </button>
@@ -1478,7 +1522,7 @@ function ContenidoTomaPedidos() {
                   <button
                     type="button"
                     onClick={() => setCantidadBebida(cantidadBebida + 1)}
-                    className="text-xs font-black text-black px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
                   >
                     +
                   </button>
@@ -1504,7 +1548,7 @@ function ContenidoTomaPedidos() {
             </h2>
 
             {items.length === 0 ? (
-              <p className="text-black text-sm text-center py-8 font-bold">
+              <p className="text-gray-500 text-sm text-center py-8 font-bold">
                 El pedido está vacío
               </p>
             ) : (
@@ -1541,7 +1585,7 @@ function ContenidoTomaPedidos() {
                             </div>
                           )}
                           {item.guarnicion && (
-                            <div className="text-xs font-bold text-black">
+                            <div className="text-xs font-bold text-gray-700">
                               + {item.guarnicion.nombre} {item.agregadoGuarnicionTexto ? <span className="text-amber-900 font-bold">({item.agregadoGuarnicionTexto})</span> : ""}
                             </div>
                           )}
@@ -1641,7 +1685,7 @@ function ContenidoTomaPedidos() {
               <button
                 onClick={imprimirSoloBebidas}
                 type="button"
-                className="bg-gray-200 hover:bg-gray-300 text-black font-extrabold text-xs py-3 px-3 rounded-lg border border-gray-400"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold text-xs py-3 px-3 rounded-lg border border-gray-400"
               >
                 🥤 Ticket Solo Bebida
               </button>
@@ -1663,7 +1707,7 @@ export default function TomaPedidosPage() {
   return (
     <Suspense
       fallback={
-        <div className="text-center p-8 font-bold text-black">
+        <div className="text-center p-8 font-bold">
           Cargando toma de pedidos...
         </div>
       }

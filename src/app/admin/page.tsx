@@ -49,6 +49,21 @@ interface ZonaEnvio {
   activa: boolean;
 }
 
+interface Empresa {
+  id: string;
+  nombre: string;
+  cuit?: string;
+  telefono?: string;
+  activa: boolean;
+}
+
+interface Empleado {
+  id: string;
+  nombre: string;
+  puesto?: string;
+  activo: boolean;
+}
+
 export default function AdminPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [bebidas, setBebidas] = useState<Bebida[]>([]);
@@ -56,6 +71,9 @@ export default function AdminPage() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [salsas, setSalsas] = useState<Salsa[]>([]);
   const [zonas, setZonas] = useState<ZonaEnvio[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [precioHuevoFrito, setPrecioHuevoFrito] = useState('500');
   const [precioGuarnicionExtra, setPrecioGuarnicionExtra] = useState<number>(3000);
@@ -88,6 +106,14 @@ export default function AdminPage() {
   const [nuevaZonaNombre, setNuevaZonaNombre] = useState('');
   const [nuevaZonaPrecio, setNuevaZonaPrecio] = useState('');
 
+  // Form Nueva Empresa y Empleado
+  const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
+  const [nuevaEmpresaCuit, setNuevaEmpresaCuit] = useState('');
+  const [nuevaEmpresaTelefono, setNuevaEmpresaTelefono] = useState('');
+
+  const [nuevoEmpleadoNombre, setNuevoEmpleadoNombre] = useState('');
+  const [nuevoEmpleadoPuesto, setNuevoEmpleadoPuesto] = useState('');
+
   // Se cargan los datos directamente al entrar
   useEffect(() => {
     cargarDatos();
@@ -114,6 +140,12 @@ export default function AdminPage() {
 
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').order('created_at', { ascending: true });
     if (zonasData) setZonas(zonasData);
+
+    const { data: empData } = await supabase.from('empresas').select('*').order('nombre', { ascending: true });
+    if (empData) setEmpresas(empData);
+
+    const { data: emplData } = await supabase.from('empleados').select('*').order('nombre', { ascending: true });
+    if (emplData) setEmpleados(emplData);
 
     const { data: confData } = await supabase
       .from('configuracion')
@@ -346,6 +378,59 @@ export default function AdminPage() {
     }
   }
 
+  // --- SECCIÓN 7: EMPRESAS ---
+  async function agregarEmpresa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nuevaEmpresaNombre) return;
+    await supabase.from('empresas').insert([
+      { nombre: nuevaEmpresaNombre, cuit: nuevaEmpresaCuit, telefono: nuevaEmpresaTelefono, activa: true },
+    ]);
+    setNuevaEmpresaNombre('');
+    setNuevaEmpresaCuit('');
+    setNuevaEmpresaTelefono('');
+    cargarDatos();
+  }
+
+  async function toggleActivaEmpresa(id: string, estadoActual: boolean) {
+    await supabase.from('empresas').update({ activa: !estadoActual }).eq('id', id);
+    cargarDatos();
+  }
+
+  async function eliminarEmpresa(id: string) {
+    if (confirm('¿Seguro que querés eliminar esta empresa?')) {
+      const { error } = await supabase.from('empresas').delete().eq('id', id);
+      if (error) {
+        alert('No se pudo eliminar la empresa porque tiene pedidos registrados. Podés desactivarla.');
+      } else {
+        cargarDatos();
+      }
+    }
+  }
+
+  // --- SECCIÓN 8: EMPLEADOS ---
+  async function agregarEmpleado(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nuevoEmpleadoNombre) return;
+    await supabase.from('empleados').insert([
+      { nombre: nuevoEmpleadoNombre, puesto: nuevoEmpleadoPuesto, activo: true },
+    ]);
+    setNuevoEmpleadoNombre('');
+    setNuevoEmpleadoPuesto('');
+    cargarDatos();
+  }
+
+  async function toggleActivoEmpleado(id: string, estadoActual: boolean) {
+    await supabase.from('empleados').update({ activo: !estadoActual }).eq('id', id);
+    cargarDatos();
+  }
+
+  async function eliminarEmpleado(id: string) {
+    if (confirm('¿Seguro que querés eliminar este empleado?')) {
+      await supabase.from('empleados').delete().eq('id', id);
+      cargarDatos();
+    }
+  }
+
   // Guardar precios adicionales
   async function guardarPrecioHuevo(e: React.FormEvent) {
     e.preventDefault();
@@ -400,7 +485,9 @@ export default function AdminPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-black" style={styleTextoNegro}>Panel de Administración</h1>
         <div className="flex gap-2">
-          {/* BOTÓN PARA CERRAR SESIÓN EN EL DISPOSITIVO */}
+          <Link href="/empresas" className="bg-indigo-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-indigo-800">
+            🏢 Cta. Cte. Empresas
+          </Link>
           <button
             onClick={() => {
               localStorage.removeItem('clave_acceso_ricos');
@@ -856,6 +943,72 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* SECCIÓN 7: EMPRESAS / CLIENTES CORPORATIVOS */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>7. Empresas / Clientes Corporativos</h2>
+        <form onSubmit={agregarEmpresa} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empresa</label>
+            <input type="text" style={styleTextoNegro} value={nuevaEmpresaNombre} onChange={(e) => setNuevaEmpresaNombre(e.target.value)} placeholder="Ej: Tech Corp" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>CUIT (Opcional)</label>
+            <input type="text" style={styleTextoNegro} value={nuevaEmpresaCuit} onChange={(e) => setNuevaEmpresaCuit(e.target.value)} placeholder="30-12345678-9" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Teléfono (Opcional)</label>
+            <input type="text" style={styleTextoNegro} value={nuevaEmpresaTelefono} onChange={(e) => setNuevaEmpresaTelefono(e.target.value)} placeholder="341 000000" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
+          </div>
+          <button type="submit" className="bg-indigo-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-indigo-800">+ Agregar Empresa</button>
+        </form>
+
+        <div className="flex flex-wrap gap-2">
+          {empresas.map((emp) => (
+            <div key={emp.id} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 p-2.5 rounded">
+              <div>
+                <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
+                {emp.cuit && <span className="text-xs font-bold text-gray-600">CUIT: {emp.cuit}</span>}
+              </div>
+              <button onClick={() => toggleActivaEmpresa(emp.id, emp.activa)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activa ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
+                {emp.activa ? 'Activa' : 'Inactiva'}
+              </button>
+              <button onClick={() => eliminarEmpresa(emp.id)} className="text-red-600 font-bold text-xs ml-1">✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SECCIÓN 8: EMPLEADOS */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>8. Gestión de Empleados (Rendición de Gastos)</h2>
+        <form onSubmit={agregarEmpleado} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre Empleado</label>
+            <input type="text" style={styleTextoNegro} value={nuevoEmpleadoNombre} onChange={(e) => setNuevoEmpleadoNombre(e.target.value)} placeholder="Ej: Juan Pérez" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Puesto / Rol (Opcional)</label>
+            <input type="text" style={styleTextoNegro} value={nuevoEmpleadoPuesto} onChange={(e) => setNuevoEmpleadoPuesto(e.target.value)} placeholder="Ej: Cocina, Ayudante" className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold" />
+          </div>
+          <button type="submit" className="bg-amber-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-800">+ Agregar Empleado</button>
+        </form>
+
+        <div className="flex flex-wrap gap-2">
+          {empleados.map((emp) => (
+            <div key={emp.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-2.5 rounded">
+              <div>
+                <span className="text-sm font-black block" style={styleTextoNegro}>{emp.nombre}</span>
+                {emp.puesto && <span className="text-xs font-bold text-gray-600">{emp.puesto}</span>}
+              </div>
+              <button onClick={() => toggleActivoEmpleado(emp.id, emp.activo)} className={`text-xs px-2 py-1 rounded font-bold ${emp.activo ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
+                {emp.activo ? 'Activo' : 'Inactivo'}
+              </button>
+              <button onClick={() => eliminarEmpleado(emp.id)} className="text-red-600 font-bold text-xs ml-1">✕</button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* SECCIÓN ADICIONALES: HUEVO FRITO */}
