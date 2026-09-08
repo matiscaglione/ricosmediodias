@@ -12,6 +12,7 @@ interface Menu {
   lleva_guarnicion: boolean;
   requiere_salsa: boolean;
   activo: boolean;
+  orden?: number;
 }
 
 interface Bebida {
@@ -71,6 +72,7 @@ export default function AdminPage() {
   // Form Nuevo Menú
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoPrecio, setNuevoPrecio] = useState('');
+  const [nuevoOrden, setNuevoOrden] = useState('1');
   const [nuevoEsFijo, setNuevoEsFijo] = useState(true);
   const [nuevoLlevaGuarnicion, setNuevoLlevaGuarnicion] = useState(false);
   const [nuevoRequiereSalsa, setNuevoRequiereSalsa] = useState(false);
@@ -92,7 +94,10 @@ export default function AdminPage() {
   }, []);
 
   async function cargarDatos() {
-    const { data: menusData } = await supabase.from('menus').select('*').order('created_at', { ascending: true });
+    const { data: menusData } = await supabase
+      .from('menus')
+      .select('*')
+      .order('orden', { ascending: true });
     if (menusData) setMenus(menusData);
 
     const { data: bebidasData } = await supabase.from('bebidas').select('*').order('created_at', { ascending: true });
@@ -145,6 +150,7 @@ export default function AdminPage() {
       { 
         nombre: nuevoNombre, 
         precio: parseFloat(nuevoPrecio), 
+        orden: parseInt(nuevoOrden) || 1,
         es_fijo: nuevoEsFijo, 
         lleva_guarnicion: nuevoLlevaGuarnicion, 
         requiere_salsa: nuevoRequiereSalsa,
@@ -155,6 +161,7 @@ export default function AdminPage() {
     if (!error) {
       setNuevoNombre('');
       setNuevoPrecio('');
+      setNuevoOrden('1');
       setNuevoLlevaGuarnicion(false);
       setNuevoRequiereSalsa(false);
       cargarDatos();
@@ -169,6 +176,7 @@ export default function AdminPage() {
       .update({
         nombre: menuEditando.nombre,
         precio: menuEditando.precio,
+        orden: menuEditando.orden ?? 1,
         es_fijo: menuEditando.es_fijo,
         lleva_guarnicion: menuEditando.lleva_guarnicion,
         requiere_salsa: menuEditando.requiere_salsa
@@ -413,7 +421,7 @@ export default function AdminPage() {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300 space-y-6">
         <h2 className="text-xl font-bold" style={styleTextoNegro}>1. Gestión de Menús y Stock Hoy</h2>
         
-        <form onSubmit={agregarMenu} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <form onSubmit={agregarMenu} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre del plato</label>
             <input
@@ -435,6 +443,17 @@ export default function AdminPage() {
               onChange={(e) => setNuevoPrecio(e.target.value)}
               placeholder="Ej: 6000"
               className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Orden</label>
+            <input
+              type="number"
+              style={styleTextoNegro}
+              value={nuevoOrden}
+              onChange={(e) => setNuevoOrden(e.target.value)}
+              placeholder="1"
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none text-center"
             />
           </div>
           <div className="space-y-1 pb-1">
@@ -492,15 +511,27 @@ export default function AdminPage() {
                 {esEditando ? (
                   <div className="space-y-3 bg-blue-50 p-3 rounded border border-blue-300">
                     <h3 className="text-xs font-black text-blue-900 uppercase">Editando plato</h3>
-                    <div>
-                      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre</label>
-                      <input
-                        type="text"
-                        style={styleTextoNegro}
-                        value={menuEditando.nombre}
-                        onChange={(e) => setMenuEditando({ ...menuEditando, nombre: e.target.value })}
-                        className="w-full border-2 border-gray-400 p-1.5 rounded text-sm font-bold bg-white"
-                      />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre</label>
+                        <input
+                          type="text"
+                          style={styleTextoNegro}
+                          value={menuEditando.nombre}
+                          onChange={(e) => setMenuEditando({ ...menuEditando, nombre: e.target.value })}
+                          className="w-full border-2 border-gray-400 p-1.5 rounded text-sm font-bold bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Orden</label>
+                        <input
+                          type="number"
+                          style={styleTextoNegro}
+                          value={menuEditando.orden ?? 1}
+                          onChange={(e) => setMenuEditando({ ...menuEditando, orden: parseInt(e.target.value) || 1 })}
+                          className="w-full border-2 border-gray-400 p-1.5 rounded text-sm font-bold bg-white text-center"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio ($)</label>
@@ -551,7 +582,12 @@ export default function AdminPage() {
                   <div className="flex flex-col justify-between h-full space-y-3">
                     <div>
                       <div className="flex justify-between items-start gap-2">
-                        <h3 className="font-black text-lg" style={styleTextoNegro}>{m.nombre}</h3>
+                        <div>
+                          <span className="text-xs font-black text-gray-500 block">
+                            Posición: #{m.orden ?? '-'}
+                          </span>
+                          <h3 className="font-black text-lg" style={styleTextoNegro}>{m.nombre}</h3>
+                        </div>
                         <span className="font-black text-base text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
                           ${m.precio.toLocaleString('es-AR')}
                         </span>

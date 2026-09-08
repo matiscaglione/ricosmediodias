@@ -11,6 +11,7 @@ interface Menu {
   precio: number;
   lleva_guarnicion: boolean;
   requiere_salsa: boolean;
+  orden?: number;
 }
 
 interface Bebida {
@@ -65,6 +66,8 @@ function ContenidoTomaPedidos() {
   const [zonasEnvio, setZonasEnvio] = useState<ZonaEnvio[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   
+  const [busquedaTextoMenu, setBusquedaTextoMenu] = useState<string>("");
+
   const [precioGuarnicionExtra, setPrecioGuarnicionExtra] = useState<number>(3000);
   const [guarnicionExtraElegida, setGuarnicionExtraElegida] = useState<Guarnicion | null>(null);
   
@@ -244,7 +247,9 @@ function ContenidoTomaPedidos() {
         .from("menus")
         .select("*")
         .in("id", idsConStock)
-        .eq("activo", true);
+        .eq("activo", true)
+        .order("orden", { ascending: true }); // Mantiene el orden definido en Admin
+
       if (menusData) setMenus(menusData);
     } else {
       setMenus([]);
@@ -420,6 +425,10 @@ function ContenidoTomaPedidos() {
   const montoTotal = subtotalSinRecargo + montoRecargoTarjeta;
 
   const formatearMoneda = (monto: number) => "$ " + monto.toLocaleString("es-AR");
+
+  const menusFiltrados = menus.filter((m) =>
+    m.nombre.toLowerCase().includes(busquedaTextoMenu.toLowerCase().trim())
+  );
 
   function imprimirSoloBebidas() {
     const bebidasEnCarrito = items.filter((i) => i.bebida);
@@ -1024,7 +1033,7 @@ function ContenidoTomaPedidos() {
 
           {/* SECCIÓN 2: MENÚS DEL DÍA */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-bold" style={styleTextoNegro}>
                 2. Seleccionar Menú del Día
               </h2>
@@ -1039,13 +1048,39 @@ function ContenidoTomaPedidos() {
               )}
             </div>
 
+            {/* BUSCADOR DE MENÚS */}
+            {!menuSeleccionado && (
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={busquedaTextoMenu}
+                  onChange={(e) => setBusquedaTextoMenu(e.target.value)}
+                  placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
+                  className="w-full border-2 border-gray-300 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
+                />
+                {busquedaTextoMenu && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaTextoMenu("")}
+                    className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
             {menus.length === 0 ? (
               <p className="text-red-600 text-sm font-bold">
                 No hay menús con stock cargado para hoy.
               </p>
+            ) : menusFiltrados.length === 0 ? (
+              <p className="text-gray-500 text-xs font-bold py-2">
+                No se encontraron menús que coincidan con "{busquedaTextoMenu}".
+              </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                {menus
+                {menusFiltrados
                   .filter((m) => !menuSeleccionado || menuSeleccionado.id === m.id)
                   .map((m) => (
                     <button
