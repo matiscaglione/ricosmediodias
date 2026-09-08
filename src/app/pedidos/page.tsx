@@ -75,9 +75,10 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
   async function cargarPedidos() {
     setCargando(true);
     
-    // Armamos el rango respetando el día calendario local sin forzar UTC (quitando la 'Z')
-    const inicioStr = `${fechaDesde}T00:00:00`;
-    const finStr = `${fechaHasta}T23:59:59`;
+    // Mismo criterio exacto que Cierre de Caja (de 03:00 AM del día de inicio hasta las 02:59:59 del día posterior al fin)
+    const fFin = new Date(`${fechaHasta}T00:00:00`);
+    fFin.setDate(fFin.getDate() + 1);
+    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
     let query = supabase
       .from('pedidos')
@@ -96,8 +97,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', inicioStr)
-      .lte('created_at', finStr);
+      .gte('created_at', `${fechaDesde}T03:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
