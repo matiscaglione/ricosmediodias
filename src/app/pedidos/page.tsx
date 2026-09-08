@@ -41,20 +41,14 @@ export default function HistorialPedidosPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-const hoyFechaStr = new Date().toLocaleDateString('es-CA');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
-  
-  // FILTRO POR RANGO DE FECHAS (Por defecto HOY)
-  const [fechaDesde, setFechaDesde] = useState<string>(hoyFechaStr);
-  const [fechaHasta, setFechaHasta] = useState<string>(hoyFechaStr);
-
   const [busquedaTexto, setBusquedaTexto] = useState<string>('');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    cargarPedidos();
+    cargarPedidosDelDia();
 
     const canal = supabase
       .channel('cambios-pedidos-historial')
@@ -62,7 +56,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos' },
         () => {
-          cargarPedidos();
+          cargarPedidosDelDia();
         }
       )
       .subscribe();
@@ -70,17 +64,15 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [filtroTurno, fechaDesde, fechaHasta]);
+  }, [filtroTurno]);
 
-  async function cargarPedidos() {
+  async function cargarPedidosDelDia() {
     setCargando(true);
     
-    // Creamos los objetos de fecha tomando estrictamente el inicio y fin del día local
-    const [anioInicio, mesInicio, diaInicio] = fechaDesde.split('-').map(Number);
-    const [anioFin, mesFin, diaFin] = fechaHasta.split('-').map(Number);
-
-    const inicioLocal = new Date(anioInicio, mesInicio - 1, diaInicio, 0, 0, 0, 0);
-    const finLocal = new Date(anioFin, mesFin - 1, diaFin, 23, 59, 59, 999);
+    // Filtro estricto exclusivo para el día de hoy (hora local Argentina)
+    const ahora = new Date();
+    const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+    const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
 
     let query = supabase
       .from('pedidos')
@@ -99,8 +91,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', inicioLocal.toISOString())
-      .lte('created_at', finLocal.toISOString());
+      .gte('created_at', inicioDia.toISOString())
+      .lte('created_at', finDia.toISOString());
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -116,6 +108,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
     }
     setCargando(false);
   }
+
   // CAMBIAR TURNO RÁPIDO HACIENDO CLIC EN LA ETIQUETA
   async function toggleTurnoPedido(id: string, turnoActual?: 'MAÑANA' | 'NOCHE') {
     const nuevoTurno = turnoActual === 'NOCHE' ? 'MAÑANA' : 'NOCHE';
@@ -169,15 +162,13 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
     }
 
     const encabezados = [
-      'Fecha/Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega',
+      'Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega',
       'Metodo Pago', 'Estado Pago', 'Detalle Platos', 'Costo Envio',
       'Monto Platos', 'Total', 'Observaciones'
     ];
 
     const filas = pedidosFiltrados.map((p) => {
-      const fechaHora = new Date(p.created_at).toLocaleString('es-AR', {
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-      });
+      const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
@@ -194,7 +185,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
       const clienteLimpio = (p.cliente_nombre || '').replace(/"/g, '""');
 
       return [
-        `"${fechaHora}"`,
+        `"${hora}"`,
         `"${p.turno || 'MAÑANA'}"`,
         `"${clienteLimpio}"`,
         `"${p.cliente_telefono || ''}"`,
@@ -213,9 +204,10 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    const fechaHoy = new Date().toISOString().split('T')[0];
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `pedidos_ricosmediodias_${fechaDesde}_al_${fechaHasta}.csv`);
+    link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}_${filtroTurno}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -374,14 +366,14 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
 
   async function eliminarPedido(pedido: Pedido) {
     const confirmar = window.confirm(
-      `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará de los informes.`
+      `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará del cierre de caja.`
     );
 
     if (!confirmar) return;
 
     try {
       setCargando(true);
-      const fechaPedidoLocal = pedido.created_at.split("T")[0];
+      const hoy = new Date().toISOString().split("T")[0];
 
       if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
         for (const det of pedido.detalle_pedidos) {
@@ -391,7 +383,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
             const { data: stockData } = await supabase
               .from("stock_diario")
               .select("cantidad_disponible")
-              .eq("fecha", fechaPedidoLocal)
+              .eq("fecha", hoy)
               .eq("menu_id", menuId)
               .single();
 
@@ -401,7 +393,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
                 .update({
                   cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
                 })
-                .eq("fecha", fechaPedidoLocal)
+                .eq("fecha", hoy)
                 .eq("menu_id", menuId);
             }
           }
@@ -423,7 +415,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
       if (errPedido) throw errPedido;
 
       alert("Pedido eliminado correctamente y stock actualizado.");
-      await cargarPedidos();
+      await cargarPedidosDelDia();
     } catch (error: any) {
       console.error("Error al eliminar el pedido:", error);
       alert("Error al eliminar el pedido: " + (error.message || error));
@@ -437,8 +429,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
       {/* ENCABEZADO */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Historial de Pedidos</h1>
-          <p className="text-sm font-bold text-gray-700">Consulta, reimpresión de tickets y control de turnos</p>
+          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Pedidos del Día</h1>
+          <p className="text-sm font-bold text-gray-700">Historial y reimpresión de tickets</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -459,43 +451,8 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
         </div>
       </header>
 
-      {/* FILTROS, FECHAS Y BUSCADOR */}
+      {/* FILTROS, BUSCADOR Y RESUMEN (SIN RANGO DE FECHAS) */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col gap-4">
-        
-        {/* SELECTOR DE RANGO DE FECHAS */}
-        <div className="flex flex-wrap items-center gap-3 bg-purple-50 p-3 rounded-lg border border-purple-200">
-          <span className="text-xs font-black text-purple-950 uppercase">📅 Rango de Fechas:</span>
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-bold text-gray-700">Desde:</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="text-xs font-black p-1 bg-white border border-purple-300 rounded text-black"
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-bold text-gray-700">Hasta:</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="text-xs font-black p-1 bg-white border border-purple-300 rounded text-black"
-            />
-          </div>
-          {(fechaDesde !== hoyFechaStr || fechaHasta !== hoyFechaStr) && (
-            <button
-              onClick={() => {
-                setFechaDesde(hoyFechaStr);
-                setFechaHasta(hoyFechaStr);
-              }}
-              className="text-xs font-extrabold bg-purple-200 hover:bg-purple-300 text-purple-900 px-2 py-1 rounded ml-auto"
-            >
-              🔄 Volver a Hoy
-            </button>
-          )}
-        </div>
-
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
           
           {/* BUSCADOR DE TEXTO EN TIEMPO REAL */}
@@ -539,7 +496,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
           </div>
         </div>
 
-        {/* BOTONES DE FILTRO DE ENTREGA Y TURNO */}
+        {/* BOTONES DE FILTRO */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-1">
             {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
@@ -569,7 +526,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
                     : 'bg-white border-gray-300 text-black hover:bg-gray-100'
                 }`}
               >
-                {t === 'TODOS' ? 'Día Completo' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+                {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
               </button>
             ))}
           </div>
@@ -581,7 +538,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
         <div className="text-center py-12 font-extrabold text-gray-600">Cargando pedidos...</div>
       ) : pedidosFiltrados.length === 0 ? (
         <div className="bg-white p-8 text-center rounded-lg border border-gray-300 font-bold text-gray-600">
-          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el rango de fechas seleccionado.'}
+          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el filtro seleccionado.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -624,7 +581,7 @@ const hoyFechaStr = new Date().toLocaleDateString('es-CA');
 
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-500 block">
-                          {new Date(pedido.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                          {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
                         </span>
                         {pedido.horario_solicitado && (
                           <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">
