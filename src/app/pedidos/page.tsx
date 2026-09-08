@@ -41,14 +41,21 @@ export default function HistorialPedidosPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
+  const hoyFechaStr = new Date().toISOString().split('T')[0];
+
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
+  
+  // FILTRO POR RANGO DE FECHAS (Por defecto HOY)
+  const [fechaDesde, setFechaDesde] = useState<string>(hoyFechaStr);
+  const [fechaHasta, setFechaHasta] = useState<string>(hoyFechaStr);
+
   const [busquedaTexto, setBusquedaTexto] = useState<string>('');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    cargarPedidosDelDia();
+    cargarPedidos();
 
     const canal = supabase
       .channel('cambios-pedidos-historial')
@@ -56,7 +63,7 @@ export default function HistorialPedidosPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos' },
         () => {
-          cargarPedidosDelDia();
+          cargarPedidos();
         }
       )
       .subscribe();
@@ -64,14 +71,14 @@ export default function HistorialPedidosPage() {
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [filtroTurno]);
+  }, [filtroTurno, fechaDesde, fechaHasta]);
 
-  async function cargarPedidosDelDia() {
+  async function cargarPedidos() {
     setCargando(true);
     
-    const ahora = new Date();
-    const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
-    const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+    // Configurar el rango completo del día desde las 00:00:00 del "Desde" hasta las 23:59:59 del "Hasta"
+    const inicioStr = `${fechaDesde}T00:00:00.000Z`;
+    const finStr = `${fechaHasta}T23:59:59.999Z`;
 
     let query = supabase
       .from('pedidos')
@@ -90,8 +97,8 @@ export default function HistorialPedidosPage() {
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', inicioDia.toISOString())
-      .lte('created_at', finDia.toISOString());
+      .gte('created_at', inicioStr)
+      .lte('created_at', finStr);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -106,6 +113,23 @@ export default function HistorialPedidosPage() {
       setPedidos(data as Pedido[]);
     }
     setCargando(false);
+  }
+
+  // CAMBIAR TURNO RÁPIDO HACIENDO CLIC EN LA ETIQUETA
+  async function toggleTurnoPedido(id: string, turnoActual?: 'MAÑANA' | 'NOCHE') {
+    const nuevoTurno = turnoActual === 'NOCHE' ? 'MAÑANA' : 'NOCHE';
+    const { error } = await supabase
+      .from('pedidos')
+      .update({ turno: nuevoTurno })
+      .eq('id', id);
+
+    if (error) {
+      alert("Error al cambiar el turno: " + error.message);
+    } else {
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, turno: nuevoTurno } : p))
+      );
+    }
   }
 
   async function toggleEstadoPago(id: string, estadoActual: boolean) {
@@ -135,7 +159,7 @@ export default function HistorialPedidosPage() {
     }
   }
 
-  const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
+  const formatearMoneda = (monto: number) => '$ ' + (monto || 0).toLocaleString('es-AR');
 
   function exportarAExcel() {
     if (pedidosFiltrados.length === 0) {
@@ -144,13 +168,15 @@ export default function HistorialPedidosPage() {
     }
 
     const encabezados = [
-      'Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega',
+      'Fecha/Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega',
       'Metodo Pago', 'Estado Pago', 'Detalle Platos', 'Costo Envio',
       'Monto Platos', 'Total', 'Observaciones'
     ];
 
     const filas = pedidosFiltrados.map((p) => {
-      const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const fechaHora = new Date(p.created_at).toLocaleString('es-AR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
       
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
@@ -167,7 +193,7 @@ export default function HistorialPedidosPage() {
       const clienteLimpio = (p.cliente_nombre || '').replace(/"/g, '""');
 
       return [
-        `"${hora}"`,
+        `"${fechaHora}"`,
         `"${p.turno || 'MAÑANA'}"`,
         `"${clienteLimpio}"`,
         `"${p.cliente_telefono || ''}"`,
@@ -186,10 +212,9 @@ export default function HistorialPedidosPage() {
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const fechaHoy = new Date().toISOString().split('T')[0];
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `pedidos_ricosmediodias_${fechaHoy}_${filtroTurno}.csv`);
+    link.setAttribute('download', `pedidos_ricosmediodias_${fechaDesde}_al_${fechaHasta}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -300,14 +325,12 @@ export default function HistorialPedidosPage() {
     ventanaImpresion.document.close();
   }
 
-  // Lógica de Filtrado Completa (Tipo, Turno y Buscador de Texto)
+  // Lógica de Filtrado Completa
   const pedidosFiltrados = pedidos.filter((p) => {
-    // 1. Filtro Tipo Entrega
     if (filtroTipo !== 'TODOS' && p.tipo_entrega !== filtroTipo) {
       return false;
     }
 
-    // 2. Buscador de Texto Libre
     if (!busquedaTexto.trim()) return true;
 
     const query = busquedaTexto.toLowerCase().trim();
@@ -350,14 +373,14 @@ export default function HistorialPedidosPage() {
 
   async function eliminarPedido(pedido: Pedido) {
     const confirmar = window.confirm(
-      `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará del cierre de caja.`
+      `¿Estás seguro de que querés eliminar el pedido de "${pedido.cliente_nombre}"?\n\nEsto devolverá el stock de los platos y lo descontará de los informes.`
     );
 
     if (!confirmar) return;
 
     try {
       setCargando(true);
-      const hoy = new Date().toISOString().split("T")[0];
+      const fechaPedidoLocal = pedido.created_at.split("T")[0];
 
       if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
         for (const det of pedido.detalle_pedidos) {
@@ -367,7 +390,7 @@ export default function HistorialPedidosPage() {
             const { data: stockData } = await supabase
               .from("stock_diario")
               .select("cantidad_disponible")
-              .eq("fecha", hoy)
+              .eq("fecha", fechaPedidoLocal)
               .eq("menu_id", menuId)
               .single();
 
@@ -377,7 +400,7 @@ export default function HistorialPedidosPage() {
                 .update({
                   cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
                 })
-                .eq("fecha", hoy)
+                .eq("fecha", fechaPedidoLocal)
                 .eq("menu_id", menuId);
             }
           }
@@ -399,11 +422,11 @@ export default function HistorialPedidosPage() {
       if (errPedido) throw errPedido;
 
       alert("Pedido eliminado correctamente y stock actualizado.");
-      await cargarPedidosDelDia();
+      await cargarPedidos();
     } catch (error: any) {
       console.error("Error al eliminar el pedido:", error);
       alert("Error al eliminar el pedido: " + (error.message || error));
-    } finally {
+    } fontinally {
       setCargando(false);
     }
   }
@@ -413,8 +436,8 @@ export default function HistorialPedidosPage() {
       {/* ENCABEZADO */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Pedidos del Día</h1>
-          <p className="text-sm font-bold text-gray-700">Historial y reimpresión de tickets</p>
+          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Historial de Pedidos</h1>
+          <p className="text-sm font-bold text-gray-700">Consulta, reimpresión de tickets y control de turnos</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -435,8 +458,43 @@ export default function HistorialPedidosPage() {
         </div>
       </header>
 
-      {/* FILTROS, BUSCADOR Y RESUMEN */}
+      {/* FILTROS, FECHAS Y BUSCADOR */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col gap-4">
+        
+        {/* SELECTOR DE RANGO DE FECHAS */}
+        <div className="flex flex-wrap items-center gap-3 bg-purple-50 p-3 rounded-lg border border-purple-200">
+          <span className="text-xs font-black text-purple-950 uppercase">📅 Rango de Fechas:</span>
+          <div className="flex items-center gap-1">
+            <label className="text-xs font-bold text-gray-700">Desde:</label>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="text-xs font-black p-1 bg-white border border-purple-300 rounded text-black"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="text-xs font-bold text-gray-700">Hasta:</label>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="text-xs font-black p-1 bg-white border border-purple-300 rounded text-black"
+            />
+          </div>
+          {(fechaDesde !== hoyFechaStr || fechaHasta !== hoyFechaStr) && (
+            <button
+              onClick={() => {
+                setFechaDesde(hoyFechaStr);
+                setFechaHasta(hoyFechaStr);
+              }}
+              className="text-xs font-extrabold bg-purple-200 hover:bg-purple-300 text-purple-900 px-2 py-1 rounded ml-auto"
+            >
+              🔄 Volver a Hoy
+            </button>
+          )}
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
           
           {/* BUSCADOR DE TEXTO EN TIEMPO REAL */}
@@ -480,7 +538,7 @@ export default function HistorialPedidosPage() {
           </div>
         </div>
 
-        {/* BOTONES DE FILTRO */}
+        {/* BOTONES DE FILTRO DE ENTREGA Y TURNO */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-1">
             {(['TODOS', 'ENVIO', 'RETIRO', 'BAR'] as const).map((tipo) => (
@@ -510,7 +568,7 @@ export default function HistorialPedidosPage() {
                     : 'bg-white border-gray-300 text-black hover:bg-gray-100'
                 }`}
               >
-                {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+                {t === 'TODOS' ? 'Día Completo' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
               </button>
             ))}
           </div>
@@ -522,7 +580,7 @@ export default function HistorialPedidosPage() {
         <div className="text-center py-12 font-extrabold text-gray-600">Cargando pedidos...</div>
       ) : pedidosFiltrados.length === 0 ? (
         <div className="bg-white p-8 text-center rounded-lg border border-gray-300 font-bold text-gray-600">
-          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el filtro seleccionado.'}
+          {busquedaTexto ? `No se encontraron pedidos con "${busquedaTexto}"` : 'No hay pedidos registrados para el rango de fechas seleccionado.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -549,9 +607,14 @@ export default function HistorialPedidosPage() {
                           {pedido.tipo_entrega === 'ENVIO' ? 'ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? 'RETIRO' : 'BAR'}
                         </span>
 
-                        <span className="text-xs px-2 py-0.5 rounded font-black bg-purple-50 text-purple-900 border border-purple-200">
-                          {pedido.turno === 'NOCHE' ? '🌙 NOCHE' : '☀️ MAÑANA'}
-                        </span>
+                        {/* BOTÓN INTERACTIVO PARA CAMBIAR TURNO AL HACER CLIC */}
+                        <button
+                          onClick={() => toggleTurnoPedido(pedido.id, pedido.turno)}
+                          title="Hacé clic para cambiar de turno (Mañana / Noche)"
+                          className="text-xs px-2 py-0.5 rounded font-black bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 cursor-pointer transition-colors"
+                        >
+                          {pedido.turno === 'NOCHE' ? '🌙 NOCHE 🔄' : '☀️ MAÑANA 🔄'}
+                        </button>
 
                         <span className="text-xs px-2 py-0.5 rounded font-black bg-blue-50 text-blue-900 border border-blue-300">
                           🍽️ {platosEnPedido} {platosEnPedido === 1 ? 'plato' : 'platos'}
@@ -560,7 +623,7 @@ export default function HistorialPedidosPage() {
 
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-500 block">
-                          {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                          {new Date(pedido.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
                         </span>
                         {pedido.horario_solicitado && (
                           <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">
