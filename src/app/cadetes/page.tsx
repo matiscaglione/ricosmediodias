@@ -16,6 +16,8 @@ interface PedidoEnvio {
   turno?: 'MAÑANA' | 'NOCHE';
   estado_cadete?: 'EN_VIAJE' | 'RENDIDO' | null;
   numero_vuelta?: number | null;
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  pago_confirmado?: boolean;
 }
 
 interface VueltaRendida {
@@ -54,6 +56,22 @@ export default function CadetesPage() {
     setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
 
     cargarEnvios();
+
+    // Escuchar cambios en tiempo real
+    const canal = supabase
+      .channel('cambios-pedidos-cadetes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pedidos' },
+        () => {
+          cargarEnvios();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, [hoyArg, filtroTurno]);
 
   function guardarNombre1(nuevoNombre: string) {
@@ -128,18 +146,23 @@ export default function CadetesPage() {
     }
 
     const totalCobrado = enviosActuales.reduce((acc, p) => acc + p.monto_total, 0);
+    const totalEfectivoACobrar = enviosActuales
+      .filter((p) => (p.metodo_pago || 'EFECTIVO') === 'EFECTIVO')
+      .reduce((acc, p) => acc + p.monto_total, 0);
+
     const totalEnvios = enviosActuales.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
-    const cajaNeto = totalCobrado - totalEnvios;
+    const cajaNeto = totalEfectivoACobrar - totalEnvios;
 
     const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
     const numeroNuevaVuelta = historialPrevio.length + 1;
 
     const confirmar = confirm(
       `Rendición de Vuelta #${numeroNuevaVuelta} - ${nombreCadete}:\n\n` +
-      `📦 Pedidos: ${enviosActuales.length}\n` +
-      `💵 Total Cobrado: $${totalCobrado.toLocaleString('es-AR')}\n` +
+      `📦 Pedidos totales: ${enviosActuales.length}\n` +
+      `💵 Total Pedidos (Suma General): $${totalCobrado.toLocaleString('es-AR')}\n` +
+      `💵 Cobrar Efectivo al Cadete: $${totalEfectivoACobrar.toLocaleString('es-AR')}\n` +
       `🛵 Pagar a Cadete (Envíos): $${totalEnvios.toLocaleString('es-AR')}\n` +
-      `📥 Dinero Limpio para Caja: $${cajaNeto.toLocaleString('es-AR')}\n\n` +
+      `📥 Dinero Limpio para Caja (Efectivo - Envíos): $${cajaNeto.toLocaleString('es-AR')}\n\n` +
       `¿Confirmar que el cadete rinde esta vuelta?`
     );
 
@@ -321,9 +344,14 @@ export default function CadetesPage() {
                         Obs: {p.observaciones}
                       </p>
                     )}
-                    <p className="text-xs font-black text-green-800 pt-0.5">
-                      Total: ${p.monto_total.toLocaleString('es-AR')} (Envío: ${p.costo_envio})
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                      <span className="text-xs font-black text-green-800">
+                        Total: ${p.monto_total.toLocaleString('es-AR')} (Envío: ${p.costo_envio})
+                      </span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-950 border border-amber-300">
+                        💳 {p.metodo_pago || 'EFECTIVO'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-1.5 min-w-[110px]">
                     <button
@@ -406,9 +434,14 @@ export default function CadetesPage() {
                       <p className="text-xs font-bold text-gray-800">
                         👤 {p.cliente_nombre || 'Cliente Envío'}
                       </p>
-                      <p className="text-xs font-bold text-gray-800 mt-0.5">
-                        ${p.monto_total} (Envío: ${p.costo_envio})
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-gray-800">
+                          ${p.monto_total} (Envío: ${p.costo_envio})
+                        </span>
+                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 border border-amber-300">
+                          {p.metodo_pago || 'EFECTIVO'}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <button
@@ -531,9 +564,14 @@ export default function CadetesPage() {
                       <p className="text-xs font-bold text-gray-800">
                         👤 {p.cliente_nombre || 'Cliente Envío'}
                       </p>
-                      <p className="text-xs font-bold text-gray-800 mt-0.5">
-                        ${p.monto_total} (Envío: ${p.costo_envio})
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-gray-800">
+                          ${p.monto_total} (Envío: ${p.costo_envio})
+                        </span>
+                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 border border-amber-300">
+                          {p.metodo_pago || 'EFECTIVO'}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <button

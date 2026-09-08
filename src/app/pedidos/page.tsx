@@ -28,6 +28,8 @@ interface Pedido {
   estado: string;
   created_at: string;
   turno?: 'MAÑANA' | 'NOCHE';
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  pago_confirmado?: boolean;
   detalle_pedidos?: DetallePedido[];
 }
 
@@ -39,12 +41,27 @@ export default function HistorialPedidosPage() {
 
   useEffect(() => {
     cargarPedidosDelDia();
+
+    // Escuchar cambios en tiempo real
+    const canal = supabase
+      .channel('cambios-pedidos-historial')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pedidos' },
+        () => {
+          cargarPedidosDelDia();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, [filtroTurno]);
 
   async function cargarPedidosDelDia() {
     setCargando(true);
     
-    // Calculamos el inicio y fin del día actual en Argentina ajustado a UTC
     const ahora = new Date();
     const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
     const finDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
@@ -82,16 +99,56 @@ export default function HistorialPedidosPage() {
     setCargando(false);
   }
 
+  async function toggleEstadoPago(id: string, estadoActual: boolean) {
+    const nuevoEstado = !estadoActual;
+    const { error } = await supabase
+      .from('pedidos')
+      .update({ pago_confirmado: nuevoEstado })
+      .eq('id', id);
+
+    if (!error) {
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, pago_confirmado: nuevoEstado } : p))
+      );
+    }
+  }
+
+  async function cambiarMetodoPago(id: string, nuevoMetodo: Pedido['metodo_pago']) {
+    const { error } = await supabase
+      .from('pedidos')
+      .update({ metodo_pago: nuevoMetodo })
+      .eq('id', id);
+
+    if (!error) {
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, metodo_pago: nuevoMetodo } : p))
+      );
+    }
+  }
+
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
 
-  // FUNCIONALIDAD PARA EXPORTAR A EXCEL (CSV)
+  // FUNCIONALIDAD PARA EXPORTAR A EXCEL (CSV) INCLUYENDO PAGO
   function exportarAExcel() {
     if (pedidosFiltrados.length === 0) {
       alert('No hay pedidos para exportar.');
       return;
     }
 
-    const encabezados = ['Hora', 'Turno', 'Cliente', 'Telefono', 'Tipo Entrega', 'Detalle Platos', 'Costo Envio', 'Monto Platos', 'Total', 'Observaciones'];
+    const encabezados = [
+      'Hora',
+      'Turno',
+      'Cliente',
+      'Telefono',
+      'Tipo Entrega',
+      'Metodo Pago',
+      'Estado Pago',
+      'Detalle Platos',
+      'Costo Envio',
+      'Monto Platos',
+      'Total',
+      'Observaciones'
+    ];
 
     const filas = pedidosFiltrados.map((p) => {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
@@ -114,6 +171,8 @@ export default function HistorialPedidosPage() {
         `"${clienteLimpio}"`,
         `"${p.cliente_telefono || ''}"`,
         `"${p.tipo_entrega}"`,
+        `"${p.metodo_pago || 'EFECTIVO'}"`,
+        `"${p.pago_confirmado ? 'PAGADO' : 'PENDIENTE'}"`,
         `"${detalleStr}"`,
         p.costo_envio,
         p.monto_platos,
@@ -151,7 +210,6 @@ export default function HistorialPedidosPage() {
 
     const itemsHtml = (pedido.detalle_pedidos || [])
       .map((i) => {
-        // 1. Si es una Bebida
         if (i.bebidas) {
           return `
             <div style="margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
@@ -160,7 +218,6 @@ export default function HistorialPedidosPage() {
             </div>`;
         }
 
-        // 2. Si es una Guarnición Extra Suelta
         if (!i.menus && i.guarniciones) {
           return `
             <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
@@ -176,7 +233,6 @@ export default function HistorialPedidosPage() {
             </div>`;
         }
 
-        // 3. Si es un Plato / Menú Principal
         return `
           <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
             <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
@@ -193,13 +249,16 @@ export default function HistorialPedidosPage() {
       })
       .join('');
 
-    // Extraer dirección de observaciones si existe
     const matchDireccion = pedido.observaciones && pedido.observaciones.includes('Dirección:')
       ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
       : '';
 
     let cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
       ${pedido.tipo_entrega === 'ENVIO' ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRA EN LOCAL' : '🍽️ COMER EN BAR'}
+    </div>`;
+
+    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0;">
+      💳 PAGO: ${pedido.metodo_pago || 'EFECTIVO'} ${pedido.pago_confirmado ? '(PAGADO)' : '(PENDIENTE DE COBRO)'}
     </div>`;
 
     ventanaImpresion.document.write(`
@@ -229,6 +288,7 @@ export default function HistorialPedidosPage() {
           <div class="line"></div>
 
           ${cabeceraEntrega}
+          ${etiquetaPago}
           
           <div style="font-size: 14px; margin-bottom: 4px;">
             <strong>Cliente:</strong> ${pedido.cliente_nombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ''}
@@ -281,7 +341,6 @@ export default function HistorialPedidosPage() {
 
   const totalRecaudado = pedidosFiltrados.reduce((acc, p) => acc + p.monto_total, 0);
 
-  // CONTEO EXCLUSIVO DE MENÚS/PLATOS VENDIDOS (Ignora bebidas y guarniciones extras sueltas)
   const totalPlatosVendidos = pedidosFiltrados.reduce((acc, pedido) => {
     const platosEnPedido = (pedido.detalle_pedidos || []).reduce((subAcc, item) => {
       return item.menus ? subAcc + item.cantidad : subAcc;
@@ -369,8 +428,8 @@ export default function HistorialPedidosPage() {
           <Link href="/" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-extrabold hover:bg-blue-700">
             ➕ Tomar Pedido
           </Link>
-          <Link href="/pedidos" className="bg-purple-700 text-white text-sm px-3 py-2 rounded font-bold hover:bg-purple-800">
-            📋 Pedidos
+          <Link href="/cadetes" className="bg-blue-600 text-white text-sm px-3 py-2 rounded font-bold hover:bg-blue-700">
+            🛵 Cadetes
           </Link>
           <Link href="/admin" className="bg-black text-white text-sm px-3 py-2 rounded font-bold hover:bg-gray-800">
             ⚙️ Admin
@@ -446,12 +505,10 @@ export default function HistorialPedidosPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pedidosFiltrados.map((pedido) => {
-            // Extraer la dirección de las observaciones si existe
             const direccionDetalle = pedido.observaciones && pedido.observaciones.includes('Dirección:')
               ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
               : null;
 
-            // Cantidad de menús principales en este pedido en particular
             const platosEnPedido = (pedido.detalle_pedidos || []).reduce((acc, item) => {
               return item.menus ? acc + item.cantidad : acc;
             }, 0);
@@ -461,21 +518,19 @@ export default function HistorialPedidosPage() {
                 <div>
                   <div className="flex justify-between items-start border-b border-gray-200 pb-3 mb-3">
                     <div>
-                      {/* ETIQUETA, TURNO Y DIRECCIÓN */}
                       <div className="mb-1 flex items-center gap-1.5 flex-wrap">
                         <span className={`text-xs px-2.5 py-1 rounded font-black border inline-block ${
                           pedido.tipo_entrega === 'ENVIO' ? 'bg-purple-100 text-purple-900 border-purple-300' :
                           pedido.tipo_entrega === 'RETIRO' ? 'bg-blue-100 text-blue-900 border-blue-300' :
                           'bg-green-100 text-green-900 border-green-300'
                         }`}>
-                          {pedido.tipo_entrega === 'ENVIO' ? '🛵 ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRO' : '🍽️ BAR'}
+                          {pedido.tipo_entrega === 'ENVIO' ? 'ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? 'RETIRO' : 'BAR'}
                         </span>
 
                         <span className="text-xs px-2 py-0.5 rounded font-black bg-purple-50 text-purple-900 border border-purple-200">
                           {pedido.turno === 'NOCHE' ? '🌙 NOCHE' : '☀️ MAÑANA'}
                         </span>
 
-                        {/* BADGE CON LA CANTIDAD DE PLATOS DEL TICKET */}
                         <span className="text-xs px-2 py-0.5 rounded font-black bg-blue-50 text-blue-900 border border-blue-300">
                           🍽️ {platosEnPedido} {platosEnPedido === 1 ? 'plato' : 'platos'}
                         </span>
@@ -487,7 +542,6 @@ export default function HistorialPedidosPage() {
                         </p>
                       )}
 
-                      {/* TITULO ADAPTADO SEGÚN TIPO DE ENTREGA */}
                       <h2 className="text-lg font-black mt-1" style={styleTextoNegro}>
                         {pedido.tipo_entrega === 'BAR'
                           ? `Bar${pedido.cliente_nombre && pedido.cliente_nombre !== 'Cliente Bar' ? ` - ${pedido.cliente_nombre}` : ''}`
@@ -510,6 +564,32 @@ export default function HistorialPedidosPage() {
                           🕒 {pedido.horario_solicitado} hs
                         </span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* CAJA DE MÉTODO Y ESTADO DE PAGO */}
+                  <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 space-y-2 mb-3">
+                    <div className="flex justify-between items-center">
+                      <select
+                        value={pedido.metodo_pago || 'EFECTIVO'}
+                        onChange={(e) => cambiarMetodoPago(pedido.id, e.target.value as any)}
+                        className="text-xs font-black bg-white border border-amber-400 p-1 rounded text-black"
+                      >
+                        <option value="EFECTIVO">💵 Efectivo</option>
+                        <option value="TRANSFERENCIA">📱 Transferencia</option>
+                        <option value="TARJETA">💳 Tarjeta</option>
+                      </select>
+
+                      <button
+                        onClick={() => toggleEstadoPago(pedido.id, !!pedido.pago_confirmado)}
+                        className={`text-xs font-black px-2.5 py-1 rounded shadow-sm transition-all ${
+                          pedido.pago_confirmado
+                            ? 'bg-green-600 text-white'
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        {pedido.pago_confirmado ? '✓ PAGADO' : '⏳ NO PAGÓ'}
+                      </button>
                     </div>
                   </div>
 
@@ -551,7 +631,7 @@ export default function HistorialPedidosPage() {
                     <span className="text-xs font-bold text-gray-500 block">Total:</span>
                     <span className="text-lg font-black" style={styleTextoNegro}>{formatearMoneda(pedido.monto_total)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       onClick={() => eliminarPedido(pedido)}
                       className="bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold py-2 px-2.5 rounded flex items-center gap-1 shadow transition-colors"

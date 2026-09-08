@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [precioHuevoFrito, setPrecioHuevoFrito] = useState('500');
   const [precioGuarnicionExtra, setPrecioGuarnicionExtra] = useState<number>(3000);
+  const [recargoTarjetaPorc, setRecargoTarjetaPorc] = useState<number>(10);
 
   // Buscador y Filtro para Menús
   const [busquedaMenu, setBusquedaMenu] = useState('');
@@ -126,11 +127,19 @@ export default function AdminPage() {
     const { data: zonasData } = await supabase.from('zonas_envio').select('*').order('created_at', { ascending: true });
     if (zonasData) setZonas(zonasData);
 
-    const { data: confData } = await supabase.from('configuracion').select('precio_huevo_frito, precio_guarnicion_extra').eq('id', 'general').single();
-if (confData) {
-  if (confData.precio_huevo_frito) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
-  if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
-}
+    const { data: confData } = await supabase
+      .from('configuracion')
+      .select('precio_huevo_frito, precio_guarnicion_extra, recargo_tarjeta_porc')
+      .eq('id', 'general')
+      .single();
+
+    if (confData) {
+      if (confData.precio_huevo_frito) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
+      if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
+      if (confData.recargo_tarjeta_porc !== undefined && confData.recargo_tarjeta_porc !== null) {
+        setRecargoTarjetaPorc(Number(confData.recargo_tarjeta_porc));
+      }
+    }
 
     const hoy = new Date().toISOString().split('T')[0];
     const { data: stockData } = await supabase.from('stock_diario').select('menu_id, cantidad_disponible').eq('fecha', hoy);
@@ -339,43 +348,59 @@ if (confData) {
     if (confirm('¿Seguro que querés eliminar esta zona?')) {
       const { error } = await supabase.from('zonas_envio').delete().eq('id', id);
       if (error) {
-        alert('No se pudo eliminar la zona porque tiene pedidos asociados. Podes desactivarla.');
+        alert('No se pudo eliminar la zona porque tiene pedidos asociados. Podés desactivarla.');
       } else {
         cargarDatos();
       }
     }
   }
 
-  // Nueva función para guardar el precio de huevo frito:
-async function guardarPrecioHuevo(e: React.FormEvent) {
-  e.preventDefault();
-  const valor = parseFloat(precioHuevoFrito) || 0;
-  const { error } = await supabase
-    .from('configuracion')
-    .upsert({ id: 'general', precio_huevo_frito: valor }, { onConflict: 'id' });
+  // Guardar precios adicionales
+  async function guardarPrecioHuevo(e: React.FormEvent) {
+    e.preventDefault();
+    const valor = parseFloat(precioHuevoFrito) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', precio_huevo_frito: valor }, { onConflict: 'id' });
 
-  if (!error) {
-    alert('Precio de huevo frito actualizado correctamente');
-    cargarDatos();
-  } else {
-    alert('Error al guardar precio: ' + error.message);
+    if (!error) {
+      alert('Precio de huevo frito actualizado correctamente');
+      cargarDatos();
+    } else {
+      alert('Error al guardar precio: ' + error.message);
+    }
   }
-}
 
-async function guardarPrecioGuarnicionExtra(e: React.FormEvent) {
-  e.preventDefault();
-  const valor = parseFloat(String(precioGuarnicionExtra)) || 0;
-  const { error } = await supabase
-    .from('configuracion')
-    .upsert({ id: 'general', precio_guarnicion_extra: valor }, { onConflict: 'id' });
+  async function guardarPrecioGuarnicionExtra(e: React.FormEvent) {
+    e.preventDefault();
+    const valor = parseFloat(String(precioGuarnicionExtra)) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', precio_guarnicion_extra: valor }, { onConflict: 'id' });
 
-  if (!error) {
-    alert('Precio de guarnición extra actualizado correctamente');
-    cargarDatos();
-  } else {
-    alert('Error al guardar precio: ' + error.message);
+    if (!error) {
+      alert('Precio de guarnición extra actualizado correctamente');
+      cargarDatos();
+    } else {
+      alert('Error al guardar precio: ' + error.message);
+    }
   }
-}
+
+  // Guardar recargo por tarjeta
+  async function guardarRecargoTarjeta(e: React.FormEvent) {
+    e.preventDefault();
+    const valor = parseFloat(String(recargoTarjetaPorc)) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', recargo_tarjeta_porc: valor }, { onConflict: 'id' });
+
+    if (!error) {
+      alert('Recargo de tarjeta por defecto actualizado correctamente');
+      cargarDatos();
+    } else {
+      alert('Error al guardar recargo: ' + error.message);
+    }
+  }
 
   const styleTextoNegro = { color: '#000000' };
 
@@ -847,46 +872,67 @@ async function guardarPrecioGuarnicionExtra(e: React.FormEvent) {
       </div>
 
       {/* SECCIÓN ADICIONALES: HUEVO FRITO */}
-<div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-  <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🍳 Precio de Adicional Huevo Frito</h2>
-  <form onSubmit={guardarPrecioHuevo} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
-    <div className="flex-1">
-      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio por unidad ($)</label>
-      <input
-        type="number"
-        step="0.01"
-        style={styleTextoNegro}
-        value={precioHuevoFrito}
-        onChange={(e) => setPrecioHuevoFrito(e.target.value)}
-        className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-      />
-    </div>
-    <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
-      💾 Guardar Precio
-    </button>
-  </form>
-</div>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🍳 Precio de Adicional Huevo Frito</h2>
+        <form onSubmit={guardarPrecioHuevo} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div className="flex-1">
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio por unidad ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={styleTextoNegro}
+              value={precioHuevoFrito}
+              onChange={(e) => setPrecioHuevoFrito(e.target.value)}
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+            />
+          </div>
+          <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
+            💾 Guardar Precio
+          </button>
+        </form>
+      </div>
 
-{/* SECCIÓN ADICIONALES: GUARNICIÓN EXTRA */}
-<div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-  <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🥗 Precio de Guarnición Extra / Adicional</h2>
-  <form onSubmit={guardarPrecioGuarnicionExtra} className="flex gap-3 items-end bg-purple-50 p-4 rounded-lg border border-purple-200">
-    <div className="flex-1">
-      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio Guarnición Extra ($)</label>
-      <input
-        type="number"
-        step="0.01"
-        style={styleTextoNegro}
-        value={precioGuarnicionExtra}
-        onChange={(e) => setPrecioGuarnicionExtra(Number(e.target.value))}
-        className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-      />
-    </div>
-    <button type="submit" className="bg-purple-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-purple-800">
-      💾 Guardar Precio
-    </button>
-  </form>
-</div>
+      {/* SECCIÓN ADICIONALES: GUARNICIÓN EXTRA */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🥗 Precio de Guarnición Extra / Adicional</h2>
+        <form onSubmit={guardarPrecioGuarnicionExtra} className="flex gap-3 items-end bg-purple-50 p-4 rounded-lg border border-purple-200">
+          <div className="flex-1">
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio Guarnición Extra ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={styleTextoNegro}
+              value={precioGuarnicionExtra}
+              onChange={(e) => setPrecioGuarnicionExtra(Number(e.target.value))}
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+            />
+          </div>
+          <button type="submit" className="bg-purple-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-purple-800">
+            💾 Guardar Precio
+          </button>
+        </form>
+      </div>
+
+      {/* SECCIÓN CONFIGURACIÓN: RECARGO TARJETA */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>💳 Recargo por Tarjeta (Por Defecto)</h2>
+        <form onSubmit={guardarRecargoTarjeta} className="flex gap-3 items-end bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex-1">
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Porcentaje de Recargo (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={styleTextoNegro}
+              value={recargoTarjetaPorc}
+              onChange={(e) => setRecargoTarjetaPorc(Number(e.target.value))}
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+            />
+          </div>
+          <button type="submit" className="bg-blue-700 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-blue-800">
+            💾 Guardar Recargo
+          </button>
+        </form>
+      </div>
 
     </div>
   );

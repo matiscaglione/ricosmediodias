@@ -13,6 +13,8 @@ interface Pedido {
   monto_total: number;
   created_at: string;
   turno?: 'MAÑANA' | 'NOCHE';
+  metodo_pago?: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  pago_confirmado?: boolean;
   detalle_pedidos?: {
     cantidad: number;
     precio_unitario: number;
@@ -81,10 +83,31 @@ export default function ReportesPage() {
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
 
   const totalRecaudado = pedidos.reduce((acc, p) => acc + p.monto_total, 0);
-  const totalPlatosMonto = pedidos.reduce((acc, p) => acc + p.monto_platos, 0);
   const totalEnviosMonto = pedidos.reduce((acc, p) => acc + p.costo_envio, 0);
 
-  // 1. CONTEO Y MONTO DE PLATOS PRINCIPALES
+  // DESGLOSE POR MÉTODO DE PAGO
+  const totalEfectivo = pedidos
+    .filter((p) => (p.metodo_pago || 'EFECTIVO') === 'EFECTIVO')
+    .reduce((acc, p) => acc + p.monto_total, 0);
+
+  const totalTransferencia = pedidos
+    .filter((p) => p.metodo_pago === 'TRANSFERENCIA')
+    .reduce((acc, p) => acc + p.monto_total, 0);
+
+  const totalTarjeta = pedidos
+    .filter((p) => p.metodo_pago === 'TARJETA')
+    .reduce((acc, p) => acc + p.monto_total, 0);
+
+  // DESGLOSE POR ESTADO DE PAGO
+  const totalCobrado = pedidos
+    .filter((p) => p.pago_confirmado)
+    .reduce((acc, p) => acc + p.monto_total, 0);
+
+  const totalPendiente = pedidos
+    .filter((p) => !p.pago_confirmado)
+    .reduce((acc, p) => acc + p.monto_total, 0);
+
+  // CONTEO Y MONTO DE PLATOS PRINCIPALES
   const totalPlatosCant = pedidos.reduce((acc, p) => {
     const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
       return d.menu_id ? subAcc + d.cantidad : subAcc;
@@ -92,7 +115,7 @@ export default function ReportesPage() {
     return acc + cant;
   }, 0);
 
-  // 2. CONTEO Y MONTO EXCLUSIVO DE BEBIDAS
+  // CONTEO Y MONTO EXCLUSIVO DE BEBIDAS
   let totalBebidasMonto = 0;
   const totalBebidasCant = pedidos.reduce((acc, p) => {
     const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
@@ -105,7 +128,7 @@ export default function ReportesPage() {
     return acc + cant;
   }, 0);
 
-  // 3. CONTEO Y MONTO EXCLUSIVO DE EXTRAS SUELTOS (Guarniciones sin plato)
+  // CONTEO Y MONTO EXCLUSIVO DE EXTRAS SUELTOS
   let totalExtrasMonto = 0;
   const totalExtrasCant = pedidos.reduce((acc, p) => {
     const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
@@ -122,7 +145,6 @@ export default function ReportesPage() {
   const totalRetirosCant = pedidos.filter((p) => p.tipo_entrega === 'RETIRO').length;
   const totalBarCant = pedidos.filter((p) => p.tipo_entrega === 'BAR').length;
 
-  // Desglose detallado de platos, guarniciones y bebidas
   const resumenPlatos: Record<string, number> = {};
   const resumenGuarniciones: Record<string, number> = {};
   const resumenBebidas: Record<string, number> = {};
@@ -149,7 +171,19 @@ export default function ReportesPage() {
   function exportarReporteCSV() {
     if (pedidos.length === 0) return alert('No hay datos para exportar en este rango.');
 
-    const encabezados = ['Fecha', 'Hora', 'Turno', 'Cliente', 'Tipo Entrega', 'Total Platos ($)', 'Costo Envio ($)', 'Total Pedido ($)'];
+    const encabezados = [
+      'Fecha',
+      'Hora',
+      'Turno',
+      'Cliente',
+      'Tipo Entrega',
+      'Metodo Pago',
+      'Estado Pago',
+      'Total Platos ($)',
+      'Costo Envio ($)',
+      'Total Pedido ($)'
+    ];
+
     const filas = pedidos.map((p) => {
       const f = new Date(p.created_at);
       const fechaStr = f.toLocaleDateString('es-AR');
@@ -160,6 +194,8 @@ export default function ReportesPage() {
         `"${p.turno || 'MAÑANA'}"`,
         `"${(p.cliente_nombre || '').replace(/"/g, '""')}"`,
         `"${p.tipo_entrega}"`,
+        `"${p.metodo_pago || 'EFECTIVO'}"`,
+        `"${p.pago_confirmado ? 'PAGADO' : 'PENDIENTE'}"`,
         p.monto_platos,
         p.costo_envio,
         p.monto_total
@@ -178,8 +214,8 @@ export default function ReportesPage() {
   const styleTextoNegro = { color: '#000000' };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>Cierre de Caja y Reportes</h1>
           <p className="text-sm font-bold text-gray-700">Resumen de ventas e historial financiero</p>
@@ -201,7 +237,7 @@ export default function ReportesPage() {
       </header>
 
       {/* FILTROS DE FECHA Y TURNO */}
-      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 mb-6 flex flex-col md:flex-row items-end justify-between gap-4">
+      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 flex flex-col md:flex-row items-end justify-between gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
           <div>
             <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Fecha Desde</label>
@@ -264,43 +300,65 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* METRICAS PRINCIPALES */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-        {/* TOTAL RECAUDADO */}
+      {/* CIERRE DE CAJA POR MÉTODO DE PAGO */}
+      <div className="bg-white p-5 rounded-lg border-2 border-amber-300 shadow-sm space-y-3">
+        <h2 className="text-lg font-black text-amber-950">💵 Cierre por Método de Pago</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <span className="text-xs font-bold text-gray-700 block">💵 Efectivo (Caja)</span>
+            <span className="text-xl font-black text-amber-950">{formatearMoneda(totalEfectivo)}</span>
+          </div>
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <span className="text-xs font-bold text-blue-900 block">📱 Transferencias</span>
+            <span className="text-xl font-black text-blue-950">{formatearMoneda(totalTransferencia)}</span>
+          </div>
+          <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+            <span className="text-xs font-bold text-purple-900 block">💳 Tarjetas</span>
+            <span className="text-xl font-black text-purple-950">{formatearMoneda(totalTarjeta)}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-between items-center pt-2 border-t border-amber-200 text-xs font-bold text-gray-800 gap-2">
+          <span>
+            ✓ Cobrado: <strong className="text-green-800">{formatearMoneda(totalCobrado)}</strong>
+          </span>
+          <span>
+            ⏳ Pendiente: <strong className="text-red-700">{formatearMoneda(totalPendiente)}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* MÉTRICAS GENERALES */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300 col-span-1 sm:col-span-2 lg:col-span-1">
           <span className="text-xs font-bold text-gray-600 block">Total Recaudado</span>
           <span className="text-2xl font-black text-green-700">{formatearMoneda(totalRecaudado)}</span>
           <span className="text-xs text-gray-500 block mt-1 font-bold">{pedidos.length} tickets</span>
         </div>
 
-        {/* CANTIDAD TOTAL DE PLATOS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-blue-300 bg-blue-50">
           <span className="text-xs font-black text-blue-900 block uppercase">Total Platos / Menús</span>
           <span className="text-2xl font-black text-blue-950">{totalPlatosCant} u.</span>
           <span className="text-xs text-blue-800 block mt-1 font-bold">Platos principales</span>
         </div>
 
-        {/* BEBIDAS SEPARADAS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50">
           <span className="text-xs font-black text-cyan-900 block uppercase">🥤 Total Bebidas</span>
           <span className="text-2xl font-black text-cyan-950">{totalBebidasCant} u.</span>
           <span className="text-xs text-cyan-800 block mt-1 font-bold">{formatearMoneda(totalBebidasMonto)}</span>
         </div>
 
-        {/* EXTRAS SEPARADOS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50">
           <span className="text-xs font-black text-purple-900 block uppercase">🍳 Total Extras</span>
           <span className="text-2xl font-black text-purple-950">{totalExtrasCant} u.</span>
           <span className="text-xs text-purple-800 block mt-1 font-bold">{formatearMoneda(totalExtrasMonto)}</span>
         </div>
 
-        {/* MONTO ENVÍOS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Total en Envíos ($)</span>
           <span className="text-xl font-black" style={styleTextoNegro}>{formatearMoneda(totalEnviosMonto)}</span>
         </div>
 
-        {/* DESGLOSE ENTREGAS */}
         <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-300">
           <span className="text-xs font-bold text-gray-600 block">Desglose Entregas</span>
           <div className="text-xs font-bold mt-1 space-y-0.5" style={styleTextoNegro}>
@@ -313,7 +371,6 @@ export default function ReportesPage() {
 
       {/* DESGLOSE EN TABLAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* PLATOS VENDIDOS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-gray-300">
           <h2 className="text-base font-black mb-3" style={styleTextoNegro}>
             🍲 Platos Principales Vendidos
@@ -335,7 +392,6 @@ export default function ReportesPage() {
           )}
         </div>
 
-        {/* GUARNICIONES / EXTRAS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-purple-300 bg-purple-50/30">
           <h2 className="text-base font-black mb-3 text-purple-950">
             🥗 Guarniciones y Extras
@@ -357,7 +413,6 @@ export default function ReportesPage() {
           )}
         </div>
 
-        {/* BEBIDAS VENDIDAS */}
         <div className="bg-white p-5 rounded-lg shadow-sm border-2 border-cyan-300 bg-cyan-50/30">
           <h2 className="text-base font-black mb-3 text-cyan-950">
             🥤 Bebidas Vendidas

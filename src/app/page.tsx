@@ -66,12 +66,14 @@ function ContenidoTomaPedidos() {
   const [guarnicionExtraElegida, setGuarnicionExtraElegida] = useState<Guarnicion | null>(null);
   
   const [items, setItems] = useState<ItemPedido[]>([]);
-  const [tipoEntrega, setTipoEntrega] = useState<"RETIRO" | "ENVIO" | "BAR">(
-    "RETIRO",
-  );
-  const [zonaSeleccionada, setZonaSeleccionada] = useState<ZonaEnvio | null>(
-    null,
-  );
+  const [tipoEntrega, setTipoEntrega] = useState<"RETIRO" | "ENVIO" | "BAR">("RETIRO");
+  
+  // Estados para Método y Estado de Pago
+  const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TRANSFERENCIA" | "TARJETA">("EFECTIVO");
+  const [pagoConfirmado, setPagoConfirmado] = useState<boolean>(false);
+  const [recargoTarjetaPorc, setRecargoTarjetaPorc] = useState<number>(10);
+
+  const [zonaSeleccionada, setZonaSeleccionada] = useState<ZonaEnvio | null>(null);
   const [direccion, setDireccion] = useState("");
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
@@ -79,17 +81,10 @@ function ContenidoTomaPedidos() {
   const [observaciones, setObservaciones] = useState("");
 
   const [menuSeleccionado, setMenuSeleccionado] = useState<Menu | null>(null);
-  const [bebidaSeleccionada, setBebidaSeleccionada] = useState<Bebida | null>(
-    null,
-  );
-  const [guarnicionSeleccionada, setGuarnicionSeleccionada] =
-    useState<Guarnicion | null>(null);
-  const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(
-    null,
-  );
-  const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>(
-    [],
-  );
+  const [bebidaSeleccionada, setBebidaSeleccionada] = useState<Bebida | null>(null);
+  const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
+  const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
+  const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
@@ -138,6 +133,8 @@ function ContenidoTomaPedidos() {
           setClienteTelefono(pedidoData.cliente_telefono || "");
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
+          if (pedidoData.metodo_pago) setMetodoPago(pedidoData.metodo_pago);
+          if (pedidoData.pago_confirmado !== undefined) setPagoConfirmado(pedidoData.pago_confirmado);
 
           const textoObs = pedidoData.observaciones || "";
 
@@ -216,15 +213,19 @@ function ContenidoTomaPedidos() {
     }
     setStockMap(mapa);
 
+    // Carga la configuración (incluye el recargo editable)
     const { data: confData } = await supabase
       .from("configuracion")
-      .select("precio_huevo_frito, precio_guarnicion_extra")
+      .select("precio_huevo_frito, precio_guarnicion_extra, recargo_tarjeta_porc")
       .eq("id", "general")
       .single();
 
     if (confData) {
       if (confData.precio_huevo_frito) setPrecioHuevo(Number(confData.precio_huevo_frito));
       if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
+      if (confData.recargo_tarjeta_porc !== undefined && confData.recargo_tarjeta_porc !== null) {
+        setRecargoTarjetaPorc(Number(confData.recargo_tarjeta_porc));
+      }
     }
 
     if (idsConStock.length > 0) {
@@ -274,9 +275,7 @@ function ContenidoTomaPedidos() {
 
   function toggleIngrediente(nombreIng: string) {
     if (ingredientesElegidos.includes(nombreIng)) {
-      setIngredientesElegidos(
-        ingredientesElegidos.filter((i) => i !== nombreIng),
-      );
+      setIngredientesElegidos(ingredientesElegidos.filter((i) => i !== nombreIng));
     } else {
       setIngredientesElegidos([...ingredientesElegidos, nombreIng]);
     }
@@ -286,9 +285,7 @@ function ContenidoTomaPedidos() {
     if (!menuSeleccionado) return;
 
     if (menuSeleccionado.requiere_salsa && !salsaSeleccionada) {
-      alert(
-        'Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")',
-      );
+      alert('Por favor elegí una salsa para este plato (o selecciona "Sin Salsa")');
       return;
     }
 
@@ -298,9 +295,7 @@ function ContenidoTomaPedidos() {
       .reduce((acc, item) => acc + item.cantidad, 0);
 
     if (cantidad + cantidadYaEnCarrito > stockDisponible) {
-      alert(
-        `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`,
-      );
+      alert(`¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`);
       return;
     }
 
@@ -396,12 +391,14 @@ function ContenidoTomaPedidos() {
   }
 
   const montoPlatos = items.reduce((acc, item) => acc + item.subtotal, 0);
-  const costoEnvio =
-    tipoEntrega === "ENVIO" && zonaSeleccionada ? zonaSeleccionada.precio : 0;
-  const montoTotal = montoPlatos + costoEnvio;
+  const costoEnvio = tipoEntrega === "ENVIO" && zonaSeleccionada ? zonaSeleccionada.precio : 0;
+  
+  // Cálculo de Totales y Recargos por Tarjeta
+  const subtotalSinRecargo = montoPlatos + costoEnvio;
+  const montoRecargoTarjeta = metodoPago === "TARJETA" ? Math.round(subtotalSinRecargo * (recargoTarjetaPorc / 100)) : 0;
+  const montoTotal = subtotalSinRecargo + montoRecargoTarjeta;
 
-  const formatearMoneda = (monto: number) =>
-    "$ " + monto.toLocaleString("es-AR");
+  const formatearMoneda = (monto: number) => "$ " + monto.toLocaleString("es-AR");
 
   function imprimirSoloBebidas() {
     const bebidasEnCarrito = items.filter((i) => i.bebida);
@@ -507,6 +504,10 @@ function ContenidoTomaPedidos() {
       ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA EN LOCAL" : "🍽️ COMER EN BAR"}
     </div>`;
 
+    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0;">
+      💳 PAGO: ${metodoPago} ${pagoConfirmado ? "(PAGADO)" : "(PENDIENTE DE COBRO)"}
+    </div>`;
+
     ventanaImpresion.document.write(`
       <html>
         <head>
@@ -525,6 +526,7 @@ function ContenidoTomaPedidos() {
           </div>
           <div class="line"></div>
           ${cabeceraEntrega}
+          ${etiquetaPago}
           <div style="font-size: 14px; margin-bottom: 4px;">
             <strong>Cliente:</strong> ${clienteNombre} ${clienteTelefono ? `(${clienteTelefono})` : ""}
           </div>
@@ -539,6 +541,7 @@ function ContenidoTomaPedidos() {
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
+              ${montoRecargoTarjeta > 0 ? `<div style="font-size: 11px;">Recargo Tarjeta (${recargoTarjetaPorc}%): ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
               <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
               <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(montoTotal)}</div>
             </div>
@@ -626,6 +629,8 @@ function ContenidoTomaPedidos() {
           horario_solicitado: horario,
           observaciones: obsFinal,
           turno: turnoActual,
+          metodo_pago: metodoPago,
+          pago_confirmado: pagoConfirmado,
         })
         .eq("id", pedidoEditandoId);
 
@@ -649,6 +654,8 @@ function ContenidoTomaPedidos() {
             observaciones: obsFinal,
             estado: "PENDIENTE",
             turno: turnoActual,
+            metodo_pago: metodoPago,
+            pago_confirmado: pagoConfirmado,
           },
         ])
         .select()
@@ -738,6 +745,8 @@ function ContenidoTomaPedidos() {
     setDireccion("");
     setHorario("");
     setObservaciones("");
+    setMetodoPago("EFECTIVO");
+    setPagoConfirmado(false);
     cargarDatosDelDia();
   }
 
@@ -790,10 +799,10 @@ function ContenidoTomaPedidos() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* SECCIÓN 1: TIPO DE ENTREGA Y CLIENTE */}
+          {/* SECCIÓN 1: TIPO DE ENTREGA, FORMA DE PAGO Y CLIENTE */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-4">
             <h2 className="text-lg font-bold" style={styleTextoNegro}>
-              1. Tipo de Entrega y Cliente
+              1. Tipo de Entrega y Método de Pago
             </h2>
 
             <div className="flex gap-2">
@@ -815,6 +824,59 @@ function ContenidoTomaPedidos() {
                       : "🍽️ Bar"}
                 </button>
               ))}
+            </div>
+
+            {/* SELECCIÓN DE MÉTODO DE PAGO */}
+            <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="block text-xs font-black text-amber-950">
+                  💳 Método de Pago:
+                </label>
+                {/* Permite ajustar temporalmente el recargo en vivo si hace falta */}
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-950">
+                  <span>Recargo Tarjeta:</span>
+                  <input
+                    type="number"
+                    value={recargoTarjetaPorc}
+                    onChange={(e) => setRecargoTarjetaPorc(Number(e.target.value))}
+                    className="w-12 p-0.5 border border-amber-400 rounded text-center text-xs font-bold bg-white"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {(["EFECTIVO", "TRANSFERENCIA", "TARJETA"] as const).map((pago) => (
+                  <button
+                    key={pago}
+                    type="button"
+                    onClick={() => setMetodoPago(pago)}
+                    className={`px-3 py-1.5 rounded text-xs font-extrabold border-2 ${
+                      metodoPago === pago
+                        ? "bg-amber-700 text-white border-amber-800"
+                        : "bg-white border-gray-300 text-gray-900"
+                    }`}
+                  >
+                    {pago === "EFECTIVO"
+                      ? "💵 Efectivo"
+                      : pago === "TRANSFERENCIA"
+                        ? "📱 Transferencia"
+                        : `💳 Tarjeta (+${recargoTarjetaPorc}%)`}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setPagoConfirmado(!pagoConfirmado)}
+                  className={`px-3 py-1.5 rounded text-xs font-black border-2 ml-auto ${
+                    pagoConfirmado
+                      ? "bg-green-600 text-white border-green-700"
+                      : "bg-gray-200 text-gray-800 border-gray-400"
+                  }`}
+                >
+                  {pagoConfirmado ? "✓ PAGO CONFIRMADO" : "⏳ PAGO PENDIENTE"}
+                </button>
+              </div>
             </div>
 
             {tipoEntrega === "ENVIO" && (
@@ -1383,9 +1445,10 @@ function ContenidoTomaPedidos() {
               className="flex justify-between text-sm font-bold"
               style={styleTextoNegro}
             >
-              <span>Subtotal:</span>
+              <span>Subtotal Platos:</span>
               <span>{formatearMoneda(montoPlatos)}</span>
             </div>
+
             {tipoEntrega === "ENVIO" && zonaSeleccionada && (
               <div
                 className="flex justify-between text-sm font-bold"
@@ -1395,6 +1458,14 @@ function ContenidoTomaPedidos() {
                 <span>{formatearMoneda(costoEnvio)}</span>
               </div>
             )}
+
+            {metodoPago === "TARJETA" && (
+              <div className="flex justify-between text-sm font-bold text-amber-900">
+                <span>Recargo Tarjeta ({recargoTarjetaPorc}%):</span>
+                <span>{formatearMoneda(montoRecargoTarjeta)}</span>
+              </div>
+            )}
+
             <div
               className="flex justify-between text-xl font-black border-t-2 border-gray-300 pt-2"
               style={styleTextoNegro}
