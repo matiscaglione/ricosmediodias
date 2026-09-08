@@ -34,9 +34,15 @@ interface Pedido {
 }
 
 export default function HistorialPedidosPage() {
+  function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
+    const horaActual = new Date().getHours();
+    return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
+  }
+
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENVIO' | 'RETIRO' | 'BAR'>('TODOS');
-  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
+  // Inicializa automáticamente con el turno que corresponda según la hora actual
+  const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -128,7 +134,6 @@ export default function HistorialPedidosPage() {
 
   const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
 
-  // FUNCIONALIDAD PARA EXPORTAR A EXCEL (CSV) INCLUYENDO PAGO
   function exportarAExcel() {
     if (pedidosFiltrados.length === 0) {
       alert('No hay pedidos para exportar.');
