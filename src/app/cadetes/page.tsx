@@ -42,17 +42,12 @@ export default function CadetesPage() {
   const [editandoCadete1, setEditandoCadete1] = useState(false);
   const [editandoCadete2, setEditandoCadete2] = useState(false);
 
-  // Historial de Vueltas Rendidas del día
+  // Historial de Vueltas dinámico desde Supabase
   const [vueltasCadete1, setVueltasCadete1] = useState<VueltaRendida[]>([]);
   const [vueltasCadete2, setVueltasCadete2] = useState<VueltaRendida[]>([]);
 
   useEffect(() => {
     cargarConfiguracionYEnvios();
-
-    const v1Guardadas = localStorage.getItem(`vueltasCadete1_${hoyArg}`);
-    const v2Guardadas = localStorage.getItem(`vueltasCadete2_${hoyArg}`);
-    setVueltasCadete1(v1Guardadas ? JSON.parse(v1Guardadas) : []);
-    setVueltasCadete2(v2Guardadas ? JSON.parse(v2Guardadas) : []);
 
     // Escuchar cambios en tiempo real
     const canal = supabase
@@ -69,7 +64,7 @@ export default function CadetesPage() {
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [hoyArg, filtroTurno]);
+  }, [hoyArg, filtroTurno, nombreCadete1, nombreCadete2]);
 
   async function cargarConfiguracionYEnvios() {
     setCargando(true);
@@ -79,15 +74,23 @@ export default function CadetesPage() {
       .eq('id', 'general')
       .single();
 
+    let c1 = 'Cadete 1';
+    let c2 = 'Cadete 2';
     if (confData) {
-      if (confData.nombre_cadete_1) setNombreCadete1(confData.nombre_cadete_1);
-      if (confData.nombre_cadete_2) setNombreCadete2(confData.nombre_cadete_2);
+      if (confData.nombre_cadete_1) {
+        c1 = confData.nombre_cadete_1;
+        setNombreCadete1(c1);
+      }
+      if (confData.nombre_cadete_2) {
+        c2 = confData.nombre_cadete_2;
+        setNombreCadete2(c2);
+      }
     }
 
-    await cargarEnvios();
+    await cargarEnvios(c1, c2);
   }
 
-  async function cargarEnvios() {
+  async function cargarEnvios(c1 = nombreCadete1, c2 = nombreCadete2) {
     let query = supabase
       .from('pedidos')
       .select('*')
@@ -102,8 +105,55 @@ export default function CadetesPage() {
 
     if (!error && data) {
       setPedidos(data as PedidoEnvio[]);
+      construirVueltasRendidas(data as PedidoEnvio[], c1, c2);
     }
     setCargando(false);
+  }
+
+  function construirVueltasRendidas(todosLosPedidos: PedidoEnvio[], c1: string, c2: string) {
+    const procesarVueltas = (nombreCadete: string) => {
+      const rendidos = todosLosPedidos.filter(
+        (p) => (p.cadete === nombreCadete || p.cadete === `Cadete ${nombreCadete === c1 ? '1' : '2'}`) && 
+               p.estado_cadete === 'RENDIDO' && 
+               p.numero_vuelta != null
+      );
+
+      const vueltasAgrupadas: Record<number, PedidoEnvio[]> = {};
+      rendidos.forEach((p) => {
+        const v = p.numero_vuelta!;
+        if (!vueltasAgrupadas[v]) vueltasAgrupadas[v] = [];
+        vueltasAgrupadas[v].push(p);
+      });
+
+      const historial: VueltaRendida[] = [];
+
+      for (const [vueltaStr, pedidosVuelta] of Object.entries(vueltasAgrupadas)) {
+        const numeroVuelta = parseInt(vueltaStr);
+        const totalCobrado = pedidosVuelta.reduce((acc, p) => acc + p.monto_total, 0);
+        const totalEfectivo = pedidosVuelta
+          .filter((p) => (p.metodo_pago || 'EFECTIVO') === 'EFECTIVO')
+          .reduce((acc, p) => acc + p.monto_total, 0);
+        const totalOtros = totalCobrado - totalEfectivo;
+        const costoEnviosTotal = pedidosVuelta.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
+
+        const horaReconstruida = new Date(pedidosVuelta[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+        historial.push({
+          numeroVuelta,
+          montoTotalRendido: totalCobrado,
+          totalEfectivo,
+          totalOtrosPagos: totalOtros,
+          costoEnviosTotal,
+          cantidadPedidos: pedidosVuelta.length,
+          hora: horaReconstruida
+        });
+      }
+
+      return historial.sort((a, b) => a.numeroVuelta - b.numeroVuelta);
+    };
+
+    setVueltasCadete1(procesarVueltas(c1));
+    setVueltasCadete2(procesarVueltas(c2));
   }
 
   async function guardarNombre1(nuevoNombre: string) {
@@ -112,6 +162,7 @@ export default function CadetesPage() {
     await supabase
       .from('configuracion')
       .upsert({ id: 'general', nombre_cadete_1: nuevoNombre }, { onConflict: 'id' });
+    cargarEnvios(nuevoNombre, nombreCadete2);
   }
 
   async function guardarNombre2(nuevoNombre: string) {
@@ -120,6 +171,7 @@ export default function CadetesPage() {
     await supabase
       .from('configuracion')
       .upsert({ id: 'general', nombre_cadete_2: nuevoNombre }, { onConflict: 'id' });
+    cargarEnvios(nombreCadete1, nuevoNombre);
   }
 
   async function asignarCadete(idPedido: string, nombreCadete: string | null) {
@@ -162,13 +214,6 @@ export default function CadetesPage() {
     }
 
     const totalCobrado = enviosActuales.reduce((acc, p) => acc + p.monto_total, 0);
-    const totalEfectivoACobrar = enviosActuales
-      .filter((p) => (p.metodo_pago || 'EFECTIVO') === 'EFECTIVO')
-      .reduce((acc, p) => acc + p.monto_total, 0);
-
-    const totalOtros = totalCobrado - totalEfectivoACobrar;
-    const totalEnvios = enviosActuales.reduce((acc, p) => acc + (p.costo_envio || 0), 0);
-
     const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
     const numeroNuevaVuelta = historialPrevio.length + 1;
 
@@ -193,29 +238,8 @@ export default function CadetesPage() {
       return;
     }
 
-    const nuevaVuelta: VueltaRendida = {
-      numeroVuelta: numeroNuevaVuelta,
-      montoTotalRendido: totalCobrado,
-      totalEfectivo: totalEfectivoACobrar,
-      totalOtrosPagos: totalOtros,
-      costoEnviosTotal: totalEnvios,
-      cantidadPedidos: enviosActuales.length,
-      hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const nuevoHistorial = [...historialPrevio, nuevaVuelta];
-
-    if (numeroCadete === 1) {
-      setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
-    } else {
-      setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
-    }
-
-    setPedidos((prev) =>
-      prev.map((p) => (idsRendidos.includes(p.id) ? { ...p, estado_cadete: 'RENDIDO', numero_vuelta: numeroNuevaVuelta } : p))
-    );
+    // Actualizamos localmente tras el éxito en Supabase
+    cargarEnvios();
   }
 
   async function reabrirVuelta(numeroCadete: 1 | 2, numeroVuelta: number) {
@@ -251,20 +275,7 @@ export default function CadetesPage() {
       }
     }
 
-    const historialPrevio = numeroCadete === 1 ? vueltasCadete1 : vueltasCadete2;
-    const nuevoHistorial = historialPrevio.filter((v) => v.numeroVuelta !== numeroVuelta);
-
-    if (numeroCadete === 1) {
-      setVueltasCadete1(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete1_${hoyArg}`, JSON.stringify(nuevoHistorial));
-    } else {
-      setVueltasCadete2(nuevoHistorial);
-      localStorage.setItem(`vueltasCadete2_${hoyArg}`, JSON.stringify(nuevoHistorial));
-    }
-
-    setPedidos((prev) =>
-      prev.map((p) => (idsReabrir.includes(p.id) ? { ...p, estado_cadete: 'EN_VIAJE', numero_vuelta: null } : p))
-    );
+    cargarEnvios();
   }
 
   const enviosSinAsignar = pedidos.filter((p) => !p.cadete);
@@ -327,7 +338,7 @@ export default function CadetesPage() {
           <h2 className="text-lg font-black text-red-700">
             📦 Envíos Pendientes de Salida ({enviosSinAsignar.length})
           </h2>
-          <button onClick={cargarEnvios} className="text-xs bg-gray-200 hover:bg-gray-300 font-extrabold px-3 py-1.5 rounded text-gray-800">
+          <button onClick={() => cargarEnvios()} className="text-xs bg-gray-200 hover:bg-gray-300 font-extrabold px-3 py-1.5 rounded text-gray-800">
             🔄 Actualizar
           </button>
         </div>
