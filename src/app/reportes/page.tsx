@@ -537,6 +537,7 @@ export default function ReportesPage() {
               onChange={(e) => {
                 setNuevoGastoTipo(e.target.value as any);
                 setNuevoGastoEmpleadoId('');
+                setNuevoGastoConcepto('');
               }}
               className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black"
             >
@@ -576,39 +577,63 @@ export default function ReportesPage() {
             </div>
           )}
 
-          {nuevoGastoTipo === 'EMPLEADO' && (
-            <div>
-              <label className="block text-xs font-bold mb-1 text-black">Detalle / Concepto</label>
+          <div>
+            <label className="block text-xs font-bold mb-1 text-black">
+              {nuevoGastoTipo === 'EMPLEADO' ? 'Detalle / Concepto (Opcional)' : 'Monto ($)'}
+            </label>
+            {nuevoGastoTipo === 'EMPLEADO' ? (
               <input
                 type="text"
                 value={nuevoGastoConcepto}
                 onChange={(e) => setNuevoGastoConcepto(e.target.value)}
-                placeholder="Ej: Jornal del día o Adelanto"
+                placeholder="Ej: Jornal o Adelanto"
                 className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
               />
-            </div>
-          )}
+            ) : (
+              <input
+                type="number"
+                step="0.01"
+                value={nuevoGastoMonto}
+                onChange={(e) => setNuevoGastoMonto(e.target.value)}
+                placeholder="0"
+                className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
+              />
+            )}
+          </div>
 
           <div>
-            <label className="block text-xs font-bold mb-1 text-black">Monto ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={nuevoGastoMonto}
-              onChange={(e) => setNuevoGastoMonto(e.target.value)}
-              placeholder="0"
-              className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
-            />
+            {nuevoGastoTipo === 'EMPLEADO' ? (
+              <>
+                <label className="block text-xs font-bold mb-1 text-black">Monto ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={nuevoGastoMonto}
+                  onChange={(e) => setNuevoGastoMonto(e.target.value)}
+                  placeholder="0"
+                  className="w-full border-2 border-gray-400 p-2 rounded text-xs font-bold bg-white text-black placeholder:text-gray-500"
+                />
+              </>
+            ) : (
+              <button
+                type="submit"
+                className="w-full bg-red-700 text-white font-extrabold text-xs py-2 px-4 rounded hover:bg-red-800 shadow"
+              >
+                + Registrar Salida
+              </button>
+            )}
           </div>
 
-          <div className="sm:col-span-4 flex justify-end">
-            <button
-              type="submit"
-              className="bg-red-700 text-white font-extrabold text-xs py-2.5 px-4 rounded hover:bg-red-800 shadow"
-            >
-              + Registrar Salida
-            </button>
-          </div>
+          {nuevoGastoTipo === 'EMPLEADO' && (
+            <div className="sm:col-span-4 flex justify-end">
+              <button
+                type="submit"
+                className="bg-red-700 text-white font-extrabold text-xs py-2 px-4 rounded hover:bg-red-800 shadow"
+              >
+                + Registrar Salida
+              </button>
+            </div>
+          )}
         </form>
 
         {gastos.length > 0 && (
