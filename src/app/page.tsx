@@ -1151,144 +1151,114 @@ function ContenidoTomaPedidos() {
 
           {/* SECCIÓN 2: MENÚS DEL DÍA */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
-            <div 
-              className="flex justify-between items-center cursor-pointer select-none"
-              onClick={() => setMenuDesplegado(!menuDesplegado)}
-            >
+            <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-bold" style={styleTextoNegro}>
-                2. Seleccionar Menú del Día {menuSeleccionado ? `(Seleccionado: ${menuSeleccionado.nombre})` : ""}
+                2. Seleccionar Menú del Día
               </h2>
-              <div className="flex items-center gap-2">
-                {menuSeleccionado && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuSeleccionado(null);
-                      setMenuDesplegado(true);
-                    }}
-                    className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold px-2.5 py-1 rounded"
-                  >
-                    Cambiar plato
-                  </button>
-                )}
-                <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                  {menuDesplegado ? "▲ Ocultar grilla" : "▼ Desplegar grilla"}
-                </span>
-              </div>
+              {menuSeleccionado && (
+                <button
+                  type="button"
+                  onClick={() => setMenuSeleccionado(null)}
+                  className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold px-2.5 py-1 rounded"
+                >
+                  ▼ Ver todos los menús
+                </button>
+              )}
             </div>
 
-            {/* CONTENIDO DESPLEGABLE DE MENÚS */}
-            {menuDesplegado && (
-              <div className="mt-3 space-y-3">
-                {/* BUSCADOR DE MENÚS */}
-                {!menuSeleccionado && (
-                  <div className="relative mb-3">
-                    <input
-                      type="text"
-                      value={busquedaTextoMenu}
-                      onChange={(e) => setBusquedaTextoMenu(e.target.value)}
-                      placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
-                      className="w-full border-2 border-gray-300 text-gray-800 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
-                    />
-                    {busquedaTextoMenu && (
-                      <button
-                        type="button"
-                        onClick={() => setBusquedaTextoMenu("")}
-                        className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {menus.length === 0 ? (
-                  <p className="text-red-600 text-sm font-bold">
-                    No hay menús con stock cargado para hoy.
-                  </p>
-                ) : menusFiltrados.length === 0 ? (
-                  <p className="text-gray-500 text-xs font-bold py-2">
-                    No se encontraron menús que coincidan con "{busquedaTextoMenu}".
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                    {menusFiltrados
-                      .filter(
-                        (m) => !menuSeleccionado || menuSeleccionado.id === m.id
-                      )
-                      .map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            if (menuSeleccionado?.id === m.id) {
-                              setMenuSeleccionado(null);
-                            } else {
-                              setMenuSeleccionado(m);
-                              setGuarnicionSeleccionada(null);
-                              setSalsaSeleccionada(null);
-                              setIngredientesElegidos([]);
-                              setAgregadoMenuTexto("");
-                              setAgregadoGuarnicionTexto("");
-                              setPrecioAgregadosExtra(0);
-                              setCantidadHuevos(0);
-                              setCantidadHuevosDuros(0);
-                              setCantidad(1);
-                              // Opcional: si querés que se contraiga solo al elegir el plato, descomentá la siguiente línea:
-                              setMenuDesplegado(false);
-                            }
-                          }}
-                          className={`p-3 rounded-lg border text-left transition-all ${
-                            menuSeleccionado?.id === m.id
-                              ? "border-blue-600 bg-blue-100 font-extrabold shadow-md ring-2 ring-blue-400"
-                              : "border-gray-300 hover:border-gray-400 bg-white"
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div
-                              className="font-extrabold text-base"
-                              style={styleTextoNegro}
-                            >
-                              {m.nombre}
-                            </div>
-                            {menuSeleccionado?.id === m.id && (
-                              <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
-                                Seleccionado
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className="text-sm font-bold mt-1"
-                            style={styleTextoNegro}
-                          >
-                            {formatearMoneda(m.precio)}
-                          </div>
-                          <div className="text-xs text-blue-700 font-bold mt-1">
-                            Stock: {stockMap[m.id] ?? 0} disp.
-                          </div>
-                        </button>
-                      ))}
-                  </div>
+            {/* BUSCADOR DE MENÚS */}
+            {!menuSeleccionado && (
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={busquedaTextoMenu}
+                  onChange={(e) => setBusquedaTextoMenu(e.target.value)}
+                  placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
+                  className="w-full border-2 border-gray-300 text-gray-800 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
+                />
+                {busquedaTextoMenu && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaTextoMenu("")}
+                    className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
             )}
 
-            {/* FORMULARIO DE OPCIONES DEL PLATO SELECCIONADO (SIEMPRE DISPONIBLE) */}
+            {menus.length === 0 ? (
+              <p className="text-red-600 text-sm font-bold">
+                No hay menús con stock cargado para hoy.
+              </p>
+            ) : menusFiltrados.length === 0 ? (
+              <p className="text-gray-500 text-xs font-bold py-2">
+                No se encontraron menús que coincidan con "{busquedaTextoMenu}".
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                {menusFiltrados
+                  .filter(
+                    (m) => !menuSeleccionado || menuSeleccionado.id === m.id
+                  )
+                  .map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        if (menuSeleccionado?.id === m.id) {
+                          setMenuSeleccionado(null);
+                        } else {
+                          setMenuSeleccionado(m);
+                          setGuarnicionSeleccionada(null);
+                          setSalsaSeleccionada(null);
+                          setIngredientesElegidos([]);
+                          setAgregadoMenuTexto("");
+                          setAgregadoGuarnicionTexto("");
+                          setPrecioAgregadosExtra(0);
+                          setCantidadHuevos(0);
+                          setCantidadHuevosDuros(0);
+                        }
+                      }}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        menuSeleccionado?.id === m.id
+                          ? "border-blue-600 bg-blue-100 font-extrabold shadow-md ring-2 ring-blue-400"
+                          : "border-gray-300 hover:border-gray-400 bg-white"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div
+                          className="font-extrabold text-base"
+                          style={styleTextoNegro}
+                        >
+                          {m.nombre}
+                        </div>
+                        {menuSeleccionado?.id === m.id && (
+                          <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
+                            Seleccionado
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="text-sm font-bold mt-1"
+                        style={styleTextoNegro}
+                      >
+                        {formatearMoneda(m.precio)}
+                      </div>
+                      <div className="text-xs text-blue-700 font-bold mt-1">
+                        Stock: {stockMap[m.id] ?? 0} disp.
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+
             {menuSeleccionado && (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 space-y-3 mt-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-sm" style={styleTextoNegro}>
-                    Opciones para: {menuSeleccionado.nombre}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setMenuDesplegado(!menuDesplegado)}
-                    className="text-xs font-bold text-blue-700 hover:underline"
-                  >
-                    {menuDesplegado ? "Ocultar lista de platos" : "Ver todos los platos"}
-                  </button>
-                </div>
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 space-y-3">
+                <h3 className="font-bold text-sm" style={styleTextoNegro}>
+                  Opciones para: {menuSeleccionado.nombre}
+                </h3>
 
                 {/* MODIFICADOR 1: DEL MENÚ / CARNE */}
                 <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
@@ -1342,7 +1312,6 @@ function ContenidoTomaPedidos() {
                     <select
                       disabled={!menuSeleccionado.lleva_guarnicion}
                       style={styleTextoNegro}
-                      value={guarnicionSeleccionada?.id || ""}
                       onChange={(e) => {
                         const g =
                           guarniciones.find(
