@@ -602,8 +602,11 @@ function ContenidoTomaPedidos() {
       })
       .join("");
 
-    let cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-      ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
+    // Cabecera de entrega con recuadro ajustado solo al texto
+    let cabeceraEntrega = `<div style="text-align: center; margin-bottom: 6px;">
+      <span style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 3px 8px; display: inline-block;">
+        ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
+      </span>
     </div>`;
 
     let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
@@ -638,8 +641,8 @@ function ContenidoTomaPedidos() {
           <div class="line"></div>
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
-              <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} hs` : "Cuando esté"}</div>
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
+              <div style="font-size: 24px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "LO ANTES POSIBLE"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
