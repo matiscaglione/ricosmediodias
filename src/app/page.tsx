@@ -548,50 +548,55 @@ function ContenidoTomaPedidos() {
         if (i.bebida) {
           return `
             <div style="margin-bottom: 6px;">
-              <div style="font-size: 17px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad}X ${i.bebida.nombre}</div>
+              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad}X ${i.bebida.nombre}</div>
               <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
         if (!i.menu && i.guarnicion) {
           const tieneIngredientes = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
+          let textoExtra = i.guarnicion.nombre;
+          if (tieneIngredientes) {
+            textoExtra += ` (${i.ingredientesEnsalada!.join(", ")})`;
+          }
 
           return `
             <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-              <div style="font-size: 17px; font-weight: 900; text-transform: uppercase; color: #000;">
-                👉 EXTRA: ${i.guarnicion.nombre}
+              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase; color: #000;">
+                👉 EXTRA: ${textoExtra} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}
               </div>
-              ${i.agregadoGuarnicionTexto ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; color: #000; text-transform: uppercase;">(${i.agregadoGuarnicionTexto})</div>` : ""}
-              ${
-                tieneIngredientes
-                  ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🥗 ${i.ingredientesEnsalada!.join(", ")}</div>`
-                  : ""
-              }
               <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
+        // Armado compacto en una sola línea para el menú principal
+        let textoDetalle = "";
+        
+        if (i.salsa) {
+          textoDetalle += ` C/ ${i.salsa.nombre}`;
+        }
+        
+        if (i.guarnicion) {
+          textoDetalle += ` C/ ${i.guarnicion.nombre}`;
+        }
+
         const tieneIngredientesMenu = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
+        if (tieneIngredientesMenu) {
+          textoDetalle += ` (${i.ingredientesEnsalada!.join(", ")})`;
+        } else if (i.menu?.nombre.toLowerCase().includes("ensalada")) {
+          // Si es un menú de tipo ensalada pero no seleccionó ingredientes específicos, muestra solo ENSALADA
+          textoDetalle += ` (ENSALADA)`;
+        }
+
+        if (i.cantidadHuevos > 0) {
+          textoDetalle += ` + ${i.cantidadHuevos === 1 ? "1 HUEVO" : `${i.cantidadHuevos} HUEVOS`}`;
+        }
 
         return `
 <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-  <div style="font-size: 17px; font-weight: 900; text-transform: uppercase;">
-    ${i.cantidad}X ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""}
+  <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">
+    ${i.cantidad}X ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
   </div>
-  ${i.salsa ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.salsa.nombre}</div>` : ""}
-  ${i.guarnicion ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.guarnicion.nombre} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}</div>` : ""}
-  
-  ${
-    tieneIngredientesMenu
-      ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🥗 ${i.ingredientesEnsalada!.join(", ")}</div>`
-      : ""
-  }
-
-  ${
-    i.cantidadHuevos > 0
-      ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
-      : ""
-  }
   <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
 </div>`;
       })
