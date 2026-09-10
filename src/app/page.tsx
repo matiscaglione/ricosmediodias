@@ -503,7 +503,7 @@ function ContenidoTomaPedidos() {
     const htmlBebidas = bebidasEnCarrito
       .map(
         (i) =>
-          `<div style="font-size: 16px; font-weight: 900; margin-bottom: 4px;">🥤 ${i.cantidad}x ${i.bebida?.nombre}</div>`
+          `<div style="font-size: 16px; font-weight: 900; margin-bottom: 4px;">🥤 ${i.cantidad} ${i.bebida?.nombre}</div>`
       )
       .join("");
 
@@ -548,7 +548,7 @@ function ContenidoTomaPedidos() {
         if (i.bebida) {
           return `
             <div style="margin-bottom: 6px;">
-              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad}X ${i.bebida.nombre}</div>
+              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebida.nombre}</div>
               <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
@@ -595,7 +595,7 @@ function ContenidoTomaPedidos() {
         return `
 <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
   <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">
-    ${i.cantidad}X ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
+    ${i.cantidad} ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
   </div>
   <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
 </div>`;
@@ -606,8 +606,8 @@ function ContenidoTomaPedidos() {
       ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
     </div>`;
 
-    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0; text-transform: uppercase;">
-      💳 PAGO: ${metodoPago}
+    let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 2px; text-transform: uppercase;">
+    <strong>PAGO:</strong> ${metodoPago}
     </div>`;
 
     ventanaImpresion.document.write(`
@@ -639,7 +639,7 @@ function ContenidoTomaPedidos() {
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} hs` : "Lo antes posible"}</div>
+              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} hs` : "Cuando esté"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
