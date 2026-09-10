@@ -629,7 +629,6 @@ function ContenidoTomaPedidos() {
             <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
             <p style="margin:2px 0; font-size: 10px;">${fechaHora}</p>
           </div>
-          <div class="line"></div>
           ${cabeceraEntrega}
           ${etiquetaPago}
           <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
@@ -642,7 +641,7 @@ function ContenidoTomaPedidos() {
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-              <div style="font-size: 21px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "CUANDO ESTÉ"}</div>
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "CUANDO ESTÉ"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
