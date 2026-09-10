@@ -594,11 +594,17 @@ function ContenidoTomaPedidos() {
           textoDetalle += ` + ${i.cantidadHuevos === 1 ? "1 HUEVO" : `${i.cantidadHuevos} HUEVOS`}`;
         }
 
+        // Línea adicional chica para mostrar el total de los agregados extras si los tuviera
+        const htmlPrecioAgregados = i.precioAgregados && i.precioAgregados > 0 
+          ? `<div style="font-size: 11px; font-weight: bold; text-align: right;">Extra: +${formatearMoneda(i.precioAgregados)}</div>` 
+          : "";
+
         return `
 <div style="${estiloBorde}">
   <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
     ${i.cantidad} ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
   </div>
+  ${htmlPrecioAgregados}
   <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
 </div>`;
       })
