@@ -548,54 +548,51 @@ function ContenidoTomaPedidos() {
         if (i.bebida) {
           return `
             <div style="margin-bottom: 6px;">
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad}X ${i.bebida.nombre}</div>
-              <div style="text-align: right; font-size: 13px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
+              <div style="font-size: 17px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad}X ${i.bebida.nombre}</div>
+              <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
         if (!i.menu && i.guarnicion) {
           const tieneIngredientes = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-const textoEnsalada = tieneIngredientes 
-  ? i.ingredientesEnsalada!.join(", ") 
-  : "ENSALADA";
 
           return `
             <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #000;">
+              <div style="font-size: 17px; font-weight: 900; text-transform: uppercase; color: #000;">
                 👉 EXTRA: ${i.guarnicion.nombre}
               </div>
-              ${i.agregadoGuarnicionTexto ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; color: #000; text-transform: uppercase;">(${i.agregadoGuarnicionTexto})</div>` : ""}
-              <div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">
-                🥗 ${textoEnsalada}
-              </div>
-              <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+              ${i.agregadoGuarnicionTexto ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; color: #000; text-transform: uppercase;">(${i.agregadoGuarnicionTexto})</div>` : ""}
+              ${
+                tieneIngredientes
+                  ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🥗 ${i.ingredientesEnsalada!.join(", ")}</div>`
+                  : ""
+              }
+              <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
-        // Lógica para cuando es un menú completo
         const tieneIngredientesMenu = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-const textoEnsaladaMenu = tieneIngredientesMenu 
-  ? i.ingredientesEnsalada!.join(", ") 
-  : "ENSALADA";
 
         return `
 <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
-  <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
+  <div style="font-size: 17px; font-weight: 900; text-transform: uppercase;">
     ${i.cantidad}X ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""}
   </div>
-  ${i.salsa ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.salsa.nombre}</div>` : ""}
-  ${i.guarnicion ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.guarnicion.nombre} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}</div>` : ""}
+  ${i.salsa ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.salsa.nombre}</div>` : ""}
+  ${i.guarnicion ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; text-transform: uppercase;">C/ ${i.guarnicion.nombre} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}</div>` : ""}
   
-  <div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">
-    🥗 ${textoEnsaladaMenu}
-  </div>
+  ${
+    tieneIngredientesMenu
+      ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🥗 ${i.ingredientesEnsalada!.join(", ")}</div>`
+      : ""
+  }
 
   ${
     i.cantidadHuevos > 0
-      ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
+      ? `<div style="font-size: 17px; font-weight: 900; margin-left: 10px; margin-top: 2px; text-transform: uppercase;">🍳 (${i.cantidadHuevos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevos} HUEVOS FRITOS`})</div>`
       : ""
   }
-  <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+  <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
 </div>`;
       })
       .join("");
@@ -604,8 +601,8 @@ const textoEnsaladaMenu = tieneIngredientesMenu
       ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
     </div>`;
 
-    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0; text-transform: uppercase;">
-      💳 PAGO: ${metodoPago}
+    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0;">
+      💳 PAGO: ${metodoPago} 
     </div>`;
 
     ventanaImpresion.document.write(`
@@ -627,17 +624,17 @@ const textoEnsaladaMenu = tieneIngredientesMenu
           <div class="line"></div>
           ${cabeceraEntrega}
           ${etiquetaPago}
-          <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+          <div style="font-size: 14px; margin-bottom: 4px;">
             <strong>Cliente:</strong> ${clienteNombre} ${clienteTelefono ? `(${clienteTelefono})` : ""}
           </div>
-          ${observaciones ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${observaciones}</div>` : ""}
+          ${observaciones ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px;">Obs: ${observaciones}</div>` : ""}
           <div class="line"></div>
           <div style="margin: 8px 0;">${itemsHtml}</div>
           <div class="line"></div>
           <div style="display: flex; justify-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} hs` : "Lo antes posible"}</div>
+              <div style="font-size: 16px; font-weight: 900;">${horario ? `🕒 ${horario} hs` : "Lo antes posible"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
@@ -647,7 +644,7 @@ const textoEnsaladaMenu = tieneIngredientesMenu
             </div>
           </div>
           <div class="line" style="margin-top: 10px;"></div>
-          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
+          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold;">¡Gracias por tu compra!</p>
           <script>window.onload = function() { window.print(); window.close(); }</script>
         </body>
       </html>
