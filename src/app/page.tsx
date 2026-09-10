@@ -606,8 +606,8 @@ function ContenidoTomaPedidos() {
       ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
     </div>`;
 
-    let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 2px; text-transform: uppercase;">
-    <strong>PAGO:</strong> ${metodoPago}
+    let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+      <strong>PAGO:</strong> ${metodoPago}
     </div>`;
 
     ventanaImpresion.document.write(`
