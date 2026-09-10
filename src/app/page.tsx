@@ -555,9 +555,9 @@ function ContenidoTomaPedidos() {
 
         if (!i.menu && i.guarnicion) {
           const tieneIngredientes = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-          const textoEnsalada = tieneIngredientes 
-            ? i.ingredientesEnsalada.join(", ") 
-            : "ENSALADA";
+const textoEnsalada = tieneIngredientes 
+  ? i.ingredientesEnsalada!.join(", ") 
+  : "ENSALADA";
 
           return `
             <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
@@ -574,9 +574,9 @@ function ContenidoTomaPedidos() {
 
         // Lógica para cuando es un menú completo
         const tieneIngredientesMenu = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-        const textoEnsaladaMenu = tieneIngredientesMenu 
-          ? i.ingredientesEnsalada.join(", ") 
-          : "ENSALADA";
+const textoEnsaladaMenu = tieneIngredientesMenu 
+  ? i.ingredientesEnsalada!.join(", ") 
+  : "ENSALADA";
 
         return `
 <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; pb: 4px;">
