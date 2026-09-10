@@ -642,7 +642,7 @@ function ContenidoTomaPedidos() {
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-              <div style="font-size: 24px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "LO ANTES POSIBLE"}</div>
+              <div style="font-size: 21px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "CUANDO ESTÉ"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
