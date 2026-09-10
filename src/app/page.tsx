@@ -544,11 +544,14 @@ function ContenidoTomaPedidos() {
     const idCorto = idPedido.slice(0, 6);
 
     const itemsHtml = items
-      .map((i) => {
+      .map((i, index, arr) => {
+        const esUltimo = index === arr.length - 1;
+        const estiloBorde = esUltimo ? "margin-bottom: 8px;" : "margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;";
+
         if (i.bebida) {
           return `
-            <div style="margin-bottom: 6px;">
-              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebida.nombre}</div>
+            <div style="${estiloBorde}">
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebida.nombre}</div>
               <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
@@ -561,9 +564,9 @@ function ContenidoTomaPedidos() {
           }
 
           return `
-            <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-              <div style="font-size: 19px; font-weight: 900; text-transform: uppercase; color: #000;">
-                👉 EXTRA: ${textoExtra} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}
+            <div style="${estiloBorde}">
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; color: #000;">
+              ${textoExtra} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}
               </div>
               <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
@@ -584,7 +587,6 @@ function ContenidoTomaPedidos() {
         if (tieneIngredientesMenu) {
           textoDetalle += ` (${i.ingredientesEnsalada!.join(", ")})`;
         } else if (i.menu?.nombre.toLowerCase().includes("ensalada")) {
-          // Si es un menú de tipo ensalada pero no seleccionó ingredientes específicos, muestra solo ENSALADA
           textoDetalle += ` (ENSALADA)`;
         }
 
@@ -593,8 +595,8 @@ function ContenidoTomaPedidos() {
         }
 
         return `
-<div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-  <div style="font-size: 19px; font-weight: 900; text-transform: uppercase;">
+<div style="${estiloBorde}">
+  <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
     ${i.cantidad} ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
   </div>
   <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
@@ -641,7 +643,7 @@ function ContenidoTomaPedidos() {
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
             <div>
               <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${horario ? `🕒 ${horario} HS` : "CUANDO ESTÉ"}</div>
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${horario ? `${horario} hs` : "CUANDO ESTÉ"}</div>
             </div>
             <div style="text-align: right;">
               ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
