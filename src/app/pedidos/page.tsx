@@ -378,16 +378,23 @@ export default function HistorialPedidosPage() {
       setCargando(true);
       const hoy = new Date().toISOString().split("T")[0];
 
-      if (pedido.detalle_pedidos && pedido.detalle_pedidos.length > 0) {
-        for (const det of pedido.detalle_pedidos) {
-          const menuId = (det as any).menu_id || (det.menus as any)?.id;
+      // 1. Nos aseguramos de traer los detalles completos con su menu_id directamente de la base de datos por seguridad
+      const { data: detallesReales, error: errDetallesReales } = await supabase
+        .from("detalle_pedidos")
+        .select("menu_id, cantidad")
+        .eq("pedido_id", pedido.id);
 
-          if (menuId) {
+      if (errDetallesReales) throw errDetallesReales;
+
+      // 2. Devolvemos el stock de cada menú encontrado de forma 100% segura
+      if (detallesReales && detallesReales.length > 0) {
+        for (const det of detallesReales) {
+          if (det.menu_id) {
             const { data: stockData } = await supabase
               .from("stock_diario")
               .select("cantidad_disponible")
               .eq("fecha", hoy)
-              .eq("menu_id", menuId)
+              .eq("menu_id", det.menu_id)
               .single();
 
             if (stockData) {
@@ -397,12 +404,13 @@ export default function HistorialPedidosPage() {
                   cantidad_disponible: stockData.cantidad_disponible + det.cantidad,
                 })
                 .eq("fecha", hoy)
-                .eq("menu_id", menuId);
+                .eq("menu_id", det.menu_id);
             }
           }
         }
       }
 
+      // 3. Borramos los detalles y el pedido
       const { error: errDetalle } = await supabase
         .from("detalle_pedidos")
         .delete()
