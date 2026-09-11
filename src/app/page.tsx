@@ -111,7 +111,8 @@ function ContenidoTomaPedidos() {
   const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
-  const [precioHuevo, setPrecioHuevo] = useState<number>(500);
+  const [precioHuevoFrito, setPrecioHuevoFrito] = useState<number>(500);
+const [precioHuevoDuro, setPrecioHuevoDuro] = useState<number>(500);
   const [cantidadHuevosDuros, setCantidadHuevosDuros] = useState<number>(0);
 
   const searchParams = useSearchParams();
@@ -258,14 +259,14 @@ function ContenidoTomaPedidos() {
     setStockMap(mapa);
 
     const { data: confData } = await supabase
-      .from("configuracion")
-      .select("precio_huevo_frito, precio_guarnicion_extra, recargo_tarjeta_porc")
-      .eq("id", "general")
-      .single();
+  .from("configuracion")
+  .select("precio_huevo_frito, precio_huevo_duro, precio_guarnicion_extra, recargo_tarjeta_porc")
+  .eq("id", "general")
+  .single();
 
-    if (confData) {
-      if (confData.precio_huevo_frito)
-        setPrecioHuevo(Number(confData.precio_huevo_frito));
+if (confData) {
+  if (confData.precio_huevo_frito) setPrecioHuevoFrito(Number(confData.precio_huevo_frito));
+  if (confData.precio_huevo_duro) setPrecioHuevoDuro(Number(confData.precio_huevo_duro));
       if (confData.precio_guarnicion_extra)
         setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
       if (
@@ -363,11 +364,10 @@ function ContenidoTomaPedidos() {
         ? guarnicionSeleccionada.precio_extra
         : 0;
 
-    const costoHuevosFritos = cantidadHuevos * precioHuevo;
-    const costoHuevosDuros = cantidadHuevosDuros * precioHuevo;
+    const costoHuevosFritos = cantidadHuevos * precioHuevoFrito;
+    const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro;
     const extraAgregados = Number(precioAgregadosExtra) || 0;
 
-    // CORRECCIÓN: Sumamos explícitamente tanto los huevos fritos como los duros al subtotal
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion + extraAgregados) * cantidad +
       costoHuevosFritos +
