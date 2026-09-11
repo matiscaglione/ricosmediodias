@@ -1466,7 +1466,7 @@ if (confData) {
 
                     <div className="flex items-center justify-between pt-2 border-t border-emerald-200">
                       <span className="text-xs font-bold text-emerald-950">
-                        🥚 Huevos duros extra (+{formatearMoneda(precioHuevo)} c/u):
+                        🥚 Huevos duros extra (+{formatearMoneda(precioHuevoDuro)} c/u):
                       </span>
                       <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-400">
                         <button
