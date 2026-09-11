@@ -57,7 +57,8 @@ interface ItemPedido {
   agregadoMenuTexto?: string;
   agregadoGuarnicionTexto?: string;
   precioAgregados?: number;
-  cantidadHuevos: number;
+  cantidadHuevosFritos: number;
+  cantidadHuevosDuros?: number;
   cantidad: number;
   subtotal: number;
 }
@@ -71,7 +72,6 @@ function ContenidoTomaPedidos() {
   const [zonasEnvio, setZonasEnvio] = useState<ZonaEnvio[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaSeleccionadaId, setEmpresaSeleccionadaId] = useState<string>("");
-  const [menuDesplegado, setMenuDesplegado] = useState<boolean>(true);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [busquedaTextoMenu, setBusquedaTextoMenu] = useState<string>("");
 
@@ -85,7 +85,6 @@ function ContenidoTomaPedidos() {
   const [pagoConfirmado, setPagoConfirmado] = useState<boolean>(false);
   const [recargoTarjetaPorc, setRecargoTarjetaPorc] = useState<number>(10);
 
-  // FECHA DEL PEDIDO (Por defecto HOY, extensible a días anteriores)
   const [fechaPedido, setFechaPedido] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
@@ -108,12 +107,12 @@ function ContenidoTomaPedidos() {
   const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
   const [cantidadBebida, setCantidadBebida] = useState<number>(1);
 
-  const [cantidadHuevos, setCantidadHuevos] = useState<number>(0);
+  const [cantidadHuevosFritos, setCantidadHuevosFritos] = useState<number>(0);
+  const [cantidadHuevosDuros, setCantidadHuevosDuros] = useState<number>(0);
   const [cantidad, setCantidad] = useState(1);
 
   const [precioHuevoFrito, setPrecioHuevoFrito] = useState<number>(500);
-const [precioHuevoDuro, setPrecioHuevoDuro] = useState<number>(500);
-  const [cantidadHuevosDuros, setCantidadHuevosDuros] = useState<number>(0);
+  const [precioHuevoDuro, setPrecioHuevoDuro] = useState<number>(500);
 
   const searchParams = useSearchParams();
   const idEditarURL = searchParams.get("editar");
@@ -221,7 +220,7 @@ const [precioHuevoDuro, setPrecioHuevoDuro] = useState<number>(500);
                 bebida: det.bebidas || undefined,
                 guarnicion: det.guarniciones || undefined,
                 cantidad: det.cantidad,
-                cantidadHuevos: cantH,
+                cantidadHuevosFritos: cantH,
                 subtotal: det.subtotal,
                 ingredientesEnsalada: ingsArray,
                 agregadoMenuTexto: det.agregado_menu || undefined,
@@ -259,14 +258,14 @@ const [precioHuevoDuro, setPrecioHuevoDuro] = useState<number>(500);
     setStockMap(mapa);
 
     const { data: confData } = await supabase
-  .from("configuracion")
-  .select("precio_huevo_frito, precio_huevo_duro, precio_guarnicion_extra, recargo_tarjeta_porc")
-  .eq("id", "general")
-  .single();
+      .from("configuracion")
+      .select("precio_huevo_frito, precio_huevo_duro, precio_guarnicion_extra, recargo_tarjeta_porc")
+      .eq("id", "general")
+      .single();
 
-if (confData) {
-  if (confData.precio_huevo_frito) setPrecioHuevoFrito(Number(confData.precio_huevo_frito));
-  if (confData.precio_huevo_duro) setPrecioHuevoDuro(Number(confData.precio_huevo_duro));
+    if (confData) {
+      if (confData.precio_huevo_frito) setPrecioHuevoFrito(Number(confData.precio_huevo_frito));
+      if (confData.precio_huevo_duro) setPrecioHuevoDuro(Number(confData.precio_huevo_duro));
       if (confData.precio_guarnicion_extra)
         setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
       if (
@@ -364,14 +363,16 @@ if (confData) {
         ? guarnicionSeleccionada.precio_extra
         : 0;
 
-    const costoHuevosFritos = cantidadHuevos * precioHuevoFrito;
+    const costoHuevosFritos = cantidadHuevosFritos * precioHuevoFrito;
     const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro;
-    const extraAgregados = Number(precioAgregadosExtra) || 0;
+    const extraAgregadosManual = Number(precioAgregadosExtra) || 0;
 
+    // Cálculo unificado del costo extra total de agregados
+    const totalExtraCalculado = extraAgregadosManual + costoHuevosFritos + costoHuevosDuros;
+
+    // Subtotal: (Precio Menú + Guarnición) * Cantidad + Todos los extras calculados
     const subtotal =
-      (menuSeleccionado.precio + precioGuarnicion + extraAgregados) * cantidad +
-      costoHuevosFritos +
-      costoHuevosDuros;
+      (menuSeleccionado.precio + precioGuarnicion) * cantidad + totalExtraCalculado;
 
     const esEnsaladaPrincipal = menuSeleccionado.nombre
       .toLowerCase()
@@ -408,8 +409,9 @@ if (confData) {
         agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim()
           ? agregadoGuarnicionTexto.trim()
           : undefined,
-        precioAgregados: extraAgregados > 0 ? extraAgregados : undefined,
-        cantidadHuevos,
+        precioAgregados: totalExtraCalculado > 0 ? totalExtraCalculado : undefined,
+        cantidadHuevosFritos: cantidadHuevosFritos,
+        cantidadHuevosDuros: cantidadHuevosDuros,
         cantidad,
         subtotal,
       },
@@ -422,7 +424,7 @@ if (confData) {
     setAgregadoMenuTexto("");
     setAgregadoGuarnicionTexto("");
     setPrecioAgregadosExtra(0);
-    setCantidadHuevos(0);
+    setCantidadHuevosFritos(0);
     setCantidadHuevosDuros(0);
     setCantidad(1);
   }
@@ -435,7 +437,7 @@ if (confData) {
       ...items,
       {
         bebida: bebidaSeleccionada,
-        cantidadHuevos: 0,
+        cantidadHuevosFritos: 0,
         cantidad: cantBeb,
         subtotal: bebidaSeleccionada.precio * cantBeb,
       },
@@ -458,7 +460,7 @@ if (confData) {
         agregadoGuarnicionTexto: agregadoGuarnicionTexto.trim()
           ? agregadoGuarnicionTexto.trim()
           : undefined,
-        cantidadHuevos: 0,
+        cantidadHuevosFritos: 0,
         cantidad: 1,
         subtotal: precioGuarnicionExtra,
       },
@@ -573,7 +575,6 @@ if (confData) {
             </div>`;
         }
 
-        // Armado compacto en una sola línea para el menú principal
         let textoDetalle = "";
         
         if (i.salsa) {
@@ -591,11 +592,10 @@ if (confData) {
           textoDetalle += ` (ENSALADA)`;
         }
 
-        if (i.cantidadHuevos > 0) {
-          textoDetalle += ` + ${i.cantidadHuevos === 1 ? "1 HUEVO" : `${i.cantidadHuevos} HUEVOS`}`;
+        if (i.cantidadHuevosFritos > 0) {
+          textoDetalle += ` + ${i.cantidadHuevosFritos === 1 ? "1 HUEVO" : `${i.cantidadHuevosFritos} HUEVOS`}`;
         }
 
-        // Línea adicional chica para mostrar el total de los agregados extras si los tuviera
         const htmlPrecioAgregados = i.precioAgregados && i.precioAgregados > 0 
           ? `<div style="font-size: 11px; font-weight: bold; text-align: right;">Extra: +${formatearMoneda(i.precioAgregados)}</div>` 
           : "";
@@ -611,7 +611,6 @@ if (confData) {
       })
       .join("");
 
-    // Cabecera de entrega con recuadro ajustado solo al texto
     let cabeceraEntrega = `<div style="text-align: center; margin-bottom: 6px;">
       <span style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 3px 8px; display: inline-block;">
         ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
@@ -683,12 +682,10 @@ if (confData) {
             ? "Retira Mostrador"
             : "Cliente Envío";
 
-    // MANTIENE EL TURNO ORIGINAL SI SE ESTÁ EDITANDO, DE LO CONTRARIO CALCULA EL ACTUAL
     const turnoFinal = pedidoEditandoId && turnoOriginalEditando
       ? turnoOriginalEditando
       : obtenerTurnoActual();
 
-    // CALCULA O CONSERVA LA FECHA Y HORA DE CREACIÓN
     const ahoraIso = new Date().toISOString();
     const horaActualStr = ahoraIso.split("T")[1];
     const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}`;
@@ -698,8 +695,8 @@ if (confData) {
         ? `Dirección: ${direccion.trim()}`
         : "";
     const detalleHuevos = items
-      .filter((i) => i.cantidadHuevos > 0)
-      .map((i) => `${i.cantidadHuevos} Huevo Frito`)
+      .filter((i) => i.cantidadHuevosFritos > 0)
+      .map((i) => `${i.cantidadHuevosFritos} Huevo Frito`)
       .join(", ");
 
     const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
@@ -946,7 +943,6 @@ if (confData) {
               <h2 className="text-lg font-bold" style={styleTextoNegro}>
                 1. Tipo de Entrega y Método de Pago
               </h2>
-              {/* SELECTOR DE FECHA DEL PEDIDO */}
               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded border border-gray-300">
                 <span className="text-xs font-extrabold text-gray-700">
                   📅 Fecha:
@@ -1081,7 +1077,6 @@ if (confData) {
               </div>
             )}
 
-            {/* ASOCIAR EMPRESA (CUENTA CORRIENTE) */}
             <div className="p-3 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
               <label className="block text-xs font-extrabold text-indigo-950 mb-1">
                 🏢 Asociar a Empresa / Cuenta Corriente (Opcional):
@@ -1188,7 +1183,6 @@ if (confData) {
               )}
             </div>
 
-            {/* BUSCADOR DE MENÚS */}
             {!menuSeleccionado && (
               <div className="relative mb-3">
                 <input
@@ -1239,7 +1233,7 @@ if (confData) {
                           setAgregadoMenuTexto("");
                           setAgregadoGuarnicionTexto("");
                           setPrecioAgregadosExtra(0);
-                          setCantidadHuevos(0);
+                          setCantidadHuevosFritos(0);
                           setCantidadHuevosDuros(0);
                         }
                       }}
@@ -1282,7 +1276,6 @@ if (confData) {
                   Opciones para: {menuSeleccionado.nombre}
                 </h3>
 
-                {/* MODIFICADOR 1: DEL MENÚ / CARNE */}
                 <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
                   <label className="block text-xs font-bold text-blue-950">
                     🥩 Detalle / Modificación del Menú (ej: c/ queso, napolitana sin salsa, jugoso):
@@ -1394,7 +1387,6 @@ if (confData) {
                   </div>
                 </div>
 
-                {/* MODIFICADOR 2: DE LA GUARNICIÓN */}
                 {menuSeleccionado.lleva_guarnicion &&
                   guarnicionSeleccionada && (
                     <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
@@ -1413,7 +1405,6 @@ if (confData) {
                     </div>
                   )}
 
-                {/* COBRO EXTRA DE AGREGADOS */}
                 <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
                   <span className="text-xs font-bold text-gray-800">
                     💰 Precio Extra Cobrado por Agregados ($):
@@ -1508,7 +1499,7 @@ if (confData) {
                     <button
                       type="button"
                       onClick={() =>
-                        setCantidadHuevos(Math.max(0, cantidadHuevos - 1))
+                        setCantidadHuevosFritos(Math.max(0, cantidadHuevosFritos - 1))
                       }
                       className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
@@ -1518,11 +1509,11 @@ if (confData) {
                       className="text-xs font-black text-gray-800 min-w-[16px] text-center"
                       style={styleTextoNegro}
                     >
-                      {cantidadHuevos}
+                      {cantidadHuevosFritos}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setCantidadHuevos(cantidadHuevos + 1)}
+                      onClick={() => setCantidadHuevosFritos(cantidadHuevosFritos + 1)}
                       className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
                     >
                       +
@@ -1754,13 +1745,13 @@ if (confData) {
                                 🥗 ({item.ingredientesEnsalada.join(", ")})
                               </span>
                             )}
-                          {item.cantidadHuevos > 0 && (
+                          {item.cantidadHuevosFritos > 0 && (
                             <div className="flex items-center gap-2 mt-1 text-xs font-black text-amber-800">
                               <span>
                                 🍳 (
-                                {item.cantidadHuevos === 1
+                                {item.cantidadHuevosFritos === 1
                                   ? "1 Huevo Frito"
-                                  : `${item.cantidadHuevos} Huevos Fritos`}
+                                  : `${item.cantidadHuevosFritos} Huevos Fritos`}
                                 )
                               </span>
                             </div>
