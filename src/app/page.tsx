@@ -367,6 +367,7 @@ function ContenidoTomaPedidos() {
     const costoHuevosDuros = cantidadHuevosDuros * precioHuevo;
     const extraAgregados = Number(precioAgregadosExtra) || 0;
 
+    // CORRECCIÓN: Sumamos explícitamente tanto los huevos fritos como los duros al subtotal
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion + extraAgregados) * cantidad +
       costoHuevosFritos +
