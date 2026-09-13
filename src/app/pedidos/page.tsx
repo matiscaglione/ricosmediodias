@@ -398,56 +398,74 @@ export default function HistorialPedidosPage() {
     : 0;
 
   ventanaImpresion.document.write(`
+    <!DOCTYPE html>
     <html>
       <head>
         <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
         <style>
           @page { 
-  size: 80mm auto; 
-  margin: 0mm !important; 
-}
-body { 
-  font-family: 'Courier New', monospace; 
-  width: 100%; 
-  max-width: 270px; 
-  padding: 0; 
-  margin: 0; 
-  font-size: 13px; 
-  color: #000; 
-}
+            size: 80mm auto; 
+            margin: 0mm !important; 
+          }
+          html, body { 
+            font-family: 'Courier New', monospace; 
+            width: 100%; 
+            max-width: 270px; 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            height: auto !important;
+            min-height: 0 !important;
+            font-size: 13px; 
+            color: #000; 
+            line-height: 1.2;
+          }
+          .ticket-container {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            display: block;
+          }
           .center { text-align: center; }
           .line { border-bottom: 2px solid #000; margin: 6px 0; }
+          p, div, h1 { margin: 0; padding: 0; }
         </style>
       </head>
       <body>
-        <div class="center">
-          <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
-          <p style="margin:2px 0; font-size: 10px;">${fechaHora}</p>
-        </div>
-        ${cabeceraEntrega}
-        ${etiquetaPago}
-        <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
-          <strong>Cliente:</strong> ${clienteNombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
-        </div>
-        ${obsLimpia ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${obsLimpia}</div>` : ""}
-        <div class="line"></div>
-        <div style="margin: 8px 0;">${itemsHtml}</div>
-        <div class="line"></div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
-          <div>
-            <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-            <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
+        <div class="ticket-container">
+          <div class="center">
+            <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
+            <p style="margin:2px 0 0 0; font-size: 10px;">${fechaHora}</p>
           </div>
-          <div style="text-align: right;">
-            ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
-            ${montoRecargoTarjeta > 0 ? `<div style="font-size: 11px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
-            <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
-            <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
+          ${cabeceraEntrega}
+          ${etiquetaPago}
+          <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+            <strong>Cliente:</strong> ${clienteNombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
           </div>
+          ${obsLimpia ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${obsLimpia}</div>` : ""}
+          <div class="line"></div>
+          <div style="margin: 8px 0;">${itemsHtml}</div>
+          <div class="line"></div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
+            <div>
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
+            </div>
+            <div style="text-align: right;">
+              ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
+              ${montoRecargoTarjeta > 0 ? `<div style="font-size: 11px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
+              <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
+              <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
+            </div>
+          </div>
+          <div class="line" style="margin-top: 10px;"></div>
+          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
         </div>
-        <div class="line" style="margin-top: 10px;"></div>
-        <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
-        <script>window.onload = function() { window.print(); window.close(); }</script>
+        <script>
+          window.onload = function() { 
+            window.print(); 
+            window.close(); 
+          }
+        </script>
       </body>
     </html>
   `);
