@@ -54,74 +54,74 @@ export default function HistorialPedidosPage() {
 
   // ESCUCHA REALTIME CON DEMORA PARA EVITAR EL DOBLE TICKET E ITEMS VACÍOS
   useEffect(() => {
-    cargarPedidosRango();
+  cargarPedidosRango();
 
-    const canal = supabase
-      .channel('cambios-pedidos-historial')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        async (payload) => {
-          const nuevoPedidoId = payload.new.id;
+  const canal = supabase
+    .channel('cambios-pedidos-historial')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'pedidos' },
+      async (payload) => {
+        const nuevoPedidoId = payload.new.id;
 
-          // Esperamos 600ms a que se guarden los detalle_pedidos en la base
-          await new Promise((resolve) => setTimeout(resolve, 600));
+        // Esperamos 600ms a que se guarden los detalle_pedidos en Supabase
+        await new Promise((resolve) => setTimeout(resolve, 600));
 
-          const { data: pedidoCompleto } = await supabase
-            .from('pedidos')
-            .select(`
-              *,
-              detalle_pedidos (
-                id,
-                cantidad,
-                precio_unitario,
-                subtotal,
-                ingredientes_ensalada,
-                agregado_menu,
-                agregado_guarnicion,
-                menus!left ( nombre, precio ),
-                guarniciones!left ( nombre, precio_extra ),
-                bebidas!left ( nombre ),
-                salsas!left ( nombre )
-              )
-            `)
-            .eq('id', nuevoPedidoId)
-            .single();
+        const { data: pedidoCompleto } = await supabase
+          .from('pedidos')
+          .select(`
+            *,
+            detalle_pedidos (
+              id,
+              cantidad,
+              precio_unitario,
+              subtotal,
+              ingredientes_ensalada,
+              agregado_menu,
+              agregado_guarnicion,
+              menus!left ( nombre, precio ),
+              guarniciones!left ( nombre, precio_extra ),
+              bebidas!left ( nombre ),
+              salsas!left ( nombre )
+            )
+          `)
+          .eq('id', nuevoPedidoId)
+          .single();
 
-          if (pedidoCompleto) {
-            setPedidos((prev) => {
-              // Evita duplicados en el estado si ya existe el pedido
-              if (prev.some((p) => p.id === pedidoCompleto.id)) return prev;
-              
-              // Se auto-imprime una sola vez con los items completos
-              reimprimirTicket(pedidoCompleto as Pedido);
-              return [pedidoCompleto as Pedido, ...prev];
-            });
-          }
+        if (pedidoCompleto) {
+          // 1. Imprimimos el ticket directamente (UNA SOLA VEZ por evento INSERT)
+          reimprimirTicket(pedidoCompleto as Pedido);
+
+          // 2. Actualizamos el estado sin meter funciones secundarias dentro de setPedidos
+          setPedidos((prev) => {
+            if (prev.some((p) => p.id === pedidoCompleto.id)) return prev;
+            return [pedidoCompleto as Pedido, ...prev];
+          });
         }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          setPedidos((prev) =>
-            prev.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'pedidos' },
-        (payload) => {
-          setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id));
-        }
-      )
-      .subscribe();
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pedidos' },
+      (payload) => {
+        setPedidos((prev) =>
+          prev.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'pedidos' },
+      (payload) => {
+        setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id));
+      }
+    )
+    .subscribe();
 
-    return () => {
-      supabase.removeChannel(canal);
-    };
-  }, [fechaInicio, fechaFin, filtroTurno]);
+  return () => {
+    supabase.removeChannel(canal);
+  };
+}, [fechaInicio, fechaFin, filtroTurno]);
 
   async function cargarPedidosRango() {
     setCargando(true);

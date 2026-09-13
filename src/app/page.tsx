@@ -498,7 +498,7 @@ function ContenidoTomaPedidos() {
     m.nombre.toLowerCase().includes(busquedaTextoMenu.toLowerCase().trim())
   );
 
-  function imprimirSoloBebidas() {
+  /*function imprimirSoloBebidas() {
     const bebidasEnCarrito = items.filter((i) => i.bebida);
     if (bebidasEnCarrito.length === 0) {
       alert("No hay bebidas seleccionadas en el pedido.");
@@ -537,8 +537,8 @@ function ContenidoTomaPedidos() {
     `);
     ventana.document.close();
   }
-
-  function imprimirTicket(idPedido: string) {
+  */
+  /*function imprimirTicket(idPedido: string) {
     const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
     if (!ventanaImpresion) return;
 
@@ -670,7 +670,7 @@ function ContenidoTomaPedidos() {
       </html>
     `);
     ventanaImpresion.document.close();
-  }
+  } */
 
   async function confirmarPedido() {
     if (items.length === 0)
