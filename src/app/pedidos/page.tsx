@@ -65,7 +65,7 @@ export default function HistorialPedidosPage() {
         const nuevoPedidoId = payload.new.id;
 
         // Esperamos 600ms a que se guarden los detalle_pedidos en Supabase
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        //await new Promise((resolve) => setTimeout(resolve, 600));
 
         const { data: pedidoCompleto } = await supabase
           .from('pedidos')
