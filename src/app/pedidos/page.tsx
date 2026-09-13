@@ -402,8 +402,19 @@ export default function HistorialPedidosPage() {
       <head>
         <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
         <style>
-          @page { size: 80mm auto; margin: 0; }
-          body { font-family: 'Courier New', monospace; width: 270px; padding: 8px; margin: 0 auto; font-size: 13px; color: #000; }
+          @page { 
+  size: 80mm auto; 
+  margin: 0mm !important; 
+}
+body { 
+  font-family: 'Courier New', monospace; 
+  width: 100%; 
+  max-width: 270px; 
+  padding: 0; 
+  margin: 0; 
+  font-size: 13px; 
+  color: #000; 
+}
           .center { text-align: center; }
           .line { border-bottom: 2px solid #000; margin: 6px 0; }
         </style>
