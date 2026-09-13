@@ -215,6 +215,12 @@ function ContenidoTomaPedidos() {
                     .filter(Boolean)
                 : undefined;
 
+              // Recalcula si había extras cobrados
+              const precioBaseMenu = det.menus ? det.menus.precio : 0;
+              const precioBaseGuar = det.guarniciones ? det.guarniciones.precio_extra : 0;
+              const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * det.cantidad;
+              const diferenciaExtra = det.subtotal - costoBaseTotal;
+
               return {
                 menu: det.menus || undefined,
                 bebida: det.bebidas || undefined,
@@ -225,6 +231,7 @@ function ContenidoTomaPedidos() {
                 ingredientesEnsalada: ingsArray,
                 agregadoMenuTexto: det.agregado_menu || undefined,
                 agregadoGuarnicionTexto: det.agregado_guarnicion || undefined,
+                precioAgregados: diferenciaExtra > 0 ? diferenciaExtra : undefined,
               };
             });
 
@@ -367,10 +374,8 @@ function ContenidoTomaPedidos() {
     const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro;
     const extraAgregadosManual = Number(precioAgregadosExtra) || 0;
 
-    // Cálculo unificado del costo extra total de agregados
     const totalExtraCalculado = extraAgregadosManual + costoHuevosFritos + costoHuevosDuros;
 
-    // Subtotal: (Precio Menú + Guarnición) * Cantidad + Todos los extras calculados
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion) * cantidad + totalExtraCalculado;
 
@@ -593,7 +598,7 @@ function ContenidoTomaPedidos() {
         }
 
         if (i.cantidadHuevosFritos > 0) {
-          textoDetalle += ` + ${i.cantidadHuevosFritos === 1 ? "1 HUEVO" : `${i.cantidadHuevosFritos} HUEVOS`}`;
+          textoDetalle += ` + ${i.cantidadHuevosFritos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevosFritos} HUEVOS FRITOS`}`;
         }
 
         const htmlPrecioAgregados = i.precioAgregados && i.precioAgregados > 0 
@@ -1327,6 +1332,7 @@ function ContenidoTomaPedidos() {
                     <select
                       disabled={!menuSeleccionado.lleva_guarnicion}
                       style={styleTextoNegro}
+                      value={guarnicionSeleccionada?.id || ""}
                       onChange={(e) => {
                         const g =
                           guarniciones.find(

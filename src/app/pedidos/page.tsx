@@ -12,8 +12,8 @@ interface DetallePedido {
   ingredientes_ensalada?: string;
   agregado_menu?: string;
   agregado_guarnicion?: string;
-  menus?: { nombre: string };
-  guarniciones?: { nombre: string };
+  menus?: { nombre: string; precio: number };
+  guarniciones?: { nombre: string; precio_extra: number };
   bebidas?: { nombre: string };
 }
 
@@ -51,6 +51,7 @@ export default function HistorialPedidosPage() {
   const [busquedaTexto, setBusquedaTexto] = useState<string>('');
   const [cargando, setCargando] = useState(true);
 
+  // EFECTO DE ESCUCHA EN TIEMPO REAL CON AUTO-IMPRESIÓN
   useEffect(() => {
     cargarPedidosRango();
 
@@ -59,8 +60,43 @@ export default function HistorialPedidosPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos' },
-        () => {
-          cargarPedidosRango();
+        async (payload) => {
+          // Si entra un pedido NUEVO (ej: enviado desde un celular)
+          if (payload.eventType === 'INSERT') {
+            const nuevoPedidoId = payload.new.id;
+
+            // Consultamos los detalles completos del nuevo pedido
+            const { data: pedidoCompleto } = await supabase
+              .from('pedidos')
+              .select(`
+                *,
+                detalle_pedidos (
+                  id,
+                  cantidad,
+                  precio_unitario,
+                  subtotal,
+                  ingredientes_ensalada,
+                  agregado_menu,
+                  agregado_guarnicion,
+                  menus!left ( nombre, precio ),
+                  guarniciones!left ( nombre, precio_extra ),
+                  bebidas!left ( nombre )
+                )
+              `)
+              .eq('id', nuevoPedidoId)
+              .single();
+
+            if (pedidoCompleto) {
+              // 1. Auto-imprimimos el ticket de la comandera
+              reimprimirTicket(pedidoCompleto as Pedido);
+
+              // 2. Actualizamos la lista local en pantalla instantáneamente (sin F5)
+              setPedidos((prev) => [pedidoCompleto as Pedido, ...prev]);
+            }
+          } else {
+            // Si fue UPDATE o DELETE, recargamos la lista normalmente
+            cargarPedidosRango();
+          }
         }
       )
       .subscribe();
@@ -72,8 +108,7 @@ export default function HistorialPedidosPage() {
 
   async function cargarPedidosRango() {
     setCargando(true);
-    
-    // Cálculo exacto del bloque operativo (03:00 AM del primer día a 02:59 AM posterior al último día)
+
     const fFin = new Date(`${fechaFin}T00:00:00`);
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
@@ -90,8 +125,8 @@ export default function HistorialPedidosPage() {
           ingredientes_ensalada,
           agregado_menu,
           agregado_guarnicion,
-          menus!left ( nombre ),
-          guarniciones!left ( nombre ),
+          menus!left ( nombre, precio ),
+          guarniciones!left ( nombre, precio_extra ),
           bebidas!left ( nombre )
         )
       `)
@@ -113,7 +148,6 @@ export default function HistorialPedidosPage() {
     setCargando(false);
   }
 
-  // CAMBIAR TURNO RÁPIDO HACIENDO CLIC EN LA ETIQUETA
   async function toggleTurnoPedido(id: string, turnoActual?: 'MAÑANA' | 'NOCHE') {
     const nuevoTurno = turnoActual === 'NOCHE' ? 'MAÑANA' : 'NOCHE';
     const { error } = await supabase
@@ -122,7 +156,7 @@ export default function HistorialPedidosPage() {
       .eq('id', id);
 
     if (error) {
-      alert("Error al cambiar el turno: " + error.message);
+      alert('Error al cambiar el turno: ' + error.message);
     } else {
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, turno: nuevoTurno } : p))
@@ -173,7 +207,7 @@ export default function HistorialPedidosPage() {
 
     const filas = pedidosFiltrados.map((p) => {
       const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      
+
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
           let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || i.bebidas?.nombre || 'Plato'}`;
@@ -208,7 +242,7 @@ export default function HistorialPedidosPage() {
     const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', `pedidos_ricosmediodias_${fechaInicio}_al_${fechaFin}_${filtroTurno}.csv`);
     document.body.appendChild(link);
@@ -217,62 +251,112 @@ export default function HistorialPedidosPage() {
   }
 
   function reimprimirTicket(pedido: Pedido) {
-    const ventanaImpresion = window.open('', '_blank', 'width=350,height=600');
+    const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
     if (!ventanaImpresion) return;
 
-    const fechaHora = new Date(pedido.created_at).toLocaleString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+    const fechaHora = new Date(pedido.created_at).toLocaleString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    const nombreClienteLimpio = (pedido.cliente_nombre || '').replace(/[^a-zA-Z0-9]/g, '');
+    const nombreClienteLimpio = (pedido.cliente_nombre || "").replace(/[^a-zA-Z0-9]/g, "");
     const idCorto = pedido.id.slice(0, 6);
 
+    const textoObs = pedido.observaciones || "";
+    const matchDireccion = textoObs.includes("Dirección:")
+      ? textoObs.split("|").find((s) => s.toLowerCase().includes("dirección"))?.replace(/dirección:/i, "").trim()
+      : "";
+
+    let huevosEncontrados = 0;
+    const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
+    if (matchHuevos) {
+      huevosEncontrados = parseInt(matchHuevos[1], 10);
+    }
+
+    const obsLimpia = textoObs
+      .split("|")
+      .map((s) => s.trim())
+      .filter((s) => !s.toLowerCase().includes("huevo") && !s.toLowerCase().includes("dirección:"))
+      .join(" | ");
+
     const itemsHtml = (pedido.detalle_pedidos || [])
-      .map((i) => {
+      .map((i, index, arr) => {
+        const esUltimo = index === arr.length - 1;
+        const estiloBorde = esUltimo
+          ? "margin-bottom: 8px;"
+          : "margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;";
+
         if (i.bebidas) {
           return `
-            <div style="margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-              <div style="font-size: 16px; font-weight: 900;">🥤 ${i.cantidad}x ${i.bebidas.nombre}</div>
-              <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+            <div style="${estiloBorde}">
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebidas.nombre}</div>
+              <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
         if (!i.menus && i.guarniciones) {
+          const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
+          let textoExtra = i.guarniciones.nombre;
+          if (tieneIngredientes) {
+            textoExtra += ` (${i.ingredientes_ensalada})`;
+          }
+
           return `
-            <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-              <div style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #000;">
-                👉 EXTRA: ${i.guarniciones.nombre}
+            <div style="${estiloBorde}">
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; color: #000;">
+                ${textoExtra} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ""}
               </div>
-              ${i.agregado_guarnicion ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px;">📝 (${i.agregado_guarnicion})</div>` : ''}
-              ${i.ingredientes_ensalada ? `<div style="font-size: 14px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>` : ''}
-              <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+              <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
             </div>`;
         }
 
+        let textoDetalle = "";
+
+        if (i.guarniciones) {
+          textoDetalle += ` C/ ${i.guarniciones.nombre}`;
+        }
+
+        const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
+        if (tieneIngredientesMenu) {
+          textoDetalle += ` (${i.ingredientes_ensalada})`;
+        } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
+          textoDetalle += ` (ENSALADA)`;
+        }
+
+        const cantH = index === 0 ? huevosEncontrados : 0;
+        if (cantH > 0) {
+          textoDetalle += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
+        }
+
+        const precioBaseMenu = i.menus ? i.menus.precio : 0;
+        const precioBaseGuar = i.guarniciones ? i.guarniciones.precio_extra : 0;
+        const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
+        const diferenciaExtra = i.subtotal - costoBaseTotal;
+
+        const htmlPrecioAgregados = diferenciaExtra > 0
+          ? `<div style="font-size: 11px; font-weight: bold; text-align: right;">Extra: +${formatearMoneda(diferenciaExtra)}</div>`
+          : "";
+
         return `
-          <div style="margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-            <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">
-              ${i.cantidad}x ${i.menus?.nombre || 'PLATO'} ${i.agregado_menu ? `(${i.agregado_menu})` : ''}
+          <div style="${estiloBorde}">
+            <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
+              ${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""} ${textoDetalle}
             </div>
-            ${i.guarniciones ? `<div style="font-size: 16px; font-weight: 900; margin-left: 10px;">👉 GUARNICIÓN: ${i.guarniciones.nombre} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ''}</div>` : ''}
-            ${i.ingredientes_ensalada ? `<div style="font-size: 15px; font-weight: 900; margin-left: 10px; margin-top: 2px;">🥗 (${i.ingredientes_ensalada})</div>` : ''}
-            <div style="text-align: right; font-size: 14px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
+            ${htmlPrecioAgregados}
+            <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
           </div>`;
       })
-      .join('');
+      .join("");
 
-    const matchDireccion = pedido.observaciones && pedido.observaciones.includes('Dirección:')
-      ? pedido.observaciones.split('|').find((s) => s.toLowerCase().includes('dirección'))?.replace(/dirección:/i, '').trim()
-      : '';
-
-    let cabeceraEntrega = `<div style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px;">
-      ${pedido.tipo_entrega === 'ENVIO' ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === 'RETIRO' ? '🚶 RETIRA EN LOCAL' : '🍽️ COMER EN BAR'}
+    let cabeceraEntrega = `<div style="text-align: center; margin-bottom: 6px;">
+      <span style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 3px 8px; display: inline-block;">
+        ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
+      </span>
     </div>`;
 
-    let etiquetaPago = `<div style="font-size: 15px; font-weight: 900; text-align: center; border: 2px dashed #000; padding: 4px; margin: 6px 0;">
-      💳 PAGO: ${pedido.metodo_pago || 'EFECTIVO'} ${pedido.pago_confirmado ? '(PAGADO)' : '(PENDIENTE DE COBRO)'}
+    let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+      <strong>PAGO:</strong> ${pedido.metodo_pago || "EFECTIVO"} ${pedido.pago_confirmado ? "(CONFIRMADO)" : "(PENDIENTE)"}
     </div>`;
 
     ventanaImpresion.document.write(`
@@ -281,7 +365,7 @@ export default function HistorialPedidosPage() {
           <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            body { font-family: 'Courier New', Courier, monospace; width: 270px; padding: 8px; margin: 0 auto; font-size: 13px; color: #000; }
+            body { font-family: 'Courier New', monospace; width: 270px; padding: 8px; margin: 0 auto; font-size: 13px; color: #000; }
             .center { text-align: center; }
             .line { border-bottom: 2px solid #000; margin: 6px 0; }
           </style>
@@ -289,31 +373,30 @@ export default function HistorialPedidosPage() {
         <body>
           <div class="center">
             <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
-            <p style="margin:2px 0; font-size: 10px;">${fechaHora} (REIMPRESIÓN)</p>
+            <p style="margin:2px 0; font-size: 10px;">${fechaHora}</p>
           </div>
-          <div class="line"></div>
           ${cabeceraEntrega}
           ${etiquetaPago}
-          <div style="font-size: 14px; margin-bottom: 4px;">
-            <strong>Cliente:</strong> ${pedido.cliente_nombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ''}
+          <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+            <strong>Cliente:</strong> ${pedido.cliente_nombre || ""} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
           </div>
-          ${pedido.observaciones ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; margin-top: 4px;">Obs: ${pedido.observaciones}</div>` : ''}
+          ${obsLimpia ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${obsLimpia}</div>` : ""}
           <div class="line"></div>
           <div style="margin: 8px 0;">${itemsHtml}</div>
           <div class="line"></div>
           <div style="display: flex; justify-between; align-items: flex-end; margin-top: 8px;">
             <div>
-              <div style="font-size: 11px; text-transform: uppercase;">Hora:</div>
-              <div style="font-size: 16px; font-weight: 900;">${pedido.horario_solicitado ? `🕒 ${pedido.horario_solicitado} hs` : 'Lo antes posible'}</div>
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
+              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
             </div>
             <div style="text-align: right;">
-              ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ''}
+              ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
               <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
               <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
             </div>
           </div>
           <div class="line" style="margin-top: 10px;"></div>
-          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold;">¡Gracias por tu compra!</p>
+          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
           <script>window.onload = function() { window.print(); window.close(); }</script>
         </body>
       </html>
@@ -321,7 +404,6 @@ export default function HistorialPedidosPage() {
     ventanaImpresion.document.close();
   }
 
-  // Lógica de Filtrado Completa
   const pedidosFiltrados = pedidos.filter((p) => {
     if (filtroTipo !== 'TODOS' && p.tipo_entrega !== filtroTipo) {
       return false;
@@ -378,7 +460,6 @@ export default function HistorialPedidosPage() {
       setCargando(true);
       const hoy = new Date().toISOString().split("T")[0];
 
-      // 1. Nos aseguramos de traer los detalles completos con su menu_id directamente de la base de datos por seguridad
       const { data: detallesReales, error: errDetallesReales } = await supabase
         .from("detalle_pedidos")
         .select("menu_id, cantidad")
@@ -386,7 +467,6 @@ export default function HistorialPedidosPage() {
 
       if (errDetallesReales) throw errDetallesReales;
 
-      // 2. Devolvemos el stock de cada menú encontrado de forma 100% segura
       if (detallesReales && detallesReales.length > 0) {
         for (const det of detallesReales) {
           if (det.menu_id) {
@@ -410,7 +490,6 @@ export default function HistorialPedidosPage() {
         }
       }
 
-      // 3. Borramos los detalles y el pedido
       const { error: errDetalle } = await supabase
         .from("detalle_pedidos")
         .delete()
@@ -619,7 +698,6 @@ export default function HistorialPedidosPage() {
                           {pedido.tipo_entrega === 'ENVIO' ? 'ENVÍO' : pedido.tipo_entrega === 'RETIRO' ? 'RETIRO' : 'BAR'}
                         </span>
 
-                        {/* BOTÓN INTERACTIVO PARA CAMBIAR TURNO AL HACER CLIC */}
                         <button
                           onClick={() => toggleTurnoPedido(pedido.id, pedido.turno)}
                           title="Hacé clic para cambiar de turno (Mañana / Noche)"
@@ -645,7 +723,6 @@ export default function HistorialPedidosPage() {
                       </div>
                     </div>
 
-                    {/* CAJA DESTACADA DE DIRECCIÓN EN CASO DE ENVÍO */}
                     {pedido.tipo_entrega === 'ENVIO' && direccionDetalle && (
                       <div className="p-2.5 bg-purple-100 border-2 border-purple-400 rounded-lg mb-2">
                         <span className="text-[10px] font-black uppercase text-purple-900 block">
@@ -672,7 +749,6 @@ export default function HistorialPedidosPage() {
                     </div>
                   </div>
 
-                  {/* CAJA DE MÉTODO Y ESTADO DE PAGO */}
                   <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 space-y-2 mb-3">
                     <div className="flex justify-between items-center">
                       <select
@@ -698,7 +774,6 @@ export default function HistorialPedidosPage() {
                     </div>
                   </div>
 
-                  {/* DETALLE DE ITEMS */}
                   <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
                     {pedido.detalle_pedidos?.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
@@ -736,7 +811,6 @@ export default function HistorialPedidosPage() {
                   </div>
                 </div>
 
-                {/* PIE DE TARJETA Y REIMPRESIÓN */}
                 <div className="border-t border-gray-200 pt-3 flex flex-wrap justify-between items-center gap-2 mt-2">
                   <div>
                     <span className="text-xs font-bold text-gray-500 block">Total:</span>
