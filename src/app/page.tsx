@@ -866,7 +866,7 @@ function ContenidoTomaPedidos() {
       }
     }
 
-    imprimirTicket(pedidoIdGuardado!);
+    //imprimirTicket(pedidoIdGuardado!);
 
     setItems([]);
     setItemsOriginalesEditar([]);
