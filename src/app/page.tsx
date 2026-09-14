@@ -125,6 +125,15 @@ function ContenidoTomaPedidos() {
     return horaActual >= 6 && horaActual < 16 ? "MAÑANA" : "NOCHE";
   }
 
+  function obtenerStockDisponibleTemporal(menuId: string): number {
+  const stockBase = stockMap[menuId] || 0;
+  const enBorrador = items
+    .filter((i) => i.menu?.id === menuId)
+    .reduce((acc, i) => acc + i.cantidad, 0);
+
+  return Math.max(0, stockBase - enBorrador);
+}
+
   useEffect(() => {
     async function inicializar() {
       await cargarDatosDelDia();
@@ -342,14 +351,11 @@ function ContenidoTomaPedidos() {
       return;
     }
 
-    const stockDisponible = stockMap[menuSeleccionado.id] || 0;
-    const cantidadYaEnCarrito = items
-      .filter((item) => item.menu?.id === menuSeleccionado.id)
-      .reduce((acc, item) => acc + item.cantidad, 0);
-
-    if (cantidad + cantidadYaEnCarrito > stockDisponible) {
+    // Validación de stock dinámico en pantalla
+    const stockDisponibleActual = obtenerStockDisponibleTemporal(menuSeleccionado.id);
+    if (cantidad > stockDisponibleActual) {
       alert(
-        `¡Stock insuficiente! Quedan ${stockDisponible - cantidadYaEnCarrito} de ${menuSeleccionado.nombre}`
+        `¡Stock insuficiente! Quedan ${stockDisponibleActual} unidad(es) disponible(s) de ${menuSeleccionado.nombre}`
       );
       return;
     }
@@ -359,14 +365,14 @@ function ContenidoTomaPedidos() {
         ? guarnicionSeleccionada.precio_extra
         : 0;
 
-    // CORRECCIÓN AQUÍ: Multiplicamos el costo de los huevos por la 'cantidad' de platos
+    // Multiplicamos el costo de los huevos por la 'cantidad' de platos
     const costoHuevosFritos = cantidadHuevosFritos * precioHuevoFrito * cantidad;
     const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro * cantidad;
     const extraAgregadosManual = Number(precioAgregadosExtra) || 0;
 
     const totalExtraCalculado = extraAgregadosManual + costoHuevosFritos + costoHuevosDuros;
 
-    // El subtotal de los platos + guarnición + los extras multiplicados por plato
+    // Subtotal del plato
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion) * cantidad + totalExtraCalculado;
 
@@ -413,6 +419,7 @@ function ContenidoTomaPedidos() {
       },
     ]);
 
+    // Resetear formulario
     setMenuSeleccionado(null);
     setGuarnicionSeleccionada(null);
     setSalsaSeleccionada(null);
@@ -1035,370 +1042,383 @@ function ContenidoTomaPedidos() {
           </div>
 
           {/* SECCIÓN 2: MENÚS DEL DÍA */}
-          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-bold" style={styleTextoNegro}>
-                2. Seleccionar Menú del Día
-              </h2>
-              {menuSeleccionado && (
+<div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300">
+  <div className="flex justify-between items-center mb-3">
+    <h2 className="text-lg font-bold" style={styleTextoNegro}>
+      2. Seleccionar Menú del Día
+    </h2>
+    {menuSeleccionado && (
+      <button
+        type="button"
+        onClick={() => setMenuSeleccionado(null)}
+        className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold px-2.5 py-1 rounded"
+      >
+        ▼ Ver todos los menús
+      </button>
+    )}
+  </div>
+
+  {!menuSeleccionado && (
+    <div className="relative mb-3">
+      <input
+        type="text"
+        value={busquedaTextoMenu}
+        onChange={(e) => setBusquedaTextoMenu(e.target.value)}
+        placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
+        className="w-full border-2 border-gray-300 text-gray-800 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
+      />
+      {busquedaTextoMenu && (
+        <button
+          type="button"
+          onClick={() => setBusquedaTextoMenu("")}
+          className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  )}
+
+  {menus.length === 0 ? (
+    <p className="text-red-600 text-sm font-bold">
+      No hay menús con stock cargado para hoy.
+    </p>
+  ) : menusFiltrados.length === 0 ? (
+    <p className="text-gray-500 text-xs font-bold py-2">
+      No se encontraron menús que coincidan con "{busquedaTextoMenu}".
+    </p>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {menusFiltrados
+        .filter(
+          (m) => !menuSeleccionado || menuSeleccionado.id === m.id
+        )
+        .map((m) => {
+          // Calculamos el stock dinámico restando lo que está en el borrador
+          const stockDisp = obtenerStockDisponibleTemporal(m.id);
+          const sinStock = stockDisp <= 0;
+
+          return (
+            <button
+              key={m.id}
+              type="button"
+              disabled={sinStock && menuSeleccionado?.id !== m.id}
+              onClick={() => {
+                if (menuSeleccionado?.id === m.id) {
+                  setMenuSeleccionado(null);
+                } else {
+                  setMenuSeleccionado(m);
+                  setGuarnicionSeleccionada(null);
+                  setSalsaSeleccionada(null);
+                  setIngredientesElegidos([]);
+                  setAgregadoMenuTexto("");
+                  setAgregadoGuarnicionTexto("");
+                  setPrecioAgregadosExtra(0);
+                  setCantidadHuevosFritos(0);
+                  setCantidadHuevosDuros(0);
+                }
+              }}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                sinStock && menuSeleccionado?.id !== m.id
+                  ? "border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed"
+                  : menuSeleccionado?.id === m.id
+                  ? "border-blue-600 bg-blue-100 font-extrabold shadow-md ring-2 ring-blue-400"
+                  : "border-gray-300 hover:border-gray-400 bg-white"
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <div
+                  className="font-extrabold text-base"
+                  style={styleTextoNegro}
+                >
+                  {m.nombre}
+                </div>
+                {menuSeleccionado?.id === m.id && (
+                  <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
+                    Seleccionado
+                  </span>
+                )}
+              </div>
+              <div
+                className="text-sm font-bold mt-1"
+                style={styleTextoNegro}
+              >
+                {formatearMoneda(m.precio)}
+              </div>
+              <div className="text-xs font-bold mt-1">
+                {sinStock ? (
+                  <span className="text-red-600 font-black">🚫 AGOTADO</span>
+                ) : (
+                  <span className="text-blue-700">Stock: {stockDisp} disp.</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+    </div>
+  )}
+
+  {menuSeleccionado && (
+    <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 space-y-3">
+      <h3 className="font-bold text-sm" style={styleTextoNegro}>
+        Opciones para: {menuSeleccionado.nombre}
+      </h3>
+
+      <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
+        <label className="block text-xs font-bold text-blue-950">
+          🥩 Detalle / Modificación del Menú (ej: c/ queso, napolitana sin salsa, jugoso):
+        </label>
+        <input
+          type="text"
+          value={agregadoMenuTexto}
+          onChange={(e) => setAgregadoMenuTexto(e.target.value)}
+          placeholder="Ej: c/ queso, sin salsa, a la napolitana"
+          className="w-full border border-blue-300 p-1.5 rounded text-xs bg-white font-bold text-black"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {menuSeleccionado.requiere_salsa && (
+          <div className="sm:col-span-2 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+            <label className="block text-xs font-black text-red-900 mb-1">
+              🍝 Seleccionar Salsa (Obligatorio)*:
+            </label>
+            <select
+              style={styleTextoNegro}
+              value={salsaSeleccionada?.id || ""}
+              onChange={(e) =>
+                setSalsaSeleccionada(
+                  salsas.find((s) => s.id === e.target.value) || null
+                )
+              }
+              className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold"
+            >
+              <option value="">-- Elegir Salsa --</option>
+              {salsas.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label
+            className="block text-xs font-bold mb-1"
+            style={styleTextoNegro}
+          >
+            {menuSeleccionado.lleva_guarnicion
+              ? "Guarnición (Opcional)"
+              : "Guarnición (No Aplica)"}
+          </label>
+          <select
+            disabled={!menuSeleccionado.lleva_guarnicion}
+            style={styleTextoNegro}
+            value={guarnicionSeleccionada?.id || ""}
+            onChange={(e) => {
+              const g =
+                guarniciones.find(
+                  (guar) => guar.id === e.target.value
+                ) || null;
+              setGuarnicionSeleccionada(g);
+              setIngredientesElegidos([]);
+              setCantidadHuevosDuros(0);
+            }}
+            className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold disabled:bg-gray-200"
+          >
+            <option value="">
+              {menuSeleccionado.lleva_guarnicion
+                ? "Sin Guarnición"
+                : "No lleva guarnición"}
+            </option>
+            {menuSeleccionado.lleva_guarnicion &&
+              guarniciones.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.nombre}{" "}
+                  {g.precio_extra > 0
+                    ? `(+${formatearMoneda(g.precio_extra)})`
+                    : ""}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div>
+          <label
+            className="block text-xs font-bold mb-1"
+            style={styleTextoNegro}
+          >
+            Cantidad Platos
+          </label>
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded border-2 border-gray-400 w-fit">
+            <button
+              type="button"
+              onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+              className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+            >
+              -
+            </button>
+            <span
+              className="text-sm font-black min-w-[20px] text-center"
+              style={styleTextoNegro}
+            >
+              {cantidad}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCantidad(cantidad + 1)}
+              className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {menuSeleccionado.lleva_guarnicion &&
+        guarnicionSeleccionada && (
+          <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
+            <label className="block text-xs font-bold text-amber-950">
+              🍟 Aclaración Guarnición (ej: en bandeja separada, sin sal):
+            </label>
+            <input
+              type="text"
+              value={agregadoGuarnicionTexto}
+              onChange={(e) =>
+                setAgregadoGuarnicionTexto(e.target.value)
+              }
+              placeholder="Ej: en bandeja separada, bien frito"
+              className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
+            />
+          </div>
+        )}
+
+      <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
+        <span className="text-xs font-bold text-gray-800">
+          💰 Precio Extra Cobrado por Agregados ($):
+        </span>
+        <input
+          type="number"
+          min="0"
+          value={
+            precioAgregadosExtra === 0 ? "" : precioAgregadosExtra
+          }
+          onChange={(e) =>
+            setPrecioAgregadosExtra(Number(e.target.value))
+          }
+          placeholder="$ 0"
+          className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center"
+        />
+      </div>
+
+      {(guarnicionSeleccionada?.requiere_ingredientes ||
+        (menuSeleccionado &&
+          menuSeleccionado.nombre
+            .toLowerCase()
+            .includes("ensalada"))) && (
+        <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-3">
+          <label className="block text-xs font-black text-emerald-900">
+            🥗 Ingredientes para la Ensalada:
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ingredientes.map((ing) => {
+              const seleccionada = ingredientesElegidos.includes(
+                ing.nombre
+              );
+              return (
                 <button
                   type="button"
-                  onClick={() => setMenuSeleccionado(null)}
-                  className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-extrabold px-2.5 py-1 rounded"
+                  key={ing.id}
+                  onClick={() => toggleIngrediente(ing.nombre)}
+                  className={`px-3 py-1 rounded text-xs font-bold border ${
+                    seleccionada
+                      ? "bg-emerald-700 text-white"
+                      : "bg-white text-gray-800"
+                  }`}
                 >
-                  ▼ Ver todos los menús
+                  {seleccionada ? "✓ " : "+ "}
+                  {ing.nombre}
                 </button>
-              )}
-            </div>
-
-            {!menuSeleccionado && (
-              <div className="relative mb-3">
-                <input
-                  type="text"
-                  value={busquedaTextoMenu}
-                  onChange={(e) => setBusquedaTextoMenu(e.target.value)}
-                  placeholder="🔍 Buscar plato (ej: milanesa, pechuga, ensalada)..."
-                  className="w-full border-2 border-gray-300 text-gray-800 p-2 pl-3 pr-8 rounded text-xs font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none"
-                />
-                {busquedaTextoMenu && (
-                  <button
-                    type="button"
-                    onClick={() => setBusquedaTextoMenu("")}
-                    className="absolute right-2.5 top-2 text-gray-500 font-extrabold text-xs"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            )}
-
-            {menus.length === 0 ? (
-              <p className="text-red-600 text-sm font-bold">
-                No hay menús con stock cargado para hoy.
-              </p>
-            ) : menusFiltrados.length === 0 ? (
-              <p className="text-gray-500 text-xs font-bold py-2">
-                No se encontraron menús que coincidan con "{busquedaTextoMenu}".
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                {menusFiltrados
-                  .filter(
-                    (m) => !menuSeleccionado || menuSeleccionado.id === m.id
-                  )
-                  .map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        if (menuSeleccionado?.id === m.id) {
-                          setMenuSeleccionado(null);
-                        } else {
-                          setMenuSeleccionado(m);
-                          setGuarnicionSeleccionada(null);
-                          setSalsaSeleccionada(null);
-                          setIngredientesElegidos([]);
-                          setAgregadoMenuTexto("");
-                          setAgregadoGuarnicionTexto("");
-                          setPrecioAgregadosExtra(0);
-                          setCantidadHuevosFritos(0);
-                          setCantidadHuevosDuros(0);
-                        }
-                      }}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        menuSeleccionado?.id === m.id
-                          ? "border-blue-600 bg-blue-100 font-extrabold shadow-md ring-2 ring-blue-400"
-                          : "border-gray-300 hover:border-gray-400 bg-white"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div
-                          className="font-extrabold text-base"
-                          style={styleTextoNegro}
-                        >
-                          {m.nombre}
-                        </div>
-                        {menuSeleccionado?.id === m.id && (
-                          <span className="text-xs bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
-                            Seleccionado
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className="text-sm font-bold mt-1"
-                        style={styleTextoNegro}
-                      >
-                        {formatearMoneda(m.precio)}
-                      </div>
-                      <div className="text-xs text-blue-700 font-bold mt-1">
-                        Stock: {stockMap[m.id] ?? 0} disp.
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            )}
-
-            {menuSeleccionado && (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-300 space-y-3">
-                <h3 className="font-bold text-sm" style={styleTextoNegro}>
-                  Opciones para: {menuSeleccionado.nombre}
-                </h3>
-
-                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
-                  <label className="block text-xs font-bold text-blue-950">
-                    🥩 Detalle / Modificación del Menú (ej: c/ queso, napolitana sin salsa, jugoso):
-                  </label>
-                  <input
-                    type="text"
-                    value={agregadoMenuTexto}
-                    onChange={(e) => setAgregadoMenuTexto(e.target.value)}
-                    placeholder="Ej: c/ queso, sin salsa, a la napolitana"
-                    className="w-full border border-blue-300 p-1.5 rounded text-xs bg-white font-bold text-black"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {menuSeleccionado.requiere_salsa && (
-                    <div className="sm:col-span-2 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
-                      <label className="block text-xs font-black text-red-900 mb-1">
-                        🍝 Seleccionar Salsa (Obligatorio)*:
-                      </label>
-                      <select
-                        style={styleTextoNegro}
-                        value={salsaSeleccionada?.id || ""}
-                        onChange={(e) =>
-                          setSalsaSeleccionada(
-                            salsas.find((s) => s.id === e.target.value) || null
-                          )
-                        }
-                        className="w-full border-2 border-red-400 p-2 rounded text-sm bg-white font-extrabold"
-                      >
-                        <option value="">-- Elegir Salsa --</option>
-                        {salsas.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label
-                      className="block text-xs font-bold mb-1"
-                      style={styleTextoNegro}
-                    >
-                      {menuSeleccionado.lleva_guarnicion
-                        ? "Guarnición (Opcional)"
-                        : "Guarnición (No Aplica)"}
-                    </label>
-                    <select
-                      disabled={!menuSeleccionado.lleva_guarnicion}
-                      style={styleTextoNegro}
-                      value={guarnicionSeleccionada?.id || ""}
-                      onChange={(e) => {
-                        const g =
-                          guarniciones.find(
-                            (guar) => guar.id === e.target.value
-                          ) || null;
-                        setGuarnicionSeleccionada(g);
-                        setIngredientesElegidos([]);
-                        setCantidadHuevosDuros(0);
-                      }}
-                      className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold disabled:bg-gray-200"
-                    >
-                      <option value="">
-                        {menuSeleccionado.lleva_guarnicion
-                          ? "Sin Guarnición"
-                          : "No lleva guarnición"}
-                      </option>
-                      {menuSeleccionado.lleva_guarnicion &&
-                        guarniciones.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.nombre}{" "}
-                            {g.precio_extra > 0
-                              ? `(+${formatearMoneda(g.precio_extra)})`
-                              : ""}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-xs font-bold mb-1"
-                      style={styleTextoNegro}
-                    >
-                      Cantidad Platos
-                    </label>
-                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded border-2 border-gray-400 w-fit">
-                      <button
-                        type="button"
-                        onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
-                      >
-                        -
-                      </button>
-                      <span
-                        className="text-sm font-black min-w-[20px] text-center"
-                        style={styleTextoNegro}
-                      >
-                        {cantidad}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCantidad(cantidad + 1)}
-                        className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {menuSeleccionado.lleva_guarnicion &&
-                  guarnicionSeleccionada && (
-                    <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg space-y-1">
-                      <label className="block text-xs font-bold text-amber-950">
-                        🍟 Aclaración Guarnición (ej: en bandeja separada, sin sal):
-                      </label>
-                      <input
-                        type="text"
-                        value={agregadoGuarnicionTexto}
-                        onChange={(e) =>
-                          setAgregadoGuarnicionTexto(e.target.value)
-                        }
-                        placeholder="Ej: en bandeja separada, bien frito"
-                        className="w-full border border-amber-300 p-1.5 rounded text-xs bg-white font-bold text-black"
-                      />
-                    </div>
-                  )}
-
-                <div className="flex items-center justify-between p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
-                  <span className="text-xs font-bold text-gray-800">
-                    💰 Precio Extra Cobrado por Agregados ($):
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      precioAgregadosExtra === 0 ? "" : precioAgregadosExtra
-                    }
-                    onChange={(e) =>
-                      setPrecioAgregadosExtra(Number(e.target.value))
-                    }
-                    placeholder="$ 0"
-                    className="w-24 border border-gray-400 p-1.5 rounded text-xs bg-white font-bold text-black text-center"
-                  />
-                </div>
-
-                {(guarnicionSeleccionada?.requiere_ingredientes ||
-                  (menuSeleccionado &&
-                    menuSeleccionado.nombre
-                      .toLowerCase()
-                      .includes("ensalada"))) && (
-                  <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-lg space-y-3">
-                    <label className="block text-xs font-black text-emerald-900">
-                      🥗 Ingredientes para la Ensalada:
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {ingredientes.map((ing) => {
-                        const seleccionada = ingredientesElegidos.includes(
-                          ing.nombre
-                        );
-                        return (
-                          <button
-                            type="button"
-                            key={ing.id}
-                            onClick={() => toggleIngrediente(ing.nombre)}
-                            className={`px-3 py-1 rounded text-xs font-bold border ${
-                              seleccionada
-                                ? "bg-emerald-700 text-white"
-                                : "bg-white text-gray-800"
-                            }`}
-                          >
-                            {seleccionada ? "✓ " : "+ "}
-                            {ing.nombre}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-emerald-200">
-                      <span className="text-xs font-bold text-emerald-950">
-                        🥚 Huevos duros extra (+{formatearMoneda(precioHuevoDuro)} c/u):
-                      </span>
-                      <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-400">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCantidadHuevosDuros(
-                              Math.max(0, cantidadHuevosDuros - 1)
-                            )
-                          }
-                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
-                        >
-                          -
-                        </button>
-                        <span
-                          className="text-xs font-black min-w-[16px] text-center"
-                          style={styleTextoNegro}
-                        >
-                          {cantidadHuevosDuros}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCantidadHuevosDuros(cantidadHuevosDuros + 1)
-                          }
-                          className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                  <span className="text-xs font-bold text-gray-800">
-                    🍳 Huevos fritos extra:
-                  </span>
-                  <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded border border-gray-300">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCantidadHuevosFritos(Math.max(0, cantidadHuevosFritos - 1))
-                      }
-                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
-                    >
-                      -
-                    </button>
-                    <span
-                      className="text-xs font-black text-gray-800 min-w-[16px] text-center"
-                      style={styleTextoNegro}
-                    >
-                      {cantidadHuevosFritos}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCantidadHuevosFritos(cantidadHuevosFritos + 1)}
-                      className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={agregarItemMenu}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-2.5 rounded text-sm"
-                >
-                  + Agregar Plato al Pedido
-                </button>
-              </div>
-            )}
+              );
+            })}
           </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-emerald-200">
+            <span className="text-xs font-bold text-emerald-950">
+              🥚 Huevos duros extra (+{formatearMoneda(precioHuevoDuro)} c/u):
+            </span>
+            <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-400">
+              <button
+                type="button"
+                onClick={() =>
+                  setCantidadHuevosDuros(
+                    Math.max(0, cantidadHuevosDuros - 1)
+                  )
+                }
+                className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+              >
+                -
+              </button>
+              <span
+                className="text-xs font-black min-w-[16px] text-center"
+                style={styleTextoNegro}
+              >
+                {cantidadHuevosDuros}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCantidadHuevosDuros(cantidadHuevosDuros + 1)
+                }
+                className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-1 border-t border-gray-200">
+        <span className="text-xs font-bold text-gray-800">
+          🍳 Huevos fritos extra:
+        </span>
+        <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded border border-gray-300">
+          <button
+            type="button"
+            onClick={() =>
+              setCantidadHuevosFritos(Math.max(0, cantidadHuevosFritos - 1))
+            }
+            className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
+          >
+            -
+          </button>
+          <span
+            className="text-xs font-black text-gray-800 min-w-[16px] text-center"
+            style={styleTextoNegro}
+          >
+            {cantidadHuevosFritos}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCantidadHuevosFritos(cantidadHuevosFritos + 1)}
+            className="text-xs font-black text-gray-800 px-1.5 py-0.5 rounded bg-white border border-gray-400 hover:bg-gray-200"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={agregarItemMenu}
+        className="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-2.5 rounded text-sm"
+      >
+        + Agregar Plato al Pedido
+      </button>
+    </div>
+  )}
+</div>
 
           {/* SECCIÓN 3: AGREGAR GUARNICIÓN EXTRA */}
           <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
