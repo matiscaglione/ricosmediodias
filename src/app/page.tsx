@@ -145,6 +145,7 @@ function ContenidoTomaPedidos() {
               ingredientes_ensalada,
               agregado_menu,
               agregado_guarnicion,
+              cantidad_huevos,
               salsas (*),
               menus (*),
               guarniciones (*),
@@ -178,20 +179,10 @@ function ContenidoTomaPedidos() {
             setDireccion(matchDireccion.replace(/dirección:/i, "").trim());
           }
 
-          let huevosEncontrados = 0;
-          const matchHuevos = textoObs.match(/(\d+)\s*Huevo/i);
-          if (matchHuevos) {
-            huevosEncontrados = parseInt(matchHuevos[1], 10);
-          }
-
           const obsLimpia = textoObs
             .split("|")
             .map((s: string) => s.trim())
-            .filter(
-              (s: string) =>
-                !s.toLowerCase().includes("huevo") &&
-                !s.toLowerCase().includes("dirección:")
-            )
+            .filter((s: string) => !s.toLowerCase().includes("dirección:"))
             .join(" | ");
 
           setObservaciones(obsLimpia);
@@ -206,9 +197,7 @@ function ContenidoTomaPedidos() {
                 det.bebidas ||
                 det.bebida_id
             )
-            .map((det: any, index: number) => {
-              const cantH = index === 0 ? huevosEncontrados : 0;
-
+            .map((det: any) => {
               const ingsArray = det.ingredientes_ensalada
                 ? det.ingredientes_ensalada
                     .split(",")
@@ -226,7 +215,7 @@ function ContenidoTomaPedidos() {
                 bebida: det.bebidas || undefined,
                 guarnicion: det.guarniciones || undefined,
                 cantidad: det.cantidad,
-                cantidadHuevosFritos: cantH,
+                cantidadHuevosFritos: det.cantidad_huevos || 0,
                 subtotal: det.subtotal,
                 ingredientesEnsalada: ingsArray,
                 agregadoMenuTexto: det.agregado_menu || undefined,
@@ -656,17 +645,9 @@ function ContenidoTomaPedidos() {
       pedidoIdGuardado = pedidoGuardado.id;
     }
 
-    // 1. Preparamos TODOS los detalles asociando los huevos a cada plato
+    // 1. Guardamos la columna 'cantidad_huevos' en la inserción del detalle
     const listaDetallesParaInsertar = items.map((item) => {
       if (item.menu) {
-        const textoHuevosItem = item.cantidadHuevosFritos > 0 
-          ? `${item.cantidadHuevosFritos === 1 ? "1 HUEVO FRITO" : `${item.cantidadHuevosFritos} HUEVOS FRITOS`}`
-          : "";
-
-        const agregadoMenuCompleto = [item.agregadoMenuTexto, textoHuevosItem]
-          .filter(Boolean)
-          .join(" - ");
-
         return {
           pedido_id: pedidoIdGuardado,
           menu_id: item.menu.id,
@@ -679,8 +660,9 @@ function ContenidoTomaPedidos() {
             item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
               ? item.ingredientesEnsalada.join(", ")
               : null,
-          agregado_menu: agregadoMenuCompleto || null,
+          agregado_menu: item.agregadoMenuTexto || null,
           agregado_guarnicion: item.agregadoGuarnicionTexto || null,
+          cantidad_huevos: item.cantidadHuevosFritos || 0,
         };
       } else if (item.bebida) {
         return {
@@ -692,8 +674,10 @@ function ContenidoTomaPedidos() {
           cantidad: item.cantidad,
           precio_unitario: item.bebida.precio,
           subtotal: item.subtotal,
+          cantidad_huevos: 0,
         };
       } else {
+        // Guarnición sola / Extra
         return {
           pedido_id: pedidoIdGuardado,
           guarnicion_id: item.guarnicion?.id || null,
@@ -708,10 +692,12 @@ function ContenidoTomaPedidos() {
               ? item.ingredientesEnsalada.join(", ")
               : null,
           agregado_guarnicion: item.agregadoGuarnicionTexto || null,
+          cantidad_huevos: 0,
         };
       }
     });
 
+    // 2. Guardamos TODOS los ítems juntos en la BD
     const { error: errDetalles } = await supabase
       .from("detalle_pedidos")
       .insert(listaDetallesParaInsertar);
@@ -721,6 +707,7 @@ function ContenidoTomaPedidos() {
       return;
     }
 
+    // 3. Descontamos el stock diario correspondiente
     for (const item of items) {
       if (item.menu) {
         const { data: stockActualData } = await supabase
@@ -741,6 +728,7 @@ function ContenidoTomaPedidos() {
       }
     }
 
+    // Reset del formulario
     setItems([]);
     setItemsOriginalesEditar([]);
     setPedidoEditandoId(null);

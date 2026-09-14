@@ -12,6 +12,7 @@ interface DetallePedido {
   ingredientes_ensalada?: string;
   agregado_menu?: string;
   agregado_guarnicion?: string;
+  cantidad_huevos?: number;
   menus?: { nombre: string; precio: number };
   guarniciones?: { nombre: string; precio_extra: number };
   bebidas?: { nombre: string };
@@ -54,74 +55,70 @@ export default function HistorialPedidosPage() {
 
   // ESCUCHA REALTIME CON DEMORA PARA EVITAR EL DOBLE TICKET E ITEMS VACÍOS
   useEffect(() => {
-  cargarPedidosRango();
+    cargarPedidosRango();
 
-  const canal = supabase
-    .channel('cambios-pedidos-historial')
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'pedidos' },
-      async (payload) => {
-        const nuevoPedidoId = payload.new.id;
+    const canal = supabase
+      .channel('cambios-pedidos-historial')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos' },
+        async (payload) => {
+          const nuevoPedidoId = payload.new.id;
 
-        // Esperamos 600ms a que se guarden los detalle_pedidos en Supabase
-        //await new Promise((resolve) => setTimeout(resolve, 600));
+          const { data: pedidoCompleto } = await supabase
+            .from('pedidos')
+            .select(`
+              *,
+              detalle_pedidos (
+                id,
+                cantidad,
+                precio_unitario,
+                subtotal,
+                ingredientes_ensalada,
+                agregado_menu,
+                agregado_guarnicion,
+                cantidad_huevos,
+                menus!left ( nombre, precio ),
+                guarniciones!left ( nombre, precio_extra ),
+                bebidas!left ( nombre ),
+                salsas!left ( nombre )
+              )
+            `)
+            .eq('id', nuevoPedidoId)
+            .single();
 
-        const { data: pedidoCompleto } = await supabase
-          .from('pedidos')
-          .select(`
-            *,
-            detalle_pedidos (
-              id,
-              cantidad,
-              precio_unitario,
-              subtotal,
-              ingredientes_ensalada,
-              agregado_menu,
-              agregado_guarnicion,
-              menus!left ( nombre, precio ),
-              guarniciones!left ( nombre, precio_extra ),
-              bebidas!left ( nombre ),
-              salsas!left ( nombre )
-            )
-          `)
-          .eq('id', nuevoPedidoId)
-          .single();
+          if (pedidoCompleto) {
+            reimprimirTicket(pedidoCompleto as Pedido);
 
-        if (pedidoCompleto) {
-          // 1. Imprimimos el ticket directamente (UNA SOLA VEZ por evento INSERT)
-          reimprimirTicket(pedidoCompleto as Pedido);
-
-          // 2. Actualizamos el estado sin meter funciones secundarias dentro de setPedidos
-          setPedidos((prev) => {
-            if (prev.some((p) => p.id === pedidoCompleto.id)) return prev;
-            return [pedidoCompleto as Pedido, ...prev];
-          });
+            setPedidos((prev) => {
+              if (prev.some((p) => p.id === pedidoCompleto.id)) return prev;
+              return [pedidoCompleto as Pedido, ...prev];
+            });
+          }
         }
-      }
-    )
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-      (payload) => {
-        setPedidos((prev) =>
-          prev.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
-        );
-      }
-    )
-    .on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'pedidos' },
-      (payload) => {
-        setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id));
-      }
-    )
-    .subscribe();
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
+        (payload) => {
+          setPedidos((prev) =>
+            prev.map((p) => (p.id === payload.new.id ? { ...p, ...payload.new } : p))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'pedidos' },
+        (payload) => {
+          setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id));
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(canal);
-  };
-}, [fechaInicio, fechaFin, filtroTurno]);
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [fechaInicio, fechaFin, filtroTurno]);
 
   async function cargarPedidosRango() {
     setCargando(true);
@@ -142,6 +139,7 @@ export default function HistorialPedidosPage() {
           ingredientes_ensalada,
           agregado_menu,
           agregado_guarnicion,
+          cantidad_huevos,
           menus!left ( nombre, precio ),
           guarniciones!left ( nombre, precio_extra ),
           bebidas!left ( nombre ),
@@ -234,6 +232,7 @@ export default function HistorialPedidosPage() {
           if (i.menus?.nombre && i.guarniciones?.nombre) str += ` (+ ${i.guarniciones.nombre})`;
           if (i.agregado_guarnicion) str += ` [Guarnición: ${i.agregado_guarnicion}]`;
           if (i.ingredientes_ensalada) str += ` [Ensalada: ${i.ingredientes_ensalada}]`;
+          if (i.cantidad_huevos && i.cantidad_huevos > 0) str += ` [${i.cantidad_huevos} Huevo(s) Frito(s)]`;
           return str;
         })
         .join('; ');
@@ -317,17 +316,18 @@ export default function HistorialPedidosPage() {
           nombreItem = `${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""}`;
           
           if (i.salsas?.nombre) detalleItem += ` C/ ${i.salsas.nombre}`;
-          
-          if (i.guarniciones) {
-            const agregadoGuarni = i.agregado_guarnicion ? ` (${i.agregado_guarnicion})` : "";
-            detalleItem += ` C/ ${i.guarniciones.nombre}${agregadoGuarni}`;
-          }
+          if (i.guarniciones) detalleItem += ` C/ ${i.guarniciones.nombre}`;
 
           const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
           if (tieneIngredientesMenu) {
             detalleItem += ` (${i.ingredientes_ensalada})`;
           } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
             detalleItem += ` (ENSALADA)`;
+          }
+
+          const cantH = i.cantidad_huevos || 0;
+          if (cantH > 0) {
+            detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
           }
         }
 
@@ -355,7 +355,7 @@ export default function HistorialPedidosPage() {
 
     let cabeceraEntrega = `<div style="text-align: center; margin: 3px 0;">
       <span style="font-size: 15px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 1px 6px; display: inline-block;">
-        ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "WALK RETIRA" : "🍽️ BAR"}
+        ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
       </span>
     </div>`;
 
@@ -822,7 +822,7 @@ export default function HistorialPedidosPage() {
                       <div key={item.id} className="flex justify-between text-sm">
                         <div className="flex-1">
                           <span className="font-extrabold" style={styleTextoNegro}>
-                            {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : '🍳 Huevo Frito / Adicional')}
+                            {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : 'Adicional')}
                             {item.agregado_menu && <span className="text-blue-900 font-bold ml-1">({item.agregado_menu})</span>}
                           </span>
                           {item.salsas?.nombre && (
@@ -845,6 +845,11 @@ export default function HistorialPedidosPage() {
                               🥗 ({item.ingredientes_ensalada})
                             </span>
                           )}
+                          {item.cantidad_huevos && item.cantidad_huevos > 0 ? (
+                            <span className="text-xs font-black text-amber-900 block pl-3">
+                              🍳 ({item.cantidad_huevos === 1 ? '1 Huevo Frito' : `${item.cantidad_huevos} Huevos Fritos`})
+                            </span>
+                          ) : null}
                         </div>
                         <span className="font-extrabold ml-2" style={styleTextoNegro}>
                           {formatearMoneda(item.subtotal)}
