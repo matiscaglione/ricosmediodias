@@ -216,7 +216,6 @@ function ContenidoTomaPedidos() {
                     .filter(Boolean)
                 : undefined;
 
-              // Recalcula si había extras cobrados
               const precioBaseMenu = det.menus ? det.menus.precio : 0;
               const precioBaseGuar = det.guarniciones ? det.guarniciones.precio_extra : 0;
               const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * det.cantidad;
@@ -538,236 +537,72 @@ function ContenidoTomaPedidos() {
     `);
     ventana.document.close();
   }
-  
-  /*function imprimirTicket(idPedido: string) {
-    const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
-    if (!ventanaImpresion) return;
-
-    const fechaHora = new Date().toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const nombreClienteLimpio = clienteNombre.replace(/[^a-zA-Z0-9]/g, "");
-    const idCorto = idPedido.slice(0, 6);
-
-    const itemsHtml = items
-      .map((i, index, arr) => {
-        const esUltimo = index === arr.length - 1;
-        const estiloBorde = esUltimo ? "margin-bottom: 8px;" : "margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;";
-
-        if (i.bebida) {
-          return `
-            <div style="${estiloBorde}">
-              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebida.nombre}</div>
-              <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
-            </div>`;
-        }
-
-        if (!i.menu && i.guarnicion) {
-          const tieneIngredientes = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-          let textoExtra = i.guarnicion.nombre;
-          if (tieneIngredientes) {
-            textoExtra += ` (${i.ingredientesEnsalada!.join(", ")})`;
-          }
-
-          return `
-            <div style="${estiloBorde}">
-              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; color: #000;">
-              ${textoExtra} ${i.agregadoGuarnicionTexto ? `(${i.agregadoGuarnicionTexto})` : ""}
-              </div>
-              <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
-            </div>`;
-        }
-
-        let textoDetalle = "";
-        
-        if (i.salsa) {
-          textoDetalle += ` C/ ${i.salsa.nombre}`;
-        }
-        
-        if (i.guarnicion) {
-          textoDetalle += ` C/ ${i.guarnicion.nombre}`;
-        }
-
-        const tieneIngredientesMenu = i.ingredientesEnsalada && i.ingredientesEnsalada.length > 0;
-        if (tieneIngredientesMenu) {
-          textoDetalle += ` (${i.ingredientesEnsalada!.join(", ")})`;
-        } else if (i.menu?.nombre.toLowerCase().includes("ensalada")) {
-          textoDetalle += ` (ENSALADA)`;
-        }
-
-        if (i.cantidadHuevosFritos > 0) {
-          textoDetalle += ` + ${i.cantidadHuevosFritos === 1 ? "1 HUEVO FRITO" : `${i.cantidadHuevosFritos} HUEVOS FRITOS`}`;
-        }
-
-        const htmlPrecioAgregados = i.precioAgregados && i.precioAgregados > 0 
-          ? `<div style="font-size: 11px; font-weight: bold; text-align: right;">Extra: +${formatearMoneda(i.precioAgregados)}</div>` 
-          : "";
-
-        return `
-<div style="${estiloBorde}">
-  <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
-    ${i.cantidad} ${i.menu?.nombre} ${i.agregadoMenuTexto ? `(${i.agregadoMenuTexto})` : ""} ${textoDetalle}
-  </div>
-  ${htmlPrecioAgregados}
-  <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
-</div>`;
-      })
-      .join("");
-
-    let cabeceraEntrega = `<div style="text-align: center; margin-bottom: 6px;">
-      <span style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 3px 8px; display: inline-block;">
-        ${tipoEntrega === "ENVIO" ? `🛵 ENVÍO: ${direccion}` : tipoEntrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
-      </span>
-    </div>`;
-
-    let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
-      <strong>PAGO:</strong> ${metodoPago}
-    </div>`;
-
-    ventanaImpresion.document.write(`
-      <html>
-        <head>
-          <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            body { font-family: 'Courier New', monospace; width: 270px; padding: 8px; margin: 0 auto; font-size: 13px; color: #000; }
-            .center { text-align: center; }
-            .line { border-bottom: 2px solid #000; margin: 6px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="center">
-            <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
-            <p style="margin:2px 0; font-size: 10px;">${fechaHora}</p>
-          </div>
-          ${cabeceraEntrega}
-          ${etiquetaPago}
-          <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
-            <strong>Cliente:</strong> ${clienteNombre} ${clienteTelefono ? `(${clienteTelefono})` : ""}
-          </div>
-          ${observaciones ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${observaciones}</div>` : ""}
-          <div class="line"></div>
-          <div style="margin: 8px 0;">${itemsHtml}</div>
-          <div class="line"></div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
-            <div>
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${horario ? `${horario} hs` : "CUANDO ESTÉ"}</div>
-            </div>
-            <div style="text-align: right;">
-              ${costoEnvio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(costoEnvio)}</div>` : ""}
-              ${montoRecargoTarjeta > 0 ? `<div style="font-size: 11px;">Recargo Tarjeta (${recargoTarjetaPorc}%): ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
-              <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
-              <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(montoTotal)}</div>
-            </div>
-          </div>
-          <div class="line" style="margin-top: 10px;"></div>
-          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
-          <script>window.onload = function() { window.print(); window.close(); }</script>
-        </body>
-      </html>
-    `);
-    ventanaImpresion.document.close();
-  } */
 
   async function confirmarPedido() {
-  if (items.length === 0)
-    return alert("Agregá al menos un menú, bebida o guarnición al pedido");
-  if (tipoEntrega === "ENVIO" && !direccion)
-    return alert("Ingresá la dirección para el envío");
+    if (items.length === 0)
+      return alert("Agregá al menos un menú, bebida o guarnición al pedido");
+    if (tipoEntrega === "ENVIO" && !direccion)
+      return alert("Ingresá la dirección para el envío");
 
-  const nombreFinal =
-    clienteNombre.trim() !== ""
-      ? clienteNombre
-      : tipoEntrega === "BAR"
-        ? "Cliente Bar"
-        : tipoEntrega === "RETIRO"
-          ? "Retira Mostrador"
-          : "Cliente Envío";
+    const nombreFinal =
+      clienteNombre.trim() !== ""
+        ? clienteNombre
+        : tipoEntrega === "BAR"
+          ? "Cliente Bar"
+          : tipoEntrega === "RETIRO"
+            ? "Retira Mostrador"
+            : "Cliente Envío";
 
-  const turnoFinal = pedidoEditandoId && turnoOriginalEditando
-    ? turnoOriginalEditando
-    : obtenerTurnoActual();
+    const turnoFinal = pedidoEditandoId && turnoOriginalEditando
+      ? turnoOriginalEditando
+      : obtenerTurnoActual();
 
-  const ahoraIso = new Date().toISOString();
-  const horaActualStr = ahoraIso.split("T")[1];
-  const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}`;
+    const ahoraIso = new Date().toISOString();
+    const horaActualStr = ahoraIso.split("T")[1];
+    const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}`;
 
-  const detalleDireccion =
-    tipoEntrega === "ENVIO" && direccion.trim() !== ""
-      ? `Dirección: ${direccion.trim()}`
-      : "";
-  const detalleHuevos = items
-    .filter((i) => i.cantidadHuevosFritos > 0)
-    .map((i) => `${i.cantidadHuevosFritos} Huevo Frito`)
-    .join(", ");
+    const detalleDireccion =
+      tipoEntrega === "ENVIO" && direccion.trim() !== ""
+        ? `Dirección: ${direccion.trim()}`
+        : "";
 
-  const obsFinal = [observaciones.trim(), detalleDireccion, detalleHuevos]
-    .filter(Boolean)
-    .join(" | ");
+    const obsFinal = [observaciones.trim(), detalleDireccion]
+      .filter(Boolean)
+      .join(" | ");
 
-  let pedidoIdGuardado = pedidoEditandoId;
+    let pedidoIdGuardado = pedidoEditandoId;
 
-  if (pedidoEditandoId) {
-    for (const itemViejo of itemsOriginalesEditar) {
-      if (itemViejo.menu) {
-        const { data: stockActualData } = await supabase
-          .from("stock_diario")
-          .select("cantidad_disponible")
-          .eq("fecha", fechaPedido)
-          .eq("menu_id", itemViejo.menu.id)
-          .single();
-
-        if (stockActualData) {
-          await supabase
+    if (pedidoEditandoId) {
+      for (const itemViejo of itemsOriginalesEditar) {
+        if (itemViejo.menu) {
+          const { data: stockActualData } = await supabase
             .from("stock_diario")
-            .update({
-              cantidad_disponible:
-                stockActualData.cantidad_disponible + itemViejo.cantidad,
-            })
+            .select("cantidad_disponible")
             .eq("fecha", fechaPedido)
-            .eq("menu_id", itemViejo.menu.id);
+            .eq("menu_id", itemViejo.menu.id)
+            .single();
+
+          if (stockActualData) {
+            await supabase
+              .from("stock_diario")
+              .update({
+                cantidad_disponible:
+                  stockActualData.cantidad_disponible + itemViejo.cantidad,
+              })
+              .eq("fecha", fechaPedido)
+              .eq("menu_id", itemViejo.menu.id);
+          }
         }
       }
-    }
 
-    await supabase
-      .from("detalle_pedidos")
-      .delete()
-      .eq("pedido_id", pedidoEditandoId);
+      await supabase
+        .from("detalle_pedidos")
+        .delete()
+        .eq("pedido_id", pedidoEditandoId);
 
-    const { error: errUpdate } = await supabase
-      .from("pedidos")
-      .update({
-        cliente_nombre: nombreFinal,
-        cliente_telefono: clienteTelefono,
-        tipo_entrega: tipoEntrega,
-        zona_envio_id: zonaSeleccionada?.id || null,
-        costo_envio: costoEnvio,
-        monto_platos: montoPlatos,
-        monto_total: montoTotal,
-        horario_solicitado: horario,
-        observaciones: obsFinal,
-        turno: turnoFinal,
-        created_at: fechaCreacionFinal,
-        metodo_pago: metodoPago,
-        pago_confirmado: pagoConfirmado,
-        empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
-      })
-      .eq("id", pedidoEditandoId);
-
-    if (errUpdate) {
-      alert("Error al actualizar el pedido: " + errUpdate.message);
-      return;
-    }
-  } else {
-    const { data: pedidoGuardado, error: errPedido } = await supabase
-      .from("pedidos")
-      .insert([
-        {
+      const { error: errUpdate } = await supabase
+        .from("pedidos")
+        .update({
           cliente_nombre: nombreFinal,
           cliente_telefono: clienteTelefono,
           tipo_entrega: tipoEntrega,
@@ -777,120 +612,150 @@ function ContenidoTomaPedidos() {
           monto_total: montoTotal,
           horario_solicitado: horario,
           observaciones: obsFinal,
-          estado: "PENDIENTE",
           turno: turnoFinal,
           created_at: fechaCreacionFinal,
           metodo_pago: metodoPago,
           pago_confirmado: pagoConfirmado,
           empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
-        },
-      ])
-      .select()
-      .single();
+        })
+        .eq("id", pedidoEditandoId);
 
-    if (errPedido || !pedidoGuardado) {
-      alert("Error al guardar el pedido: " + errPedido?.message);
-      return;
-    }
-    pedidoIdGuardado = pedidoGuardado.id;
-  }
-
-  // 1. Preparamos TODOS los detalles en una sola lista (Bulk Insert)
-  const listaDetallesParaInsertar = items.map((item) => {
-    if (item.menu) {
-      return {
-        pedido_id: pedidoIdGuardado,
-        menu_id: item.menu.id,
-        guarnicion_id: item.guarnicion?.id || null,
-        salsa_id: item.salsa?.id || null, // 🟢 AHORA SÍ GUARDA LA SALSA
-        cantidad: item.cantidad,
-        precio_unitario: item.menu.precio,
-        subtotal: item.subtotal,
-        ingredientes_ensalada:
-          item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
-            ? item.ingredientesEnsalada.join(", ")
-            : null,
-        agregado_menu: item.agregadoMenuTexto || null,
-        agregado_guarnicion: item.agregadoGuarnicionTexto || null,
-      };
-    } else if (item.bebida) {
-      return {
-        pedido_id: pedidoIdGuardado,
-        bebida_id: item.bebida.id,
-        menu_id: null,
-        guarnicion_id: null,
-        salsa_id: null,
-        cantidad: item.cantidad,
-        precio_unitario: item.bebida.precio,
-        subtotal: item.subtotal,
-      };
+      if (errUpdate) {
+        alert("Error al actualizar el pedido: " + errUpdate.message);
+        return;
+      }
     } else {
-      // Guarnición sola / Extra
-      return {
-        pedido_id: pedidoIdGuardado,
-        guarnicion_id: item.guarnicion?.id || null,
-        menu_id: null,
-        bebida_id: null,
-        salsa_id: null,
-        cantidad: item.cantidad,
-        precio_unitario: precioGuarnicionExtra,
-        subtotal: item.subtotal,
-        ingredientes_ensalada:
-          item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
-            ? item.ingredientesEnsalada.join(", ")
-            : null,
-        agregado_guarnicion: item.agregadoGuarnicionTexto || null,
-      };
-    }
-  });
-
-  // 2. Guardamos TODOS los ítems juntos en la BD en 1 sola consulta
-  const { error: errDetalles } = await supabase
-    .from("detalle_pedidos")
-    .insert(listaDetallesParaInsertar);
-
-  if (errDetalles) {
-    alert("Error al guardar los detalles del pedido: " + errDetalles.message);
-    return;
-  }
-
-  // 3. Descontamos el stock diario correspondiente
-  for (const item of items) {
-    if (item.menu) {
-      const { data: stockActualData } = await supabase
-        .from("stock_diario")
-        .select("cantidad_disponible")
-        .eq("fecha", fechaPedido)
-        .eq("menu_id", item.menu.id)
+      const { data: pedidoGuardado, error: errPedido } = await supabase
+        .from("pedidos")
+        .insert([
+          {
+            cliente_nombre: nombreFinal,
+            cliente_telefono: clienteTelefono,
+            tipo_entrega: tipoEntrega,
+            zona_envio_id: zonaSeleccionada?.id || null,
+            costo_envio: costoEnvio,
+            monto_platos: montoPlatos,
+            monto_total: montoTotal,
+            horario_solicitado: horario,
+            observaciones: obsFinal,
+            estado: "PENDIENTE",
+            turno: turnoFinal,
+            created_at: fechaCreacionFinal,
+            metodo_pago: metodoPago,
+            pago_confirmado: pagoConfirmado,
+            empresa_id: empresaSeleccionadaId ? empresaSeleccionadaId : null,
+          },
+        ])
+        .select()
         .single();
 
-      const stockActual = stockActualData?.cantidad_disponible || 0;
-      const nuevoStock = Math.max(0, stockActual - item.cantidad);
-
-      await supabase
-        .from("stock_diario")
-        .update({ cantidad_disponible: nuevoStock })
-        .eq("fecha", fechaPedido)
-        .eq("menu_id", item.menu.id);
+      if (errPedido || !pedidoGuardado) {
+        alert("Error al guardar el pedido: " + errPedido?.message);
+        return;
+      }
+      pedidoIdGuardado = pedidoGuardado.id;
     }
-  }
 
-  // Reset del formulario
-  setItems([]);
-  setItemsOriginalesEditar([]);
-  setPedidoEditandoId(null);
-  setTurnoOriginalEditando(null);
-  setClienteNombre("");
-  setClienteTelefono("");
-  setDireccion("");
-  setHorario("");
-  setObservaciones("");
-  setEmpresaSeleccionadaId("");
-  setFechaPedido(new Date().toISOString().split("T")[0]);
-  setMetodoPago("EFECTIVO");
-  setPagoConfirmado(false);
-  cargarDatosDelDia();
-}
+    // 1. Preparamos TODOS los detalles asociando los huevos a cada plato
+    const listaDetallesParaInsertar = items.map((item) => {
+      if (item.menu) {
+        const textoHuevosItem = item.cantidadHuevosFritos > 0 
+          ? `${item.cantidadHuevosFritos === 1 ? "1 HUEVO FRITO" : `${item.cantidadHuevosFritos} HUEVOS FRITOS`}`
+          : "";
+
+        const agregadoMenuCompleto = [item.agregadoMenuTexto, textoHuevosItem]
+          .filter(Boolean)
+          .join(" - ");
+
+        return {
+          pedido_id: pedidoIdGuardado,
+          menu_id: item.menu.id,
+          guarnicion_id: item.guarnicion?.id || null,
+          salsa_id: item.salsa?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.menu.precio,
+          subtotal: item.subtotal,
+          ingredientes_ensalada:
+            item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
+              ? item.ingredientesEnsalada.join(", ")
+              : null,
+          agregado_menu: agregadoMenuCompleto || null,
+          agregado_guarnicion: item.agregadoGuarnicionTexto || null,
+        };
+      } else if (item.bebida) {
+        return {
+          pedido_id: pedidoIdGuardado,
+          bebida_id: item.bebida.id,
+          menu_id: null,
+          guarnicion_id: null,
+          salsa_id: null,
+          cantidad: item.cantidad,
+          precio_unitario: item.bebida.precio,
+          subtotal: item.subtotal,
+        };
+      } else {
+        return {
+          pedido_id: pedidoIdGuardado,
+          guarnicion_id: item.guarnicion?.id || null,
+          menu_id: null,
+          bebida_id: null,
+          salsa_id: null,
+          cantidad: item.cantidad,
+          precio_unitario: precioGuarnicionExtra,
+          subtotal: item.subtotal,
+          ingredientes_ensalada:
+            item.ingredientesEnsalada && item.ingredientesEnsalada.length > 0
+              ? item.ingredientesEnsalada.join(", ")
+              : null,
+          agregado_guarnicion: item.agregadoGuarnicionTexto || null,
+        };
+      }
+    });
+
+    const { error: errDetalles } = await supabase
+      .from("detalle_pedidos")
+      .insert(listaDetallesParaInsertar);
+
+    if (errDetalles) {
+      alert("Error al guardar los detalles del pedido: " + errDetalles.message);
+      return;
+    }
+
+    for (const item of items) {
+      if (item.menu) {
+        const { data: stockActualData } = await supabase
+          .from("stock_diario")
+          .select("cantidad_disponible")
+          .eq("fecha", fechaPedido)
+          .eq("menu_id", item.menu.id)
+          .single();
+
+        const stockActual = stockActualData?.cantidad_disponible || 0;
+        const nuevoStock = Math.max(0, stockActual - item.cantidad);
+
+        await supabase
+          .from("stock_diario")
+          .update({ cantidad_disponible: nuevoStock })
+          .eq("fecha", fechaPedido)
+          .eq("menu_id", item.menu.id);
+      }
+    }
+
+    setItems([]);
+    setItemsOriginalesEditar([]);
+    setPedidoEditandoId(null);
+    setTurnoOriginalEditando(null);
+    setClienteNombre("");
+    setClienteTelefono("");
+    setDireccion("");
+    setHorario("");
+    setObservaciones("");
+    setEmpresaSeleccionadaId("");
+    setFechaPedido(new Date().toISOString().split("T")[0]);
+    setMetodoPago("EFECTIVO");
+    setPagoConfirmado(false);
+    cargarDatosDelDia();
+  }
 
   const styleTextoNegro = { color: "#000000" };
 
