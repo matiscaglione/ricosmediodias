@@ -281,14 +281,11 @@ export default function HistorialPedidosPage() {
     minute: "2-digit",
   });
 
-  // 1. EVALUAR SI EL NOMBRE ES UN VALOR GENERADO AUTOMÁTICAMENTE
   const esNombreGenerico = ["cliente bar", "retira mostrador", "cliente envío", "cliente envio"].includes(
     (pedido.cliente_nombre || "").trim().toLowerCase()
   );
   
-  // Si no pusiste un nombre real, queda vacío
   const clienteNombre = esNombreGenerico ? "" : pedido.cliente_nombre;
-
   const nombreClienteLimpio = clienteNombre.replace(/[^a-zA-Z0-9]/g, "");
   const idCorto = pedido.id.slice(0, 6);
 
@@ -310,56 +307,35 @@ export default function HistorialPedidosPage() {
     .join(" | ");
 
   const itemsHtml = (pedido.detalle_pedidos || [])
-    .map((i, index, arr) => {
-      const esUltimo = index === arr.length - 1;
-      const estiloBorde = esUltimo
-        ? "margin-bottom: 8px;"
-        : "margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 4px;";
+    .map((i, index) => {
+      let nombreItem = "";
+      let detalleItem = "";
 
       if (i.bebidas) {
-        return `
-          <div style="${estiloBorde}">
-            <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">🥤 ${i.cantidad} ${i.bebidas.nombre}</div>
-            <div style="text-align: right; font-size: 15px; font-weight: bold;">${formatearMoneda(i.subtotal)}</div>
-          </div>`;
-      }
-
-      if (!i.menus && i.guarniciones) {
+        nombreItem = `🥤 ${i.cantidad} ${i.bebidas.nombre}`;
+      } else if (!i.menus && i.guarniciones) {
         const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
-        let textoExtra = i.guarniciones.nombre;
+        nombreItem = `${i.guarniciones.nombre} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ""}`;
         if (tieneIngredientes) {
-          textoExtra += ` (${i.ingredientes_ensalada})`;
+          detalleItem = `(${i.ingredientes_ensalada})`;
+        }
+      } else {
+        nombreItem = `${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""}`;
+        
+        if (i.salsas?.nombre) detalleItem += ` C/ ${i.salsas.nombre}`;
+        if (i.guarniciones) detalleItem += ` C/ ${i.guarniciones.nombre}`;
+
+        const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
+        if (tieneIngredientesMenu) {
+          detalleItem += ` (${i.ingredientes_ensalada})`;
+        } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
+          detalleItem += ` (ENSALADA)`;
         }
 
-        return `
-          <div style="${estiloBorde}">
-            <div style="font-size: 20px; font-weight: 900; text-transform: uppercase; color: #000;">
-              ${textoExtra} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ""}
-            </div>
-            <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
-          </div>`;
-      }
-
-      let textoDetalle = "";
-
-      if (i.salsas?.nombre) {
-        textoDetalle += ` C/ ${i.salsas.nombre}`;
-      }
-
-      if (i.guarniciones) {
-        textoDetalle += ` C/ ${i.guarniciones.nombre}`;
-      }
-
-      const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
-      if (tieneIngredientesMenu) {
-        textoDetalle += ` (${i.ingredientes_ensalada})`;
-      } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
-        textoDetalle += ` (ENSALADA)`;
-      }
-
-      const cantH = index === 0 ? huevosEncontrados : 0;
-      if (cantH > 0) {
-        textoDetalle += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
+        const cantH = index === 0 ? huevosEncontrados : 0;
+        if (cantH > 0) {
+          detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
+        }
       }
 
       const precioBaseMenu = i.menus ? i.menus.precio : 0;
@@ -368,27 +344,33 @@ export default function HistorialPedidosPage() {
       const diferenciaExtra = i.subtotal - costoBaseTotal;
 
       const htmlPrecioAgregados = diferenciaExtra > 0
-        ? `<div style="font-size: 11px; font-weight: bold; text-align: right;">Extra: +${formatearMoneda(diferenciaExtra)}</div>`
+        ? `<div style="font-size: 11px; font-weight: bold; text-align: right; color: #000;">Extra: +${formatearMoneda(diferenciaExtra)}</div>`
         : "";
 
       return `
-        <div style="${estiloBorde}">
-          <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
-            ${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""} ${textoDetalle}
-          </div>
+        <div style="margin-bottom: 3px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="font-size: 18px; font-weight: 900; text-transform: uppercase; vertical-align: top; padding: 0;">
+                ${nombreItem} ${detalleItem ? `<span style="font-size: 15px; font-weight: bold;">${detalleItem}</span>` : ""}
+              </td>
+              <td style="text-align: right; font-size: 13px; font-weight: bold; vertical-align: top; white-width: nowrap; padding-left: 4px;">
+                ${formatearMoneda(i.subtotal)}
+              </td>
+            </tr>
+          </table>
           ${htmlPrecioAgregados}
-          <div style="text-align: right; font-size: 15px; font-weight: bold; margin-top: 2px;">${formatearMoneda(i.subtotal)}</div>
         </div>`;
     })
     .join("");
 
-  let cabeceraEntrega = `<div style="text-align: center; margin-bottom: 6px;">
-    <span style="font-size: 16px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 3px 8px; display: inline-block;">
+  let cabeceraEntrega = `<div style="text-align: center; margin: 3px 0;">
+    <span style="font-size: 15px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 1px 6px; display: inline-block;">
       ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
     </span>
   </div>`;
 
-  let etiquetaPago = `<div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+  let etiquetaPago = `<div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
     <strong>PAGO:</strong> ${pedido.metodo_pago || "EFECTIVO"}
   </div>`;
 
@@ -415,9 +397,9 @@ export default function HistorialPedidosPage() {
             margin: 0 !important; 
             height: auto !important;
             min-height: 0 !important;
-            font-size: 13px; 
+            font-size: 12px; 
             color: #000; 
-            line-height: 1.2;
+            line-height: 1.05;
           }
           .ticket-container {
             width: 100%;
@@ -426,39 +408,41 @@ export default function HistorialPedidosPage() {
             display: block;
           }
           .center { text-align: center; }
-          .line { border-bottom: 2px solid #000; margin: 6px 0; }
+          .line { border-bottom: 2px solid #000; margin: 3px 0; }
           p, div, h1 { margin: 0; padding: 0; }
         </style>
       </head>
       <body>
         <div class="ticket-container">
           <div class="center">
-            <h1 style="margin:0; font-size: 22px; font-weight: 900;">RicosMediodias</h1>
-            <p style="margin:2px 0 0 0; font-size: 10px;">${fechaHora}</p>
+            <h1 style="margin:0; font-size: 20px; font-weight: 900;">RicosMediodias</h1>
+            <p style="margin:1px 0 0 0; font-size: 10px;">${fechaHora}</p>
           </div>
           ${cabeceraEntrega}
           ${etiquetaPago}
-          <div style="font-size: 14px; margin-bottom: 4px; text-transform: uppercase;">
+          <div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
             <strong>Cliente:</strong> ${clienteNombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
           </div>
-          ${obsLimpia ? `<div style="font-size: 13px; font-weight: bold; background-color: #eee; padding: 2px 4px; text-transform: uppercase;">Obs: ${obsLimpia}</div>` : ""}
+          ${obsLimpia ? `<div style="font-size: 12px; font-weight: bold; background-color: #eee; padding: 1px 3px; text-transform: uppercase; margin-bottom: 2px;">Obs: ${obsLimpia}</div>` : ""}
           <div class="line"></div>
-          <div style="margin: 8px 0;">${itemsHtml}</div>
+          <div style="margin: 4px 0;">${itemsHtml}</div>
           <div class="line"></div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px;">
-            <div>
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-              <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
-            </div>
-            <div style="text-align: right;">
-              ${pedido.costo_envio > 0 ? `<div style="font-size: 11px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
-              ${montoRecargoTarjeta > 0 ? `<div style="font-size: 11px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
-              <div style="font-size: 11px; text-transform: uppercase;">Total:</div>
-              <div style="font-size: 20px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
-            </div>
-          </div>
-          <div class="line" style="margin-top: 10px;"></div>
-          <p class="center" style="margin: 6px 0 0 0; font-size: 11px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
+          <table style="width: 100%; margin-top: 3px; border-collapse: collapse;">
+            <tr>
+              <td style="vertical-align: bottom;">
+                <div style="font-size: 10px; text-transform: uppercase; font-weight: bold;">Hora:</div>
+                <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
+              </td>
+              <td style="text-align: right; vertical-align: bottom;">
+                ${pedido.costo_envio > 0 ? `<div style="font-size: 10px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
+                ${montoRecargoTarjeta > 0 ? `<div style="font-size: 10px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
+                <div style="font-size: 10px; text-transform: uppercase;">Total:</div>
+                <div style="font-size: 18px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
+              </td>
+            </tr>
+          </table>
+          <div class="line" style="margin-top: 4px;"></div>
+          <p class="center" style="margin: 3px 0 0 0; font-size: 10px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
         </div>
         <script>
           window.onload = function() { 
