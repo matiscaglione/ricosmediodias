@@ -359,12 +359,14 @@ function ContenidoTomaPedidos() {
         ? guarnicionSeleccionada.precio_extra
         : 0;
 
-    const costoHuevosFritos = cantidadHuevosFritos * precioHuevoFrito;
-    const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro;
+    // CORRECCIÓN AQUÍ: Multiplicamos el costo de los huevos por la 'cantidad' de platos
+    const costoHuevosFritos = cantidadHuevosFritos * precioHuevoFrito * cantidad;
+    const costoHuevosDuros = cantidadHuevosDuros * precioHuevoDuro * cantidad;
     const extraAgregadosManual = Number(precioAgregadosExtra) || 0;
 
     const totalExtraCalculado = extraAgregadosManual + costoHuevosFritos + costoHuevosDuros;
 
+    // El subtotal de los platos + guarnición + los extras multiplicados por plato
     const subtotal =
       (menuSeleccionado.precio + precioGuarnicion) * cantidad + totalExtraCalculado;
 
