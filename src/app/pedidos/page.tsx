@@ -269,6 +269,7 @@ export default function HistorialPedidosPage() {
   }
 
   // IMPRESIÓN CON FORMATO 100% IDÉNTICO A TOMA DE PEDIDOS
+  // IMPRESIÓN CON FORMATO 100% IDÉNTICO A TOMA DE PEDIDOS
   function reimprimirTicket(pedido: Pedido) {
     const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
     if (!ventanaImpresion) return;
@@ -325,18 +326,16 @@ export default function HistorialPedidosPage() {
             detalleItem += ` (ENSALADA)`;
           }
 
-          // Leemos la cantidad de huevos asignada a cada vianda individual
-const cantH = i.cantidad_huevos || 0;
-
-if (cantH > 0) {
-  if (i.cantidad > 1) {
-    // Si hay más de 1 plato, indicamos la cantidad por unidad (C/U)
-    detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO C/U" : `${cantH} HUEVOS FRITOS C/U`}`;
-  } else {
-    // Si es un solo plato, mostramos el formato individual estándar
-    detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
-  }
-}
+          // Lógica por unidad (C/U) o individual
+          const cantH = i.cantidad_huevos || 0;
+          if (cantH > 0) {
+            if (i.cantidad > 1) {
+              detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO C/U" : `${cantH} HUEVOS FRITOS C/U`}`;
+            } else {
+              detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
+            }
+          }
+        }
 
         // Cálculo de extra cobrado
         const precioBaseMenu = i.menus ? i.menus.precio : 0;
