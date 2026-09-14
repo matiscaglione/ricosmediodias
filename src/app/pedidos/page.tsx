@@ -338,28 +338,24 @@ export default function HistorialPedidosPage() {
         }
       }
 
+      // Cálculo de extra cobrado
       const precioBaseMenu = i.menus ? i.menus.precio : 0;
       const precioBaseGuar = i.guarniciones ? i.guarniciones.precio_extra : 0;
       const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
       const diferenciaExtra = i.subtotal - costoBaseTotal;
 
-      const htmlPrecioAgregados = diferenciaExtra > 0
-        ? `<div style="font-size: 11px; font-weight: bold; text-align: right; color: #000;">Extra: +${formatearMoneda(diferenciaExtra)}</div>`
-        : "";
+      const textoExtra = diferenciaExtra > 0 ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
 
       return `
-        <div style="margin-bottom: 3px;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td style="font-size: 20px; font-weight: 900; text-transform: uppercase; vertical-align: top; padding: 0;">
-                ${nombreItem} ${detalleItem ? `<span style="font-size: 19px; font-weight: bold;">${detalleItem}</span>` : ""}
-              </td>
-              <td style="text-align: right; font-size: 13px; font-weight: bold; vertical-align: top; white-width: nowrap; padding-left: 4px;">
-                ${formatearMoneda(i.subtotal)}
-              </td>
-            </tr>
-          </table>
-          ${htmlPrecioAgregados}
+        <div style="margin-bottom: 4px;">
+          <!-- LÍNEA PRINCIPAL (GIGANTE PARA COCINA) -->
+          <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
+            ${nombreItem} ${detalleItem ? `<span style="font-size: 20px; font-weight: bold;">${detalleItem}</span>` : ""}
+          </div>
+          <!-- LÍNEA SECUNDARIA (PRECIO + EXTRA CHIQUITO ALINEADO A LA DERECHA) -->
+          <div style="text-align: right; font-size: 11px; font-weight: bold; color: #000; margin-top: 1px;">
+            Subtotal: ${formatearMoneda(i.subtotal)}${textoExtra}
+          </div>
         </div>`;
     })
     .join("");
