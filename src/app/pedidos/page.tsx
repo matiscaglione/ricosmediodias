@@ -351,8 +351,8 @@ export default function HistorialPedidosPage() {
         <div style="margin-bottom: 3px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
-              <td style="font-size: 18px; font-weight: 900; text-transform: uppercase; vertical-align: top; padding: 0;">
-                ${nombreItem} ${detalleItem ? `<span style="font-size: 15px; font-weight: bold;">${detalleItem}</span>` : ""}
+              <td style="font-size: 20px; font-weight: 900; text-transform: uppercase; vertical-align: top; padding: 0;">
+                ${nombreItem} ${detalleItem ? `<span style="font-size: 19px; font-weight: bold;">${detalleItem}</span>` : ""}
               </td>
               <td style="text-align: right; font-size: 13px; font-weight: bold; vertical-align: top; white-width: nowrap; padding-left: 4px;">
                 ${formatearMoneda(i.subtotal)}
