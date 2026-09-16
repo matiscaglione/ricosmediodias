@@ -26,19 +26,27 @@ interface PedidoEmpresa {
 }
 
 export default function EmpresasCtaCtePage() {
+  function obtenerFechaHoyArg(): string {
+    return new Date().toLocaleDateString("sv-SE", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+  }
+
+  function obtenerInicioMesArg(): string {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    return inicioMes.toLocaleDateString("sv-SE", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+  }
+
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [pedidos, setPedidos] = useState<PedidoEmpresa[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
-  // Filtros de fecha y estado
-  const [fechaDesde, setFechaDesde] = useState<string>(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0]
-  );
-  const [fechaHasta, setFechaHasta] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  // Filtros de fecha y estado considerando la zona horaria local
+  const [fechaDesde, setFechaDesde] = useState<string>(obtenerInicioMesArg());
+  const [fechaHasta, setFechaHasta] = useState<string>(obtenerFechaHoyArg());
   const [filtroEstadoPago, setFiltroEstadoPago] = useState<
     "TODOS" | "PENDIENTES" | "PAGADOS"
   >("PENDIENTES");
@@ -70,9 +78,13 @@ export default function EmpresasCtaCtePage() {
       }
     }
 
-    // 2. Cargar Pedidos asignados a Empresas en la fecha
-    const inicioIso = `${fechaDesde}T00:00:00`;
-    const finIso = `${fechaHasta}T23:59:59`;
+    // 2. Cargar Pedidos asignados a Empresas en el bloque operativo
+    const fFin = new Date(`${fechaHasta}T00:00:00`);
+    fFin.setDate(fFin.getDate() + 1);
+    const fechaFinSiguiente = fFin.toISOString().split("T")[0];
+
+    const inicioIso = `${fechaDesde}T06:00:00`;
+    const finIso = `${fechaFinSiguiente}T05:59:59`;
 
     const { data: pedData, error: errPed } = await supabase
       .from("pedidos")
@@ -148,6 +160,7 @@ export default function EmpresasCtaCtePage() {
   function formatearFechaHora(fechaStr: string) {
     const d = new Date(fechaStr);
     return d.toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -194,6 +207,7 @@ export default function EmpresasCtaCtePage() {
             table { width: 100%; border-collapse: collapse; margin-top: 15px; }
             th { text-align: left; background-color: #f2f2f2; padding: 8px; font-size: 12px; border-bottom: 2px solid #000; }
             .resumen { background-color: #f9f9f9; padding: 12px; border: 1px solid #ddd; margin-top: 20px; border-radius: 6px; }
+            .flex-between { display: flex; justify-content: space-between; align-items: center; }
           </style>
         </head>
         <body>
@@ -217,14 +231,14 @@ export default function EmpresasCtaCtePage() {
           </table>
 
           <div class="resumen">
-            <div style="display: flex; justify-between; margin-bottom: 6px; font-size: 14px;">
+            <div class="flex-between" style="margin-bottom: 6px; font-size: 14px;">
               <span>Total Pagado:</span> <strong>${formatearMoneda(totalCobrado)}</strong>
             </div>
-            <div style="display: flex; justify-between; margin-bottom: 6px; font-size: 14px; color: #b91c1c;">
+            <div class="flex-between" style="margin-bottom: 6px; font-size: 14px; color: #b91c1c;">
               <span>Total Pendiente de Cobro:</span> <strong>${formatearMoneda(totalPendiente)}</strong>
             </div>
             <hr />
-            <div style="display: flex; justify-between; font-size: 16px; font-weight: bold;">
+            <div class="flex-between" style="font-size: 16px; font-weight: bold;">
               <span>TOTAL GENERAL PERÍODO:</span> <span>${formatearMoneda(totalCobrado + totalPendiente)}</span>
             </div>
           </div>

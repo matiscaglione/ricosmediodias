@@ -22,7 +22,11 @@ interface Pedido {
 }
 
 export default function EstadisticasPage() {
-  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  function obtenerFechaHoyArg(): string {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  }
+
+  const hoyArg = obtenerFechaHoyArg();
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>('TODOS');
@@ -40,6 +44,7 @@ export default function EstadisticasPage() {
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
+    // Cargar Pedidos respetando el bloque operativo unificado (06:00 a 05:59 del día siguiente)
     let query = supabase
       .from('pedidos')
       .select(`
@@ -56,8 +61,8 @@ export default function EstadisticasPage() {
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', `${fechaInicio}T03:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+      .gte('created_at', `${fechaInicio}T06:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -94,7 +99,7 @@ export default function EstadisticasPage() {
         rankingGuarnicionesMap[nombreGuarni] = (rankingGuarnicionesMap[nombreGuarni] || 0) + (d.cantidad || 1);
       }
 
-      // 3. Bebidas (100% independiente)
+      // 3. Bebidas
       if (d.bebidas && d.bebidas.nombre) {
         const nombreBebida = d.bebidas.nombre;
         rankingBebidasMap[nombreBebida] = (rankingBebidasMap[nombreBebida] || 0) + (d.cantidad || 1);
@@ -181,8 +186,9 @@ export default function EstadisticasPage() {
 
         <button
           onClick={() => {
-            setFechaInicio(hoyArg);
-            setFechaFin(hoyArg);
+            const hoy = obtenerFechaHoyArg();
+            setFechaInicio(hoy);
+            setFechaFin(hoy);
             setFiltroTurno('TODOS');
           }}
           className="bg-blue-600 text-white font-extrabold text-xs px-3 py-2 rounded hover:bg-blue-700"

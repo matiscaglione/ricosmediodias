@@ -36,7 +36,11 @@ export default function CadetesPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  function obtenerFechaHoyArg(): string {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  }
+
+  const hoyArg = obtenerFechaHoyArg();
   const [pedidos, setPedidos] = useState<PedidoEnvio[]>([]);
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
   const [cargando, setCargando] = useState(false);
@@ -96,11 +100,17 @@ export default function CadetesPage() {
   }
 
   async function cargarEnvios(c1 = nombreCadete1, c2 = nombreCadete2) {
+    const fFin = new Date(`${hoyArg}T00:00:00`);
+    fFin.setDate(fFin.getDate() + 1);
+    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
+
+    // Cargar Envíos respetando el bloque operativo completo de la jornada (06:00 hs a 05:59 hs del día siguiente)
     let query = supabase
       .from('pedidos')
       .select('*')
       .eq('tipo_entrega', 'ENVIO')
-      .gte('created_at', `${hoyArg}T03:00:00`);
+      .gte('created_at', `${hoyArg}T06:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);

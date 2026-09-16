@@ -117,6 +117,11 @@ export default function AdminPage() {
   const [nuevoEmpleadoNombre, setNuevoEmpleadoNombre] = useState('');
   const [nuevoEmpleadoPuesto, setNuevoEmpleadoPuesto] = useState('');
 
+  // Función helper para la fecha local de Argentina
+  function obtenerFechaHoyArg() {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  }
+
   useEffect(() => {
     cargarDatos();
   }, []);
@@ -152,21 +157,21 @@ export default function AdminPage() {
     if (emplData) setEmpleados(emplData);
 
     const { data: confData } = await supabase
-  .from('configuracion')
-  .select('precio_huevo_frito, precio_huevo_duro, precio_guarnicion_extra, recargo_tarjeta_porc')
-  .eq('id', 'general')
-  .single();
+      .from('configuracion')
+      .select('precio_huevo_frito, precio_huevo_duro, precio_guarnicion_extra, recargo_tarjeta_porc')
+      .eq('id', 'general')
+      .single();
 
-if (confData) {
-  if (confData.precio_huevo_frito) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
-  if (confData.precio_huevo_duro) setPrecioHuevoDuro(String(confData.precio_huevo_duro));
+    if (confData) {
+      if (confData.precio_huevo_frito) setPrecioHuevoFrito(String(confData.precio_huevo_frito));
+      if (confData.precio_huevo_duro) setPrecioHuevoDuro(String(confData.precio_huevo_duro));
       if (confData.precio_guarnicion_extra) setPrecioGuarnicionExtra(Number(confData.precio_guarnicion_extra));
       if (confData.recargo_tarjeta_porc !== undefined && confData.recargo_tarjeta_porc !== null) {
         setRecargoTarjetaPorc(Number(confData.recargo_tarjeta_porc));
       }
     }
 
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = obtenerFechaHoyArg();
     const { data: stockData } = await supabase.from('stock_diario').select('menu_id, cantidad_disponible').eq('fecha', hoy);
     
     if (stockData) {
@@ -243,7 +248,7 @@ if (confData) {
   }
 
   async function guardarStock(menuId: string, cantidad: number) {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = obtenerFechaHoyArg();
     await supabase.from('stock_diario').upsert(
       { fecha: hoy, menu_id: menuId, cantidad_inicial: cantidad, cantidad_disponible: cantidad },
       { onConflict: 'fecha,menu_id' }
@@ -524,19 +529,19 @@ if (confData) {
   }
 
   async function guardarPrecioHuevoDuro(e: React.FormEvent) {
-  e.preventDefault();
-  const valor = parseFloat(precioHuevoDuro) || 0;
-  const { error } = await supabase
-    .from('configuracion')
-    .upsert({ id: 'general', precio_huevo_duro: valor }, { onConflict: 'id' });
+    e.preventDefault();
+    const valor = parseFloat(precioHuevoDuro) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .upsert({ id: 'general', precio_huevo_duro: valor }, { onConflict: 'id' });
 
-  if (!error) {
-    alert('Precio de huevo duro actualizado correctamente');
-    cargarDatos();
-  } else {
-    alert('Error al guardar precio: ' + error.message);
+    if (!error) {
+      alert('Precio de huevo duro actualizado correctamente');
+      cargarDatos();
+    } else {
+      alert('Error al guardar precio: ' + error.message);
+    }
   }
-}
 
   async function guardarPrecioGuarnicionExtra(e: React.FormEvent) {
     e.preventDefault();
@@ -1225,24 +1230,24 @@ if (confData) {
       </div>
       
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">
-  <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🍳 Precio de Adicional Huevo Duro</h2>
-  <form onSubmit={guardarPrecioHuevoDuro} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
-    <div className="flex-1">
-      <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio por unidad ($)</label>
-      <input
-        type="number"
-        step="0.01"
-        style={styleTextoNegro}
-        value={precioHuevoDuro}
-        onChange={(e) => setPrecioHuevoDuro(e.target.value)}
-        className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
-      />
-    </div>
-    <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
-      💾 Guardar Precio
-    </button>
-  </form>
-</div>
+        <h2 className="text-xl font-bold mb-4" style={styleTextoNegro}>🍳 Precio de Adicional Huevo Duro</h2>
+        <form onSubmit={guardarPrecioHuevoDuro} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div className="flex-1">
+            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio por unidad ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={styleTextoNegro}
+              value={precioHuevoDuro}
+              onChange={(e) => setPrecioHuevoDuro(e.target.value)}
+              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+            />
+          </div>
+          <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
+            💾 Guardar Precio
+          </button>
+        </form>
+      </div>
 
       {/* SECCIÓN ADICIONALES: GUARNICIÓN EXTRA */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300">

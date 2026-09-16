@@ -55,10 +55,15 @@ interface Pedido {
 export default function ReportesPage() {
   function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
     const horaActual = new Date().getHours();
+    // Mañana: 06:00 hs a 15:59 hs / Noche: 16:00 hs a 05:59 hs
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  function obtenerFechaHoyArg(): string {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  }
+
+  const hoyArg = obtenerFechaHoyArg();
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
@@ -90,7 +95,7 @@ export default function ReportesPage() {
     fFin.setDate(fFin.getDate() + 1);
     const fechaFinSiguiente = fFin.toISOString().split('T')[0];
 
-    // Cargar Pedidos respetando el bloque operativo de 03:00 a 02:59
+    // Cargar Pedidos respetando el bloque operativo de la jornada (06:00 a 05:59 del día siguiente)
     let queryPedidos = supabase
       .from('pedidos')
       .select(`
@@ -108,8 +113,8 @@ export default function ReportesPage() {
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', `${fechaInicio}T03:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+      .gte('created_at', `${fechaInicio}T06:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       queryPedidos = queryPedidos.eq('turno', filtroTurno);
@@ -147,7 +152,7 @@ export default function ReportesPage() {
 
   async function agregarGasto(e: React.FormEvent) {
     e.preventDefault();
-    
+
     const conceptoFinal = nuevoGastoConcepto.trim() || (nuevoGastoTipo === 'EMPLEADO' ? 'Pago a Empleado' : '');
 
     if (!conceptoFinal || !nuevoGastoMonto) {
@@ -185,7 +190,7 @@ export default function ReportesPage() {
     }
   }
 
-  const formatearMoneda = (monto: number) => '$ ' + monto.toLocaleString('es-AR');
+  const formatearMoneda = (monto: number) => '$ ' + (monto || 0).toLocaleString('es-AR');
 
   const totalRecaudado = pedidos.reduce((acc, p) => acc + p.monto_total, 0);
   const totalEnviosMonto = pedidos.reduce((acc, p) => acc + p.costo_envio, 0);
@@ -227,18 +232,18 @@ export default function ReportesPage() {
     return acc + cant;
   }, 0);
 
-  // CONTEO Y MONTO EXCLUSIVO DE BEBIDAS
+  // CÁLCULO DE BEBIDAS (UNIDADES Y MONTO ACUMULADO)
+  let totalBebidasCant = 0;
   let totalBebidasMonto = 0;
-  const totalBebidasCant = pedidos.reduce((acc, p) => {
-    const cant = (p.detalle_pedidos || []).reduce((subAcc, d) => {
+
+  pedidos.forEach((p) => {
+    (p.detalle_pedidos || []).forEach((d) => {
       if (d.bebida_id || d.bebidas) {
+        totalBebidasCant += d.cantidad;
         totalBebidasMonto += d.subtotal || d.precio_unitario * d.cantidad;
-        return subAcc + d.cantidad;
       }
-      return subAcc;
-    }, 0);
-    return acc + cant;
-  }, 0);
+    });
+  });
 
   // MONTO NETO DE COMIDAS (Total - Bebidas - Envíos)
   const totalSoloComidaMonto = Math.max(0, totalRecaudado - totalBebidasMonto - totalEnviosMonto);
@@ -403,9 +408,9 @@ export default function ReportesPage() {
         <div className="flex gap-2 w-full md:w-auto justify-end">
           <button
             onClick={() => {
-              const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
-              setFechaInicio(hoyArg);
-              setFechaFin(hoyArg);
+              const hoy = obtenerFechaHoyArg();
+              setFechaInicio(hoy);
+              setFechaFin(hoy);
               setFiltroTurno(obtenerTurnoActual());
             }}
             className="bg-gray-200 text-black border-2 border-gray-400 text-xs px-3 py-2 rounded font-bold hover:bg-gray-300"
@@ -471,7 +476,7 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* CIERRE DE CAJA POR MÉTODO DE PAGO (MOVIDO AQUÍ) */}
+      {/* CIERRE DE CAJA POR MÉTODO DE PAGO */}
       <div className="bg-white p-5 rounded-lg border-2 border-amber-300 shadow-sm space-y-3">
         <h2 className="text-lg font-black text-amber-950">💵 Cierre por Método de Pago</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -658,8 +663,6 @@ export default function ReportesPage() {
           </div>
         )}
       </div>
-
-      
 
       {/* DESGLOSE EN TABLAS (ORDENADAS DE MAYOR A MENOR) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
