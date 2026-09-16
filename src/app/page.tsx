@@ -125,7 +125,12 @@ function ContenidoTomaPedidos() {
   const [fechaOriginalEditando, setFechaOriginalEditando] = useState<string | null>(null);
 
   function obtenerTurnoActual(): "MAÑANA" | "NOCHE" {
-    const horaActual = new Date().getHours();
+    const horaArgStr = new Date().toLocaleTimeString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      hour: "2-digit",
+      hour12: false,
+    });
+    const horaActual = parseInt(horaArgStr, 10);
     // Mañana: 06:00 hs a 15:59 hs / Noche: 16:00 hs a 05:59 hs
     return horaActual >= 6 && horaActual < 16 ? "MAÑANA" : "NOCHE";
   }
@@ -177,7 +182,9 @@ function ContenidoTomaPedidos() {
           setTipoEntrega(pedidoData.tipo_entrega || "ENVIO");
           setHorario(pedidoData.horario_solicitado || "");
           if (pedidoData.created_at) {
-            const fOriginal = pedidoData.created_at.split("T")[0];
+            const fOriginal = new Date(pedidoData.created_at).toLocaleDateString("sv-SE", {
+              timeZone: "America/Argentina/Buenos_Aires",
+            });
             setFechaPedido(fOriginal);
             setFechaOriginalEditando(fOriginal);
           }
@@ -505,6 +512,7 @@ function ContenidoTomaPedidos() {
     if (!ventanaImpresion) return;
 
     const fechaHora = new Date(pedido.created_at || Date.now()).toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -750,8 +758,17 @@ function ContenidoTomaPedidos() {
       ? turnoOriginalEditando
       : obtenerTurnoActual();
 
-    const horaActualStr = new Date().toTimeString().split(" ")[0];
-    const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}`;
+    // Obtener la hora exacta de Argentina en formato HH:mm:ss
+    const horaActualStr = new Date().toLocaleTimeString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+
+    // Construcción con desplazamiento horario para Argentina (-03:00) para evitar desfasajes UTC
+    const fechaCreacionFinal = `${fechaPedido}T${horaActualStr}-03:00`;
 
     const detalleDireccion =
       tipoEntrega === "ENVIO" && direccion.trim() !== ""

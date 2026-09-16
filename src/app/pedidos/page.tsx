@@ -39,11 +39,20 @@ interface Pedido {
 
 export default function HistorialPedidosPage() {
   function obtenerTurnoActual(): 'MAÑANA' | 'NOCHE' {
-    const horaActual = new Date().getHours();
+    const horaArgStr = new Date().toLocaleTimeString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const horaActual = parseInt(horaArgStr, 10);
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  function obtenerFechaHoyArg(): string {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  }
+
+  const hoyArg = obtenerFechaHoyArg();
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
 
@@ -149,8 +158,8 @@ export default function HistorialPedidosPage() {
           salsas!left ( nombre )
         )
       `)
-      .gte('created_at', `${fechaInicio}T03:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T02:59:59`);
+      .gte('created_at', `${fechaInicio}T06:00:00`)
+      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
@@ -225,7 +234,11 @@ export default function HistorialPedidosPage() {
     ];
 
     const filas = pedidosFiltrados.map((p) => {
-      const hora = new Date(p.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const hora = new Date(p.created_at).toLocaleTimeString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
 
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
@@ -276,6 +289,7 @@ export default function HistorialPedidosPage() {
     if (!ventanaImpresion) return;
 
     const fechaHora = new Date(pedido.created_at).toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -515,8 +529,9 @@ export default function HistorialPedidosPage() {
 
     try {
       setCargando(true);
-      // CORRECCIÓN: Usamos la fecha original de creación del pedido en lugar de la fecha de hoy
-      const fechaOriginal = pedido.created_at ? pedido.created_at.split("T")[0] : new Date().toISOString().split("T")[0];
+      const fechaOriginal = pedido.created_at
+        ? new Date(pedido.created_at).toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' })
+        : obtenerFechaHoyArg();
 
       const { data: detallesReales, error: errDetallesReales } = await supabase
         .from("detalle_pedidos")
@@ -632,9 +647,9 @@ export default function HistorialPedidosPage() {
           <div>
             <button
               onClick={() => {
-                const hoyArg = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
-                setFechaInicio(hoyArg);
-                setFechaFin(hoyArg);
+                const hoy = obtenerFechaHoyArg();
+                setFechaInicio(hoy);
+                setFechaFin(hoy);
                 setFiltroTurno(obtenerTurnoActual());
               }}
               className="bg-gray-200 text-black border-2 border-gray-400 text-xs px-4 py-2 rounded font-bold hover:bg-gray-300 w-full sm:w-auto"
@@ -771,7 +786,7 @@ export default function HistorialPedidosPage() {
 
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-500 block">
-                          {new Date(pedido.created_at).toLocaleDateString('es-AR')} - {new Date(pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                          {new Date(pedido.created_at).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} - {new Date(pedido.created_at).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })} hs
                         </span>
                         {pedido.horario_solicitado && (
                           <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">

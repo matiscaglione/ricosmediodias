@@ -59,11 +59,20 @@ export default function ReportesPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  function obtenerFechaHoyArg(): string {
-    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  // Obtiene la fecha operativa ajustada (Si son entre las 00:00 y las 05:59 AM, pertenece al día comercial anterior)
+  function obtenerFechaOperativaArg(): string {
+    const ahora = new Date();
+    const hora = ahora.getHours();
+
+    // Si estamos en la madrugada (00:00 a 05:59), restamos 1 día para mantener el turno NOCHE operativo
+    if (hora < 6) {
+      ahora.setDate(ahora.getDate() - 1);
+    }
+
+    return ahora.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   }
 
-  const hoyArg = obtenerFechaHoyArg();
+  const hoyArg = obtenerFechaOperativaArg();
   const [fechaInicio, setFechaInicio] = useState(hoyArg);
   const [fechaFin, setFechaFin] = useState(hoyArg);
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
@@ -91,9 +100,16 @@ export default function ReportesPage() {
   async function cargarReporte() {
     setCargando(true);
 
-    const fFin = new Date(`${fechaFin}T00:00:00`);
-    fFin.setDate(fFin.getDate() + 1);
-    const fechaFinSiguiente = fFin.toISOString().split('T')[0];
+    // Calcular el día siguiente para la fecha fin del rango
+    const partesFechaFin = fechaFin.split('-');
+    const fechaFinObj = new Date(Number(partesFechaFin[0]), Number(partesFechaFin[1]) - 1, Number(partesFechaFin[2]));
+    fechaFinObj.setDate(fechaFinObj.getDate() + 1);
+
+    const fechaFinSiguiente = fechaFinObj.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+
+    // Rangos formateados explícitamente con el huso horario de Argentina (-03:00)
+    const desdeISO = `${fechaInicio}T06:00:00-03:00`;
+    const hastaISO = `${fechaFinSiguiente}T05:59:59-03:00`;
 
     // Cargar Pedidos respetando el bloque operativo de la jornada (06:00 a 05:59 del día siguiente)
     let queryPedidos = supabase
@@ -113,8 +129,8 @@ export default function ReportesPage() {
           bebidas!left ( nombre )
         )
       `)
-      .gte('created_at', `${fechaInicio}T06:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
+      .gte('created_at', desdeISO)
+      .lte('created_at', hastaISO);
 
     if (filtroTurno !== 'TODOS') {
       queryPedidos = queryPedidos.eq('turno', filtroTurno);
@@ -303,8 +319,8 @@ export default function ReportesPage() {
 
     const filas = pedidos.map((p) => {
       const f = new Date(p.created_at);
-      const fechaStr = f.toLocaleDateString('es-AR');
-      const horaStr = f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const fechaStr = f.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const horaStr = f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
       return [
         `"${fechaStr}"`,
         `"${horaStr}"`,
@@ -408,7 +424,7 @@ export default function ReportesPage() {
         <div className="flex gap-2 w-full md:w-auto justify-end">
           <button
             onClick={() => {
-              const hoy = obtenerFechaHoyArg();
+              const hoy = obtenerFechaOperativaArg();
               setFechaInicio(hoy);
               setFechaFin(hoy);
               setFiltroTurno(obtenerTurnoActual());
