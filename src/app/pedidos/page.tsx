@@ -270,186 +270,201 @@ export default function HistorialPedidosPage() {
 
   // IMPRESIÓN CON FORMATO 100% IDÉNTICO A TOMA DE PEDIDOS
   // IMPRESIÓN CON FORMATO 100% IDÉNTICO A TOMA DE PEDIDOS
-  function reimprimirTicket(pedido: Pedido) {
-    const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
-    if (!ventanaImpresion) return;
+ function reimprimirTicket(pedido: Pedido) {
+  const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
+  if (!ventanaImpresion) return;
 
-    const fechaHora = new Date(pedido.created_at).toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const fechaHora = new Date(pedido.created_at).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-    const esNombreGenerico = ["cliente bar", "retira mostrador", "cliente envío", "cliente envio"].includes(
-      (pedido.cliente_nombre || "").trim().toLowerCase()
-    );
-    
-    const clienteNombre = esNombreGenerico ? "" : pedido.cliente_nombre;
-    const nombreClienteLimpio = clienteNombre.replace(/[^a-zA-Z0-9]/g, "");
-    const idCorto = pedido.id.slice(0, 6);
+  const esNombreGenerico = ["cliente bar", "retira mostrador", "cliente envío", "cliente envio"].includes(
+    (pedido.cliente_nombre || "").trim().toLowerCase()
+  );
+  
+  const clienteNombre = esNombreGenerico ? "" : pedido.cliente_nombre;
+  const nombreClienteLimpio = clienteNombre.replace(/[^a-zA-Z0-9]/g, "");
+  const idCorto = pedido.id ? pedido.id.slice(0, 6) : "";
 
-    const textoObs = pedido.observaciones || "";
-    const matchDireccion = textoObs.includes("Dirección:")
-      ? textoObs.split("|").find((s) => s.toLowerCase().includes("dirección"))?.replace(/dirección:/i, "").trim()
-      : "";
+  const textoObs = pedido.observaciones || "";
+  const matchDireccion = textoObs.includes("Dirección:")
+    ? textoObs.split("|").find((s) => s.toLowerCase().includes("dirección"))?.replace(/dirección:/i, "").trim()
+    : "";
 
-    const obsLimpia = textoObs
-      .split("|")
-      .map((s) => s.trim())
-      .filter((s) => !s.toLowerCase().includes("dirección:"))
-      .join(" | ");
+  const obsLimpia = textoObs
+    .split("|")
+    .map((s) => s.trim())
+    .filter((s) => !s.toLowerCase().includes("dirección:"))
+    .join(" | ");
 
-    const itemsHtml = (pedido.detalle_pedidos || [])
-      .map((i) => {
-        let nombreItem = "";
-        let detalleItem = "";
+  const itemsHtml = (pedido.detalle_pedidos || [])
+    .map((i: any) => {
+      let nombreItem = "";
+      let detalleItem = "";
 
-        if (i.bebidas) {
-          nombreItem = `🥤 ${i.cantidad} ${i.bebidas.nombre}`;
-        } else if (!i.menus && i.guarniciones) {
-          const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
-          nombreItem = `${i.guarniciones.nombre} ${i.agregado_guarnicion ? `(${i.agregado_guarnicion})` : ""}`;
-          if (tieneIngredientes) {
-            detalleItem = `(${i.ingredientes_ensalada})`;
-          }
-        } else {
-          nombreItem = `${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""}`;
-          
-          if (i.salsas?.nombre) detalleItem += ` C/ ${i.salsas.nombre}`;
-          if (i.guarniciones) detalleItem += ` C/ ${i.guarniciones.nombre}`;
+      // Normalizamos el texto de la guarnición (sea de la BD o del formulario directo)
+      const textoGuarnicion = i.agregado_guarnicion || i.agregadoGuarnicionTexto || "";
 
-          const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
-          if (tieneIngredientesMenu) {
-            detalleItem += ` (${i.ingredientes_ensalada})`;
-          } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
-            detalleItem += ` (ENSALADA)`;
-          }
-
-          // Lógica por unidad (C/U) o individual
-          const cantH = i.cantidad_huevos || 0;
-          if (cantH > 0) {
-            if (i.cantidad > 1) {
-              detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO C/U" : `${cantH} HUEVOS FRITOS C/U`}`;
-            } else {
-              detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
-            }
-          }
+      if (i.bebidas) {
+        nombreItem = `🥤 ${i.cantidad} ${i.bebidas.nombre}`;
+      } else if (!i.menus && i.guarniciones) {
+        // Guarnición Sola
+        const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
+        nombreItem = `${i.guarniciones.nombre} ${textoGuarnicion ? `(${textoGuarnicion})` : ""}`;
+        if (tieneIngredientes) {
+          detalleItem = `(${i.ingredientes_ensalada})`;
+        }
+      } else {
+        // Plato Principal
+        nombreItem = `${i.cantidad} ${i.menus?.nombre || "PLATO"} ${i.agregado_menu ? `(${i.agregado_menu})` : ""}`;
+        
+        if (i.salsas?.nombre) detalleItem += ` C/ ${i.salsas.nombre}`;
+        
+        // CORRECCIÓN AQUÍ: Concatenamos el nombre de la guarnición + su aclaración
+        if (i.guarniciones) {
+          detalleItem += ` C/ ${i.guarniciones.nombre}${textoGuarnicion ? ` (${textoGuarnicion})` : ""}`;
         }
 
-        // Cálculo de extra cobrado
-        const precioBaseMenu = i.menus ? i.menus.precio : 0;
-        const precioBaseGuar = i.guarniciones ? i.guarniciones.precio_extra : 0;
-        const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
-        const diferenciaExtra = i.subtotal - costoBaseTotal;
+        const tieneIngredientesMenu = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
+        if (tieneIngredientesMenu) {
+          detalleItem += ` (${i.ingredientes_ensalada})`;
+        } else if (i.menus?.nombre.toLowerCase().includes("ensalada")) {
+          detalleItem += ` (ENSALADA)`;
+        }
 
-        const textoExtra = diferenciaExtra > 0 ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
+        // Lógica por unidad (C/U) o individual
+        const cantH = i.cantidad_huevos || 0;
+        if (cantH > 0) {
+          if (i.cantidad > 1) {
+            detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO C/U" : `${cantH} HUEVOS FRITOS C/U`}`;
+          } else {
+            detalleItem += ` + ${cantH === 1 ? "1 HUEVO FRITO" : `${cantH} HUEVOS FRITOS`}`;
+          }
+        }
+      }
 
-        return `
-          <div style="margin-bottom: 4px;">
-            <!-- LÍNEA PRINCIPAL (GIGANTE PARA COCINA) -->
-            <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
-              ${nombreItem} ${detalleItem ? `<span style="font-size: 20px; font-weight: bold;">${detalleItem}</span>` : ""}
-            </div>
-            <!-- LÍNEA SECUNDARIA (PRECIO + EXTRA CHIQUITO ALINEADO A LA DERECHA) -->
-            <div style="text-align: right; font-size: 11px; font-weight: bold; color: #000; margin-top: 1px;">
-              Subtotal: ${formatearMoneda(i.subtotal)}${textoExtra}
-            </div>
-          </div>`;
-      })
-      .join("");
+      // Cálculo de extra cobrado
+      const precioBaseMenu = i.menus ? i.menus.precio : 0;
+      const precioBaseGuar = i.guarniciones ? i.guarniciones.precio_extra : 0;
+      const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
+      const diferenciaExtra = i.subtotal - costoBaseTotal;
 
-    let cabeceraEntrega = `<div style="text-align: center; margin: 3px 0;">
-      <span style="font-size: 15px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 1px 6px; display: inline-block;">
-        ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
-      </span>
-    </div>`;
+      const textoExtra = diferenciaExtra > 0 ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
 
-    let etiquetaPago = `<div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
-      <strong>PAGO:</strong> ${pedido.metodo_pago || "EFECTIVO"}
-    </div>`;
-
-    const subtotalSinRecargo = (pedido.monto_platos || 0) + (pedido.costo_envio || 0);
-    const montoRecargoTarjeta = (pedido.metodo_pago === "TARJETA" && pedido.monto_total > subtotalSinRecargo)
-      ? pedido.monto_total - subtotalSinRecargo
-      : 0;
-
-    ventanaImpresion.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
-          <style>
-            @page { 
-              size: 80mm auto; 
-              margin: 0mm !important; 
-            }
-            html, body { 
-              font-family: 'Courier New', monospace; 
-              width: 100%; 
-              max-width: 270px; 
-              padding: 0 !important; 
-              margin: 0 !important; 
-              height: auto !important;
-              min-height: 0 !important;
-              font-size: 12px; 
-              color: #000; 
-              line-height: 1.05;
-            }
-            .ticket-container {
-              width: 100%;
-              margin: 0;
-              padding: 0;
-              display: block;
-            }
-            .center { text-align: center; }
-            .line { border-bottom: 2px solid #000; margin: 3px 0; }
-            p, div, h1 { margin: 0; padding: 0; }
-          </style>
-        </head>
-        <body>
-          <div class="ticket-container">
-            <div class="center">
-              <h1 style="margin:0; font-size: 20px; font-weight: 900;">RicosMediodias</h1>
-              <p style="margin:1px 0 0 0; font-size: 10px;">${fechaHora}</p>
-            </div>
-            ${cabeceraEntrega}
-            ${etiquetaPago}
-            <div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
-              <strong>Cliente:</strong> ${clienteNombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
-            </div>
-            ${obsLimpia ? `<div style="font-size: 12px; font-weight: bold; background-color: #eee; padding: 1px 3px; text-transform: uppercase; margin-bottom: 2px;">Obs: ${obsLimpia}</div>` : ""}
-            <div class="line"></div>
-            <div style="margin: 4px 0;">${itemsHtml}</div>
-            <div class="line"></div>
-            <table style="width: 100%; margin-top: 3px; border-collapse: collapse;">
-              <tr>
-                <td style="vertical-align: bottom;">
-                  <div style="font-size: 10px; text-transform: uppercase; font-weight: bold;">Hora:</div>
-                  <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
-                </td>
-                <td style="text-align: right; vertical-align: bottom;">
-                  ${pedido.costo_envio > 0 ? `<div style="font-size: 10px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
-                  ${montoRecargoTarjeta > 0 ? `<div style="font-size: 10px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
-                  <div style="font-size: 10px; text-transform: uppercase;">Total:</div>
-                  <div style="font-size: 18px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
-                </td>
-              </tr>
-            </table>
-            <div class="line" style="margin-top: 4px;"></div>
-            <p class="center" style="margin: 3px 0 0 0; font-size: 10px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
+      return `
+        <div style="margin-bottom: 4px;">
+          <!-- LÍNEA PRINCIPAL (GIGANTE PARA COCINA) -->
+          <div style="font-size: 20px; font-weight: 900; text-transform: uppercase;">
+            ${nombreItem} ${detalleItem ? `<span style="font-size: 20px; font-weight: bold;">${detalleItem}</span>` : ""}
           </div>
-          <script>
-            window.onload = function() { 
-              window.print(); 
-              window.close(); 
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    ventanaImpresion.document.close();
-  }
+          <!-- LÍNEA SECUNDARIA (PRECIO + EXTRA CHIQUITO ALINEADO A LA DERECHA) -->
+          <div style="text-align: right; font-size: 11px; font-weight: bold; color: #000; margin-top: 1px;">
+            Subtotal: ${formatearMoneda(i.subtotal)}${textoExtra}
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  let cabeceraEntrega = `<div style="text-align: center; margin: 3px 0;">
+    <span style="font-size: 15px; font-weight: bold; text-transform: uppercase; border: 2px solid #000; padding: 1px 6px; display: inline-block;">
+      ${pedido.tipo_entrega === "ENVIO" ? `🛵 ENVÍO: ${matchDireccion}` : pedido.tipo_entrega === "RETIRO" ? "🚶 RETIRA" : "🍽️ BAR"}
+    </span>
+  </div>`;
+
+  let etiquetaPago = `<div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
+    <strong>PAGO:</strong> ${pedido.metodo_pago || "EFECTIVO"}
+  </div>`;
+
+  const subtotalSinRecargo = (pedido.monto_platos || 0) + (pedido.costo_envio || 0);
+  const montoRecargoTarjeta = (pedido.metodo_pago === "TARJETA" && pedido.monto_total > subtotalSinRecargo)
+    ? pedido.monto_total - subtotalSinRecargo
+    : 0;
+
+  ventanaImpresion.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Ticket_#${idCorto}_${nombreClienteLimpio}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          @page { 
+            size: 80mm auto; 
+            margin: 0mm !important; 
+          }
+          html, body { 
+            font-family: 'Courier New', monospace; 
+            width: 100%; 
+            max-width: 270px; 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            height: auto !important;
+            min-height: 0 !important;
+            font-size: 12px; 
+            color: #000; 
+            line-height: 1.05;
+          }
+          .ticket-container {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            display: block;
+          }
+          .center { text-align: center; }
+          .line { border-bottom: 2px solid #000; margin: 3px 0; }
+          p, div, h1 { margin: 0; padding: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="ticket-container">
+          <div class="center">
+            <h1 style="margin:0; font-size: 20px; font-weight: 900;">RicosMediodias</h1>
+            <p style="margin:1px 0 0 0; font-size: 10px;">${fechaHora}</p>
+          </div>
+          ${cabeceraEntrega}
+          ${etiquetaPago}
+          <div style="font-size: 13px; margin-bottom: 2px; text-transform: uppercase;">
+            <strong>Cliente:</strong> ${clienteNombre} ${pedido.cliente_telefono ? `(${pedido.cliente_telefono})` : ""}
+          </div>
+          ${obsLimpia ? `<div style="font-size: 12px; font-weight: bold; background-color: #eee; padding: 1px 3px; text-transform: uppercase; margin-bottom: 2px;">Obs: ${obsLimpia}</div>` : ""}
+          <div class="line"></div>
+          <div style="margin: 4px 0;">${itemsHtml}</div>
+          <div class="line"></div>
+          <table style="width: 100%; margin-top: 3px; border-collapse: collapse;">
+            <tr>
+              <td style="vertical-align: bottom;">
+                <div style="font-size: 10px; text-transform: uppercase; font-weight: bold;">Hora:</div>
+                <div style="font-size: 18px; font-weight: 900; text-transform: uppercase;">${pedido.horario_solicitado ? `${pedido.horario_solicitado} hs` : "CUANDO ESTÉ"}</div>
+              </td>
+              <td style="text-align: right; vertical-align: bottom;">
+                ${pedido.costo_envio > 0 ? `<div style="font-size: 10px;">Envío: ${formatearMoneda(pedido.costo_envio)}</div>` : ""}
+                ${montoRecargoTarjeta > 0 ? `<div style="font-size: 10px;">Recargo Tarjeta: ${formatearMoneda(montoRecargoTarjeta)}</div>` : ""}
+                <div style="font-size: 10px; text-transform: uppercase;">Total:</div>
+                <div style="font-size: 18px; font-weight: 900;">${formatearMoneda(pedido.monto_total)}</div>
+              </td>
+            </tr>
+          </table>
+          <div class="line" style="margin-top: 4px;"></div>
+          <p class="center" style="margin: 3px 0 0 0; font-size: 10px; font-weight: bold; text-transform: uppercase;">¡Gracias por tu compra!</p>
+        </div>
+        <script>
+          window.onload = function() { 
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            setTimeout(function() {
+              window.print();
+              if (!isIOS) {
+                setTimeout(function() { window.close(); }, 500);
+              }
+            }, isIOS ? 500 : 200);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  ventanaImpresion.document.close();
+}
 
   const pedidosFiltrados = pedidos.filter((p) => {
     if (filtroTipo !== 'TODOS' && p.tipo_entrega !== filtroTipo) {
