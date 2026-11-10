@@ -100,11 +100,9 @@ export default function CadetesPage() {
   }
 
   async function cargarEnvios(c1 = nombreCadete1, c2 = nombreCadete2) {
-    // En lugar de usar new Date(`${hoyArg}T00:00:00`) e .toISOString()
-
-const mañana = new Date();
-mañana.setDate(mañana.getDate() + 1);
-const fechaFinSiguiente = mañana.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const mañana = new Date();
+    mañana.setDate(mañana.getDate() + 1);
+    const fechaFinSiguiente = mañana.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
 
     // Cargar Envíos respetando el bloque operativo completo de la jornada (06:00 hs a 05:59 hs del día siguiente)
     let query = supabase
@@ -317,92 +315,113 @@ const fechaFinSiguiente = mañana.toLocaleDateString('sv-SE', { timeZone: 'Ameri
   const styleTextoNegro = { color: '#000000' };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto font-sans bg-gray-100 min-h-screen space-y-6">
+      
+      {/* CABECERA PRINCIPAL */}
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-300">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black" style={styleTextoNegro}>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-2" style={styleTextoNegro}>
             🛵 Control de Cadetes y Vueltas
           </h1>
-          <p className="text-sm font-bold text-gray-700">Asignación y rendición por turnos</p>
+          <p className="text-xs md:text-sm font-bold text-gray-600 mt-0.5">
+            Asignación en tiempo real y liquidación rápida por turnos
+          </p>
         </div>
-        <Link href="/" className="bg-black text-white text-sm px-4 py-2 rounded font-bold hover:bg-gray-800">
-          ⬅ Inicio
+        <Link href="/" className="bg-gray-900 text-white text-xs md:text-sm px-4 py-2.5 rounded-lg font-black hover:bg-black transition-colors shadow">
+          ⬅ Volver al Inicio
         </Link>
       </header>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-300 flex justify-between items-center">
-        <span className="text-xs font-bold" style={styleTextoNegro}>Filtrar Turno:</span>
-        <div className="flex gap-1">
+      {/* FILTRO DE TURNO */}
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-300 flex justify-between items-center flex-wrap gap-2">
+        <span className="text-xs font-black uppercase text-gray-700 tracking-wide">
+          📅 Filtrar por Turno:
+        </span>
+        <div className="flex gap-1.5">
           {(['TODOS', 'MAÑANA', 'NOCHE'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setFiltroTurno(t)}
-              className={`text-xs px-3 py-1.5 rounded font-black border-2 ${
+              className={`text-xs px-3.5 py-1.5 rounded-lg font-black transition-all ${
                 filtroTurno === t
-                  ? 'bg-blue-700 text-white border-blue-700'
-                  : 'bg-white border-gray-300 text-black hover:bg-gray-100'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'bg-gray-100 border border-gray-300 text-gray-800 hover:bg-gray-200'
               }`}
             >
-              {t === 'TODOS' ? 'Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
+              {t === 'TODOS' ? '🌐 Todo el Día' : t === 'MAÑANA' ? '☀️ Mañana' : '🌙 Noche'}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="bg-white p-5 rounded-lg border-2 border-red-400 shadow-sm space-y-3">
-        <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-          <h2 className="text-lg font-black text-red-700">
-            📦 Envíos Pendientes de Salida ({enviosSinAsignar.length})
-          </h2>
-          <button onClick={() => cargarEnvios()} className="text-xs bg-gray-200 hover:bg-gray-300 font-extrabold px-3 py-1.5 rounded text-gray-800">
+      {/* SECCIÓN 1: ENVÍOS PENDIENTES DE SALIDA */}
+      <div className="bg-white p-4 md:p-5 rounded-xl border-2 border-red-400 shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-gray-200 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-3 w-3 rounded-full bg-red-600 animate-pulse"></span>
+            <h2 className="text-lg font-black text-red-700">
+              📦 Envíos Pendientes de Salida ({enviosSinAsignar.length})
+            </h2>
+          </div>
+          <button 
+            onClick={() => cargarEnvios()} 
+            className="text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 font-black px-3 py-1.5 rounded-lg text-gray-800 flex items-center gap-1 transition-colors"
+          >
             🔄 Actualizar
           </button>
         </div>
 
         {cargando ? (
-          <p className="text-xs text-gray-800 font-bold py-2">Cargando envíos...</p>
+          <p className="text-xs text-gray-500 font-bold py-4 text-center">Cargando envíos en camino...</p>
         ) : enviosSinAsignar.length === 0 ? (
-          <p className="text-xs text-gray-700 font-bold py-2">No hay envíos pendientes de asignar.</p>
+          <div className="text-center py-6 bg-red-50/50 rounded-lg border border-dashed border-red-200">
+            <p className="text-xs text-red-800 font-black">¡Todo al día! No hay envíos pendientes de asignar.</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {enviosSinAsignar.map((p) => {
               const direccionTxt = obtenerDireccion(p.observaciones);
               return (
-                <div key={p.id} className="p-3 border-2 border-red-200 rounded-lg bg-red-50 flex justify-between items-center gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">📍</span>
-                      <p className="font-black text-sm text-red-950 uppercase">
+                <div key={p.id} className="p-3.5 border border-red-300 rounded-xl bg-red-50/70 hover:bg-red-50 flex flex-col justify-between gap-3 shadow-sm">
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-base mt-0.5">📍</span>
+                      <p className="font-black text-sm text-red-950 uppercase leading-snug">
                         {direccionTxt}
                       </p>
                     </div>
-                    <p className="font-bold text-xs text-gray-800">
+
+                    <p className="font-bold text-xs text-gray-800 pl-5">
                       👤 {p.cliente_nombre || 'Cliente Envío'} {p.cliente_telefono ? `(${p.cliente_telefono})` : ''}
                     </p>
+
                     {p.observaciones && !p.observaciones.toLowerCase().includes('dirección:') && (
-                      <p className="text-xs text-gray-700 font-bold italic">
-                        Obs: {p.observaciones}
+                      <p className="text-[11px] text-gray-600 font-bold italic pl-5 bg-red-100/60 p-1 rounded">
+                        📝 {p.observaciones}
                       </p>
                     )}
-                    <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                      <span className="text-xs font-black text-green-800">
-                        Total: ${p.monto_total.toLocaleString('es-AR')} (Envío: ${p.costo_envio})
+
+                    <div className="flex items-center justify-between pt-1 border-t border-red-200 text-xs">
+                      <span className="font-black text-emerald-800">
+                        Total: ${p.monto_total.toLocaleString('es-AR')}
                       </span>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-950 border border-amber-300">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
                         💳 {p.metodo_pago || 'EFECTIVO'}
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 min-w-[110px]">
+
+                  {/* BOTONES DE ASIGNACIÓN RÁPIDA */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-red-200">
                     <button
                       onClick={() => asignarCadete(p.id, nombreCadete1)}
-                      className="bg-blue-700 text-white text-xs font-black px-3 py-2 rounded hover:bg-blue-800 shadow text-center"
+                      className="bg-blue-700 text-white text-xs font-black py-2 px-2 rounded-lg hover:bg-blue-800 shadow-sm text-center truncate"
                     >
                       + {nombreCadete1}
                     </button>
                     <button
                       onClick={() => asignarCadete(p.id, nombreCadete2)}
-                      className="bg-purple-700 text-white text-xs font-black px-3 py-2 rounded hover:bg-purple-800 shadow text-center"
+                      className="bg-purple-700 text-white text-xs font-black py-2 px-2 rounded-lg hover:bg-purple-800 shadow-sm text-center truncate"
                     >
                       + {nombreCadete2}
                     </button>
@@ -414,276 +433,299 @@ const fechaFinSiguiente = mañana.toLocaleDateString('sv-SE', { timeZone: 'Ameri
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* CADETE 1 */}
-        <div className="bg-white p-5 rounded-lg border-2 border-blue-300 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-gray-300 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🏍️</span>
-              {editandoCadete1 ? (
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={nombreCadete1}
-                    onChange={(e) => setNombreCadete1(e.target.value)}
-                    className="border-2 border-blue-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
-                  />
-                  <button onClick={() => guardarNombre1(nombreCadete1)} className="bg-green-700 text-white text-xs px-2.5 py-1 rounded font-black">
-                    ✓
-                  </button>
+      {/* SECCIÓN 2: COLUMNAS POR CADETE */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* ================= CADETE 1 ================= */}
+        <div className="bg-white p-5 rounded-xl border-2 border-blue-400 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            
+            {/* ENCABEZADO CADETE 1 */}
+            <div className="flex justify-between items-center border-b border-gray-200 pb-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🏍️</span>
+                {editandoCadete1 ? (
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={nombreCadete1}
+                      onChange={(e) => setNombreCadete1(e.target.value)}
+                      className="border-2 border-blue-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
+                    />
+                    <button onClick={() => guardarNombre1(nombreCadete1)} className="bg-emerald-700 text-white text-xs px-2.5 py-1 rounded font-black">
+                      ✓
+                    </button>
+                  </div>
+                ) : (
+                  <h2 className="text-xl font-black text-blue-900 cursor-pointer flex items-center gap-1.5" onClick={() => setEditandoCadete1(true)}>
+                    {nombreCadete1} <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold hover:bg-blue-200">✏️ Editar</span>
+                  </h2>
+                )}
+              </div>
+
+              <button
+                onClick={() => rendirVueltaCadete(1)}
+                disabled={enviosCadete1.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black text-xs px-3 py-2 rounded-lg shadow-sm transition-colors"
+              >
+                ✅ Rendir Vuelta
+              </button>
+            </div>
+
+            {/* PEDIDOS EN VIAJE */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
+                <h3 className="text-xs font-black text-blue-900 uppercase tracking-wide">
+                  📍 En Viaje ({enviosCadete1.length} pedidos)
+                </h3>
+                <div className="text-right text-[11px] font-bold text-gray-700">
+                  Envío: <span className="text-blue-900 font-black">${totalEnviosVuelta1}</span> | Caja: <span className="text-emerald-700 font-black">${totalRendirVuelta1}</span>
                 </div>
+              </div>
+
+              {enviosCadete1.length === 0 ? (
+                <p className="text-xs text-gray-500 font-bold italic py-3 text-center bg-blue-50/30 rounded-lg border border-dashed border-blue-200">
+                  Sin envíos asignados en este viaje.
+                </p>
               ) : (
-                <h2 className="text-xl font-black text-blue-900 cursor-pointer flex items-center gap-1" onClick={() => setEditandoCadete1(true)}>
-                  {nombreCadete1} <span className="text-xs text-gray-600 font-bold">✏️ Editar</span>
-                </h2>
+                enviosCadete1.map((p) => {
+                  const direccionTxt = obtenerDireccion(p.observaciones);
+                  return (
+                    <div key={p.id} className="p-3 border border-blue-200 rounded-lg bg-blue-50/50 flex justify-between items-center gap-2">
+                      <div className="space-y-0.5">
+                        <p className="font-black text-xs text-blue-950 uppercase">
+                          📍 {direccionTxt}
+                        </p>
+                        <p className="text-xs font-bold text-gray-700">
+                          👤 {p.cliente_nombre || 'Cliente Envío'}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-xs font-extrabold text-emerald-800">
+                            ${p.monto_total} <span className="text-[10px] text-gray-500">(Envío: ${p.costo_envio})</span>
+                          </span>
+                          <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                            {p.metodo_pago || 'EFECTIVO'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 items-end">
+                        <button
+                          onClick={() => asignarCadete(p.id, nombreCadete2)}
+                          className="text-[11px] bg-white text-purple-900 border border-purple-300 font-black px-2 py-1 rounded hover:bg-purple-50"
+                        >
+                          ➡️ {nombreCadete2}
+                        </button>
+                        <button onClick={() => asignarCadete(p.id, null)} className="text-[10px] text-red-600 font-bold hover:underline">
+                          Quitar ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
-            <button
-              onClick={() => rendirVueltaCadete(1)}
-              disabled={enviosCadete1.length === 0}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-600 text-white font-black text-xs px-3 py-2 rounded shadow"
-            >
-              ✅ Rendir Vuelta
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                📍 En Viaje ({enviosCadete1.length} pedidos)
+            {/* VUELTAS RENDIDAS */}
+            <div className="pt-2 border-t border-gray-200 space-y-2">
+              <h3 className="text-xs font-black text-gray-700 uppercase tracking-wide">
+                📋 Vueltas Rendidas en el Día ({vueltasCadete1.length})
               </h3>
-              <div className="text-right text-xs font-bold text-gray-800">
-                Pagar Envío: <span className="text-blue-900 font-black">${totalEnviosVuelta1}</span> | Cobrar Caja: <span className="text-green-800 font-black">${totalRendirVuelta1}</span>
-              </div>
-            </div>
-
-            {enviosCadete1.length === 0 ? (
-              <p className="text-xs text-gray-600 font-bold italic py-2 bg-blue-50 p-2 rounded">
-                Sin envíos en este viaje.
-              </p>
-            ) : (
-              enviosCadete1.map((p) => {
-                const direccionTxt = obtenerDireccion(p.observaciones);
-                return (
-                  <div key={p.id} className="p-2.5 border-2 border-blue-200 rounded bg-blue-50 flex justify-between items-center gap-2">
-                    <div>
-                      <p className="font-extrabold text-xs text-blue-950 uppercase">
-                        📍 {direccionTxt}
-                      </p>
-                      <p className="text-xs font-bold text-gray-800">
-                        👤 {p.cliente_nombre || 'Cliente Envío'}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs font-bold text-gray-800">
-                          ${p.monto_total} (Envío: ${p.costo_envio})
-                        </span>
-                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 border border-amber-300">
-                          {p.metodo_pago || 'EFECTIVO'}
-                        </span>
+              {vueltasCadete1.length === 0 ? (
+                <p className="text-xs text-gray-400 font-bold italic text-center py-2">Aún no rindió vueltas hoy.</p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {vueltasCadete1.map((v) => (
+                    <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border border-gray-200 font-bold text-black space-y-1 shadow-sm">
+                      <div className="flex justify-between items-center border-b pb-1">
+                        <span className="font-black text-blue-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} envíos</span>
+                        <button
+                          onClick={() => reabrirVuelta(1, v.numeroVuelta)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow-sm"
+                        >
+                          🔓 Corregir
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-600 pt-0.5">
+                        <div>Total: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
+                        <div>Efectivo: <span className="font-black text-emerald-700">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
+                        <div>Digital: <span className="font-black text-purple-700">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
+                        <div>Pagar Cadete: <span className="font-black text-blue-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => asignarCadete(p.id, nombreCadete2)}
-                        className="text-xs bg-white text-purple-900 border-2 border-purple-400 font-extrabold px-2 py-1 rounded hover:bg-purple-50"
-                      >
-                        ➡️ Pasar a {nombreCadete2}
-                      </button>
-                      <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-700 font-black px-2 py-1 hover:bg-red-100 rounded">
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-gray-300 space-y-2">
-            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-              📋 Vueltas Rendidas en el Día ({vueltasCadete1.length})
-            </h3>
-            {vueltasCadete1.length === 0 ? (
-              <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {vueltasCadete1.map((v) => (
-                  <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border-2 border-gray-300 font-bold text-black space-y-1.5 shadow-sm">
-                    <div className="flex justify-between items-center border-b pb-1">
-                      <span className="font-black text-blue-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
-                      <button
-                        onClick={() => reabrirVuelta(1, v.numeroVuelta)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded shadow"
-                      >
-                        🔓 Corregir
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-700">
-                      <div>Total General: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
-                      <div>Efectivo: <span className="font-black text-green-800">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
-                      <div>Transf/Card: <span className="font-black text-purple-800">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
-                      <div>Envíos Cadete: <span className="font-black text-blue-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="bg-blue-100 p-3 rounded-lg border border-blue-300 space-y-1 mt-2">
-              <div className="text-xs font-black text-blue-950 uppercase">
-                📊 Cierre Acumulado ({nombreCadete1})
-              </div>
-              <div className="flex justify-between text-xs font-bold text-black">
-                <span>Total Dinero Recaudado:</span>
-                <span className="font-black text-black">${acumuladoRendido1.toLocaleString('es-AR')}</span>
-              </div>
-              <div className="flex justify-between text-xs font-bold text-black">
-                <span>Pagar por Envíos a Cadete:</span>
-                <span className="font-black text-blue-900">${acumuladoEnvios1.toLocaleString('es-AR')}</span>
-              </div>
-              <div className="flex justify-between text-sm font-black border-t border-blue-300 pt-1 text-black">
-                <span>Queda en Caja (Neto):</span>
-                <span className="text-green-800">${(acumuladoRendido1 - acumuladoEnvios1).toLocaleString('es-AR')}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CADETE 2 */}
-        <div className="bg-white p-5 rounded-lg border-2 border-purple-300 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-gray-300 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🏍️</span>
-              {editandoCadete2 ? (
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={nombreCadete2}
-                    onChange={(e) => setNombreCadete2(e.target.value)}
-                    className="border-2 border-purple-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
-                  />
-                  <button onClick={() => guardarNombre2(nombreCadete2)} className="bg-green-700 text-white text-xs px-2.5 py-1 rounded font-black">
-                    ✓
-                  </button>
+                  ))}
                 </div>
-              ) : (
-                <h2 className="text-xl font-black text-purple-900 cursor-pointer flex items-center gap-1" onClick={() => setEditandoCadete2(true)}>
-                  {nombreCadete2} <span className="text-xs text-gray-600 font-bold">✏️ Editar</span>
-                </h2>
               )}
             </div>
 
-            <button
-              onClick={() => rendirVueltaCadete(2)}
-              disabled={enviosCadete2.length === 0}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-600 text-white font-black text-xs px-3 py-2 rounded shadow"
-            >
-              ✅ Rendir Vuelta
-            </button>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                📍 En Viaje ({enviosCadete2.length} pedidos)
-              </h3>
-              <div className="text-right text-xs font-bold text-gray-800">
-                Pagar Envío: <span className="text-purple-900 font-black">${totalEnviosVuelta2}</span> | Cobrar Caja: <span className="text-green-800 font-black">${totalRendirVuelta2}</span>
+          {/* CIERRE ACUMULADO CADETE 1 */}
+          <div className="bg-blue-900 text-white p-3.5 rounded-xl shadow border border-blue-950 space-y-1 mt-4">
+            <div className="text-xs font-black text-blue-200 uppercase tracking-wide border-b border-blue-800 pb-1">
+              📊 Cierre Acumulado ({nombreCadete1})
+            </div>
+            <div className="flex justify-between text-xs font-bold pt-1">
+              <span>Total Recaudado:</span>
+              <span className="font-black text-white">${acumuladoRendido1.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="flex justify-between text-xs font-bold text-blue-200">
+              <span>Pagar Envíos a Cadete:</span>
+              <span className="font-black text-blue-200">-${acumuladoEnvios1.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="flex justify-between text-sm font-black border-t border-blue-800 pt-1 text-emerald-400">
+              <span>Queda en Caja (Neto):</span>
+              <span>${(acumuladoRendido1 - acumuladoEnvios1).toLocaleString('es-AR')}</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ================= CADETE 2 ================= */}
+        <div className="bg-white p-5 rounded-xl border-2 border-purple-400 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            
+            {/* ENCABEZADO CADETE 2 */}
+            <div className="flex justify-between items-center border-b border-gray-200 pb-3 bg-purple-50/50 p-3 rounded-lg border border-purple-100">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🏍️</span>
+                {editandoCadete2 ? (
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={nombreCadete2}
+                      onChange={(e) => setNombreCadete2(e.target.value)}
+                      className="border-2 border-purple-500 px-2 py-1 rounded text-sm font-bold text-black bg-white"
+                    />
+                    <button onClick={() => guardarNombre2(nombreCadete2)} className="bg-emerald-700 text-white text-xs px-2.5 py-1 rounded font-black">
+                      ✓
+                    </button>
+                  </div>
+                ) : (
+                  <h2 className="text-xl font-black text-purple-900 cursor-pointer flex items-center gap-1.5" onClick={() => setEditandoCadete2(true)}>
+                    {nombreCadete2} <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold hover:bg-purple-200">✏️ Editar</span>
+                  </h2>
+                )}
               </div>
+
+              <button
+                onClick={() => rendirVueltaCadete(2)}
+                disabled={enviosCadete2.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black text-xs px-3 py-2 rounded-lg shadow-sm transition-colors"
+              >
+                ✅ Rendir Vuelta
+              </button>
             </div>
 
-            {enviosCadete2.length === 0 ? (
-              <p className="text-xs text-gray-600 font-bold italic py-2 bg-purple-50 p-2 rounded">
-                Sin envíos en este viaje.
-              </p>
-            ) : (
-              enviosCadete2.map((p) => {
-                const direccionTxt = obtenerDireccion(p.observaciones);
-                return (
-                  <div key={p.id} className="p-2.5 border-2 border-purple-200 rounded bg-purple-50 flex justify-between items-center gap-2">
-                    <div>
-                      <p className="font-extrabold text-xs text-purple-950 uppercase">
-                        📍 {direccionTxt}
-                      </p>
-                      <p className="text-xs font-bold text-gray-800">
-                        👤 {p.cliente_nombre || 'Cliente Envío'}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs font-bold text-gray-800">
-                          ${p.monto_total} (Envío: ${p.costo_envio})
-                        </span>
-                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 border border-amber-300">
-                          {p.metodo_pago || 'EFECTIVO'}
-                        </span>
+            {/* PEDIDOS EN VIAJE */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
+                <h3 className="text-xs font-black text-purple-900 uppercase tracking-wide">
+                  📍 En Viaje ({enviosCadete2.length} pedidos)
+                </h3>
+                <div className="text-right text-[11px] font-bold text-gray-700">
+                  Envío: <span className="text-purple-900 font-black">${totalEnviosVuelta2}</span> | Caja: <span className="text-emerald-700 font-black">${totalRendirVuelta2}</span>
+                </div>
+              </div>
+
+              {enviosCadete2.length === 0 ? (
+                <p className="text-xs text-gray-500 font-bold italic py-3 text-center bg-purple-50/30 rounded-lg border border-dashed border-purple-200">
+                  Sin envíos asignados en este viaje.
+                </p>
+              ) : (
+                enviosCadete2.map((p) => {
+                  const direccionTxt = obtenerDireccion(p.observaciones);
+                  return (
+                    <div key={p.id} className="p-3 border border-purple-200 rounded-lg bg-purple-50/50 flex justify-between items-center gap-2">
+                      <div className="space-y-0.5">
+                        <p className="font-black text-xs text-purple-950 uppercase">
+                          📍 {direccionTxt}
+                        </p>
+                        <p className="text-xs font-bold text-gray-700">
+                          👤 {p.cliente_nombre || 'Cliente Envío'}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-xs font-extrabold text-emerald-800">
+                            ${p.monto_total} <span className="text-[10px] text-gray-500">(Envío: ${p.costo_envio})</span>
+                          </span>
+                          <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                            {p.metodo_pago || 'EFECTIVO'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 items-end">
+                        <button
+                          onClick={() => asignarCadete(p.id, nombreCadete1)}
+                          className="text-[11px] bg-white text-blue-900 border border-blue-300 font-black px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          ⬅️ {nombreCadete1}
+                        </button>
+                        <button onClick={() => asignarCadete(p.id, null)} className="text-[10px] text-red-600 font-bold hover:underline">
+                          Quitar ✕
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => asignarCadete(p.id, nombreCadete1)}
-                        className="text-xs bg-white text-blue-900 border-2 border-blue-400 font-extrabold px-2 py-1 rounded hover:bg-blue-50"
-                      >
-                        ⬅️ Pasar a {nombreCadete1}
-                      </button>
-                      <button onClick={() => asignarCadete(p.id, null)} className="text-xs text-red-700 font-black px-2 py-1 hover:bg-red-100 rounded">
-                        ✕
-                      </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* VUELTAS RENDIDAS */}
+            <div className="pt-2 border-t border-gray-200 space-y-2">
+              <h3 className="text-xs font-black text-gray-700 uppercase tracking-wide">
+                📋 Vueltas Rendidas en el Día ({vueltasCadete2.length})
+              </h3>
+              {vueltasCadete2.length === 0 ? (
+                <p className="text-xs text-gray-400 font-bold italic text-center py-2">Aún no rindió vueltas hoy.</p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {vueltasCadete2.map((v) => (
+                    <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border border-gray-200 font-bold text-black space-y-1 shadow-sm">
+                      <div className="flex justify-between items-center border-b pb-1">
+                        <span className="font-black text-purple-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} envíos</span>
+                        <button
+                          onClick={() => reabrirVuelta(2, v.numeroVuelta)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow-sm"
+                        >
+                          🔓 Corregir
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-600 pt-0.5">
+                        <div>Total: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
+                        <div>Efectivo: <span className="font-black text-emerald-700">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
+                        <div>Digital: <span className="font-black text-purple-700">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
+                        <div>Pagar Cadete: <span className="font-black text-purple-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
 
-          <div className="pt-3 border-t border-gray-300 space-y-2">
-            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-              📋 Vueltas Rendidas en el Día ({vueltasCadete2.length})
-            </h3>
-            {vueltasCadete2.length === 0 ? (
-              <p className="text-xs text-gray-600 font-bold italic">Aún no rindió vueltas hoy.</p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {vueltasCadete2.map((v) => (
-                  <div key={v.numeroVuelta} className="text-xs p-2.5 bg-gray-50 rounded-lg border-2 border-gray-300 font-bold text-black space-y-1.5 shadow-sm">
-                    <div className="flex justify-between items-center border-b pb-1">
-                      <span className="font-black text-purple-900">Vuelta #{v.numeroVuelta} ({v.hora} hs) - {v.cantidadPedidos} pedidos</span>
-                      <button
-                        onClick={() => reabrirVuelta(2, v.numeroVuelta)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded shadow"
-                      >
-                        🔓 Corregir
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-700">
-                      <div>Total General: <span className="font-black text-black">${v.montoTotalRendido.toLocaleString('es-AR')}</span></div>
-                      <div>Efectivo: <span className="font-black text-green-800">${v.totalEfectivo.toLocaleString('es-AR')}</span></div>
-                      <div>Transf/Card: <span className="font-black text-purple-800">${v.totalOtrosPagos.toLocaleString('es-AR')}</span></div>
-                      <div>Envíos Cadete: <span className="font-black text-purple-900">${v.costoEnviosTotal.toLocaleString('es-AR')}</span></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="bg-purple-100 p-3 rounded-lg border border-purple-300 space-y-1 mt-2">
-              <div className="text-xs font-black text-purple-950 uppercase">
-                📊 Cierre Acumulado ({nombreCadete2})
-              </div>
-              <div className="flex justify-between text-xs font-bold text-black">
-                <span>Total Dinero Recaudado:</span>
-                <span className="font-black text-black">${acumuladoRendido2.toLocaleString('es-AR')}</span>
-              </div>
-              <div className="flex justify-between text-xs font-bold text-black">
-                <span>Pagar por Envíos a Cadete:</span>
-                <span className="font-black text-purple-900">${acumuladoEnvios2.toLocaleString('es-AR')}</span>
-              </div>
-              <div className="flex justify-between text-sm font-black border-t border-purple-300 pt-1 text-black">
-                <span>Queda en Caja (Neto):</span>
-                <span className="text-green-800">${(acumuladoRendido2 - acumuladoEnvios2).toLocaleString('es-AR')}</span>
-              </div>
+          {/* CIERRE ACUMULADO CADETE 2 */}
+          <div className="bg-purple-900 text-white p-3.5 rounded-xl shadow border border-purple-950 space-y-1 mt-4">
+            <div className="text-xs font-black text-purple-200 uppercase tracking-wide border-b border-purple-800 pb-1">
+              📊 Cierre Acumulado ({nombreCadete2})
+            </div>
+            <div className="flex justify-between text-xs font-bold pt-1">
+              <span>Total Recaudado:</span>
+              <span className="font-black text-white">${acumuladoRendido2.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="flex justify-between text-xs font-bold text-purple-200">
+              <span>Pagar Envíos a Cadete:</span>
+              <span className="font-black text-purple-200">-${acumuladoEnvios2.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="flex justify-between text-sm font-black border-t border-purple-800 pt-1 text-emerald-400">
+              <span>Queda en Caja (Neto):</span>
+              <span>${(acumuladoRendido2 - acumuladoEnvios2).toLocaleString('es-AR')}</span>
             </div>
           </div>
+
         </div>
+
       </div>
     </div>
   );
