@@ -36,11 +36,19 @@ export default function CadetesPage() {
     return horaActual >= 6 && horaActual < 16 ? 'MAÑANA' : 'NOCHE';
   }
 
-  function obtenerFechaHoyArg(): string {
-    return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+  // Lógica comercial de fecha operativa (madrugada de 00:00 a 05:59 mantiene la jornada del día anterior)
+  function obtenerFechaOperativaArg(): string {
+    const ahora = new Date();
+    const hora = ahora.getHours();
+
+    if (hora < 6) {
+      ahora.setDate(ahora.getDate() - 1);
+    }
+
+    return ahora.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
   }
 
-  const hoyArg = obtenerFechaHoyArg();
+  const hoyArg = obtenerFechaOperativaArg();
   const [pedidos, setPedidos] = useState<PedidoEnvio[]>([]);
   const [filtroTurno, setFiltroTurno] = useState<'TODOS' | 'MAÑANA' | 'NOCHE'>(obtenerTurnoActual());
   const [cargando, setCargando] = useState(false);
@@ -100,19 +108,24 @@ export default function CadetesPage() {
   }
 
   async function cargarEnvios(c1 = nombreCadete1, c2 = nombreCadete2) {
-    // En lugar de usar new Date(`${hoyArg}T00:00:00`) e .toISOString()
+    // 1. Calcular la fecha del día siguiente en Argentina
+    const partesFecha = hoyArg.split('-');
+    const fechaObj = new Date(Number(partesFecha[0]), Number(partesFecha[1]) - 1, Number(partesFecha[2]));
+    fechaObj.setDate(fechaObj.getDate() + 1);
 
-const mañana = new Date();
-mañana.setDate(mañana.getDate() + 1);
-const fechaFinSiguiente = mañana.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const fechaFinSiguiente = fechaObj.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+
+    // 2. Definir los ISO con offset -03:00 explícito para Argentina
+    const desdeISO = `${hoyArg}T06:00:00-03:00`;
+    const hastaISO = `${fechaFinSiguiente}T05:59:59-03:00`;
 
     // Cargar Envíos respetando el bloque operativo completo de la jornada (06:00 hs a 05:59 hs del día siguiente)
     let query = supabase
       .from('pedidos')
       .select('*')
       .eq('tipo_entrega', 'ENVIO')
-      .gte('created_at', `${hoyArg}T06:00:00`)
-      .lte('created_at', `${fechaFinSiguiente}T05:59:59`);
+      .gte('created_at', desdeISO)
+      .lte('created_at', hastaISO);
 
     if (filtroTurno !== 'TODOS') {
       query = query.eq('turno', filtroTurno);
