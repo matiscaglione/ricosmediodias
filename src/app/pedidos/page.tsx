@@ -17,6 +17,7 @@ interface DetallePedido {
   guarniciones?: { nombre: string; precio_extra: number };
   bebidas?: { nombre: string };
   salsas?: { nombre: string };
+  postres?: { nombre: string };
 }
 
 interface Pedido {
@@ -93,7 +94,8 @@ export default function HistorialPedidosPage() {
                 menus!left ( nombre, precio ),
                 guarniciones!left ( nombre, precio_extra ),
                 bebidas!left ( nombre ),
-                salsas!left ( nombre )
+                salsas!left ( nombre ),
+                postres!left ( nombre )
               )
             `)
             .eq('id', nuevoPedidoId)
@@ -155,7 +157,8 @@ export default function HistorialPedidosPage() {
           menus!left ( nombre, precio ),
           guarniciones!left ( nombre, precio_extra ),
           bebidas!left ( nombre ),
-          salsas!left ( nombre )
+          salsas!left ( nombre ),
+          postres!left ( nombre )
         )
       `)
       .gte('created_at', `${fechaInicio}T06:00:00`)
@@ -242,7 +245,7 @@ export default function HistorialPedidosPage() {
 
       const detalleStr = (p.detalle_pedidos || [])
         .map((i) => {
-          let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || i.bebidas?.nombre || 'Plato'}`;
+          let str = `${i.cantidad}x ${i.menus?.nombre || i.guarniciones?.nombre || i.bebidas?.nombre || i.postres?.nombre || 'Plato'}`;
           if (i.agregado_menu) str += ` (${i.agregado_menu})`;
           if (i.salsas?.nombre) str += ` (Salsa: ${i.salsas.nombre})`;
           if (i.menus?.nombre && i.guarniciones?.nombre) str += ` (+ ${i.guarniciones.nombre})`;
@@ -322,7 +325,9 @@ export default function HistorialPedidosPage() {
 
         const textoGuarnicion = i.agregado_guarnicion || i.agregadoGuarnicionTexto || "";
 
-        if (i.bebidas) {
+        if (i.postres) {
+          nombreItem = `🍰 ${i.cantidad} ${i.postres.nombre}`;
+        } else if (i.bebidas) {
           nombreItem = `🥤 ${i.cantidad} ${i.bebidas.nombre}`;
         } else if (!i.menus && i.guarniciones) {
           const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
@@ -361,7 +366,7 @@ export default function HistorialPedidosPage() {
         const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
         const diferenciaExtra = i.subtotal - costoBaseTotal;
 
-        const textoExtra = diferenciaExtra > 0 ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
+        const textoExtra = (diferenciaExtra > 0 && !i.postres && !i.bebidas) ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
 
         return `
           <div style="margin-bottom: 4px;">
@@ -490,6 +495,7 @@ export default function HistorialPedidosPage() {
       const menuNom = (item.menus?.nombre || '').toLowerCase();
       const guarNom = (item.guarniciones?.nombre || '').toLowerCase();
       const bebNom = (item.bebidas?.nombre || '').toLowerCase();
+      const postreNom = (item.postres?.nombre || '').toLowerCase();
       const agrMenu = (item.agregado_menu || '').toLowerCase();
       const agrGuar = (item.agregado_guarnicion || '').toLowerCase();
       const ensalada = (item.ingredientes_ensalada || '').toLowerCase();
@@ -499,6 +505,7 @@ export default function HistorialPedidosPage() {
         menuNom.includes(query) ||
         guarNom.includes(query) ||
         bebNom.includes(query) ||
+        postreNom.includes(query) ||
         agrMenu.includes(query) ||
         agrGuar.includes(query) ||
         ensalada.includes(query) ||
@@ -786,7 +793,7 @@ export default function HistorialPedidosPage() {
 
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-500 block">
-                          {new Date(pedido.created_at).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} - {new Date(pedido.created_at).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })} hs
+                          {new Date(pedido.created_at).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} {new Date(pedido.created_at).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })} hs
                         </span>
                         {pedido.horario_solicitado && (
                           <span className="text-xs font-extrabold text-blue-700 block bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-0.5">
@@ -852,7 +859,7 @@ export default function HistorialPedidosPage() {
                       <div key={item.id} className="flex justify-between text-sm">
                         <div className="flex-1">
                           <span className="font-extrabold" style={styleTextoNegro}>
-                            {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : 'Adicional')}
+                            {item.cantidad}x {item.menus?.nombre || item.bebidas?.nombre || item.postres?.nombre || (item.guarniciones ? `👉 Extra: ${item.guarniciones.nombre}` : 'Adicional')}
                             {item.agregado_menu && <span className="text-blue-900 font-bold ml-1">({item.agregado_menu})</span>}
                           </span>
                           {item.salsas?.nombre && (

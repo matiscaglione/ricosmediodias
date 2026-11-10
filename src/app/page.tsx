@@ -20,6 +20,12 @@ interface Bebida {
   precio: number;
 }
 
+interface Postre {
+  id: string;
+  nombre: string;
+  precio: number;
+}
+
 interface Guarnicion {
   id: string;
   nombre: string;
@@ -51,6 +57,7 @@ interface Empresa {
 interface ItemPedido {
   menu?: Menu;
   bebida?: Bebida;
+  postre?: Postre;
   guarnicion?: Guarnicion;
   salsa?: Salsa;
   ingredientesEnsalada?: string[];
@@ -66,6 +73,7 @@ interface ItemPedido {
 function ContenidoTomaPedidos() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [bebidas, setBebidas] = useState<Bebida[]>([]);
+  const [postres, setPostres] = useState<Postre[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [salsas, setSalsas] = useState<Salsa[]>([]);
@@ -101,6 +109,7 @@ function ContenidoTomaPedidos() {
 
   const [menuSeleccionado, setMenuSeleccionado] = useState<Menu | null>(null);
   const [bebidaSeleccionada, setBebidaSeleccionada] = useState<Bebida | null>(null);
+  const [postreSeleccionado, setPostreSeleccionado] = useState<Postre | null>(null);
   const [guarnicionSeleccionada, setGuarnicionSeleccionada] = useState<Guarnicion | null>(null);
   const [salsaSeleccionada, setSalsaSeleccionada] = useState<Salsa | null>(null);
   const [ingredientesElegidos, setIngredientesElegidos] = useState<string[]>([]);
@@ -109,6 +118,7 @@ function ContenidoTomaPedidos() {
   const [agregadoGuarnicionTexto, setAgregadoGuarnicionTexto] = useState("");
   const [precioAgregadosExtra, setPrecioAgregadosExtra] = useState<number>(0);
   const [cantidadBebida, setCantidadBebida] = useState<number>(1);
+  const [cantidadPostre, setCantidadPostre] = useState<number>(1);
 
   const [cantidadHuevosFritos, setCantidadHuevosFritos] = useState<number>(0);
   const [cantidadHuevosDuros, setCantidadHuevosDuros] = useState<number>(0);
@@ -158,6 +168,7 @@ function ContenidoTomaPedidos() {
               menu_id,
               guarnicion_id,
               bebida_id,
+              postre_id,
               cantidad,
               precio_unitario,
               subtotal,
@@ -168,7 +179,8 @@ function ContenidoTomaPedidos() {
               salsas (*),
               menus (*),
               guarniciones (*),
-              bebidas (*)
+              bebidas (*),
+              postres (*)
             )
           `)
           .eq("id", idEditarURL)
@@ -218,7 +230,9 @@ function ContenidoTomaPedidos() {
                 det.menu_id ||
                 det.guarniciones ||
                 det.bebidas ||
-                det.bebida_id
+                det.bebida_id ||
+                det.postres ||
+                det.postre_id
             )
             .map((det: any) => {
               const ingsArray = det.ingredientes_ensalada
@@ -236,6 +250,7 @@ function ContenidoTomaPedidos() {
               return {
                 menu: det.menus || undefined,
                 bebida: det.bebidas || undefined,
+                postre: det.postres || undefined,
                 guarnicion: det.guarniciones || undefined,
                 salsa: det.salsas || undefined,
                 cantidad: det.cantidad,
@@ -314,6 +329,12 @@ function ContenidoTomaPedidos() {
       .select("*")
       .eq("activa", true);
     if (bebidasData) setBebidas(bebidasData);
+
+    const { data: postresData } = await supabase
+      .from("postres")
+      .select("*")
+      .eq("activo", true);
+    if (postresData) setPostres(postresData);
 
     const { data: guarniData } = await supabase
       .from("guarniciones")
@@ -461,6 +482,24 @@ function ContenidoTomaPedidos() {
     setCantidadBebida(1);
   }
 
+  function agregarPostreAlPedido() {
+    if (!postreSeleccionado) return;
+
+    const cantPost = Math.max(1, cantidadPostre);
+    setItems([
+      ...items,
+      {
+        postre: postreSeleccionado,
+        cantidadHuevosFritos: 0,
+        cantidad: cantPost,
+        subtotal: postreSeleccionado.precio * cantPost,
+      },
+    ]);
+
+    setPostreSeleccionado(null);
+    setCantidadPostre(1);
+  }
+
   function agregarGuarnicionExtraAlPedido() {
     if (!guarnicionExtraElegida) return;
 
@@ -545,7 +584,9 @@ function ContenidoTomaPedidos() {
 
         const textoGuarnicion = i.agregado_guarnicion || i.agregadoGuarnicionTexto || "";
 
-        if (i.bebidas) {
+        if (i.postres) {
+          nombreItem = `🍰 ${i.cantidad} ${i.postres.nombre}`;
+        } else if (i.bebidas) {
           nombreItem = `🥤 ${i.cantidad} ${i.bebidas.nombre}`;
         } else if (!i.menus && i.guarniciones) {
           const tieneIngredientes = i.ingredientes_ensalada && i.ingredientes_ensalada.length > 0;
@@ -584,7 +625,7 @@ function ContenidoTomaPedidos() {
         const costoBaseTotal = (precioBaseMenu + precioBaseGuar) * i.cantidad;
         const diferenciaExtra = i.subtotal - costoBaseTotal;
 
-        const textoExtra = diferenciaExtra > 0 ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
+        const textoExtra = (diferenciaExtra > 0 && !i.postres && !i.bebidas) ? ` (Extra: +${formatearMoneda(diferenciaExtra)})` : "";
 
         return `
           <div style="margin-bottom: 4px;">
@@ -741,7 +782,7 @@ function ContenidoTomaPedidos() {
 
   async function confirmarPedido() {
     if (items.length === 0)
-      return alert("Agregá al menos un menú, bebida o guarnición al pedido");
+      return alert("Agregá al menos un menú, bebida, postre o guarnición al pedido");
     if (tipoEntrega === "ENVIO" && !direccion)
       return alert("Ingresá la dirección para el envío");
 
@@ -873,6 +914,8 @@ function ContenidoTomaPedidos() {
           menu_id: item.menu.id,
           guarnicion_id: item.guarnicion?.id || null,
           salsa_id: item.salsa?.id || null,
+          bebida_id: null,
+          postre_id: null,
           cantidad: item.cantidad,
           precio_unitario: item.menu.precio,
           subtotal: item.subtotal,
@@ -891,8 +934,22 @@ function ContenidoTomaPedidos() {
           menu_id: null,
           guarnicion_id: null,
           salsa_id: null,
+          postre_id: null,
           cantidad: item.cantidad,
           precio_unitario: item.bebida.precio,
+          subtotal: item.subtotal,
+          cantidad_huevos: 0,
+        };
+      } else if (item.postre) {
+        return {
+          pedido_id: pedidoIdGuardado,
+          postre_id: item.postre.id,
+          menu_id: null,
+          bebida_id: null,
+          guarnicion_id: null,
+          salsa_id: null,
+          cantidad: item.cantidad,
+          precio_unitario: item.postre.precio,
           subtotal: item.subtotal,
           cantidad_huevos: 0,
         };
@@ -903,6 +960,7 @@ function ContenidoTomaPedidos() {
           menu_id: null,
           bebida_id: null,
           salsa_id: null,
+          postre_id: null,
           cantidad: item.cantidad,
           precio_unitario: precioGuarnicionExtra,
           subtotal: item.subtotal,
@@ -968,6 +1026,7 @@ function ContenidoTomaPedidos() {
         guarniciones: item.guarnicion,
         salsas: item.salsa,
         bebidas: item.bebida,
+        postres: item.postre,
       })),
     };
 
@@ -1791,6 +1850,67 @@ function ContenidoTomaPedidos() {
               </div>
             </div>
           </div>
+
+          {/* SECCIÓN 5: SELECCIÓN DE POSTRES */}
+          <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-300 space-y-3">
+            <h2 className="text-lg font-bold" style={styleTextoNegro}>
+              5. Agregar Postre
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3 items-center">
+              <select
+                style={styleTextoNegro}
+                value={postreSeleccionado?.id || ""}
+                onChange={(e) =>
+                  setPostreSeleccionado(
+                    postres.find((p) => p.id === e.target.value) || null
+                  )
+                }
+                className="flex-1 w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold"
+              >
+                <option value="">-- Seleccionar Postre --</option>
+                {postres.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} - ${p.precio}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded border-2 border-gray-400">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCantidadPostre(Math.max(1, cantidadPostre - 1))
+                    }
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                  >
+                    -
+                  </button>
+                  <span
+                    className="text-xs font-black min-w-[16px] text-center"
+                    style={styleTextoNegro}
+                  >
+                    {cantidadPostre}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCantidadPostre(cantidadPostre + 1)}
+                    className="text-xs font-black text-gray-800 px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={agregarPostreAlPedido}
+                  className="bg-pink-600 text-white font-extrabold px-4 py-2 rounded text-sm hover:bg-pink-700 whitespace-nowrap"
+                >
+                  + Agregar Postre
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* PANEL DERECHO - RESUMEN DEL PEDIDO */}
@@ -1812,7 +1932,11 @@ function ContenidoTomaPedidos() {
                     className="flex justify-between items-center text-sm border-b border-gray-300 pb-2"
                   >
                     <div>
-                      {item.bebida ? (
+                      {item.postre ? (
+                        <div className="font-extrabold text-pink-700">
+                          🍰 {item.cantidad}x {item.postre.nombre}
+                        </div>
+                      ) : item.bebida ? (
                         <div className="font-extrabold text-blue-900">
                           🥤 {item.cantidad}x {item.bebida.nombre}
                         </div>
@@ -1908,7 +2032,7 @@ function ContenidoTomaPedidos() {
               className="flex justify-between text-sm font-bold"
               style={styleTextoNegro}
             >
-              <span>Subtotal Platos:</span>
+              <span>Subtotal Platos / Ítems:</span>
               <span>{formatearMoneda(montoPlatos)}</span>
             </div>
 
