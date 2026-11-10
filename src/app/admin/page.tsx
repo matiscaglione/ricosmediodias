@@ -22,14 +22,6 @@ interface Bebida {
   activa: boolean;
 }
 
-interface Postre {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  precio: number;
-  disponible: boolean;
-}
-
 interface Guarnicion {
   id: string;
   nombre: string;
@@ -75,7 +67,6 @@ interface Empleado {
 export default function AdminPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [bebidas, setBebidas] = useState<Bebida[]>([]);
-  const [postres, setPostres] = useState<Postre[]>([]);
   const [guarniciones, setGuarniciones] = useState<Guarnicion[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [salsas, setSalsas] = useState<Salsa[]>([]);
@@ -96,7 +87,6 @@ export default function AdminPage() {
   // Estados para Edición
   const [menuEditando, setMenuEditando] = useState<Menu | null>(null);
   const [bebidaEditando, setBebidaEditando] = useState<Bebida | null>(null);
-  const [postreEditando, setPostreEditando] = useState<Postre | null>(null);
   const [empresaEditando, setEmpresaEditando] = useState<Empresa | null>(null);
   const [empleadoEditando, setEmpleadoEditando] = useState<Empleado | null>(null);
 
@@ -111,11 +101,6 @@ export default function AdminPage() {
   // Forms secundarios
   const [nuevaBebidaNombre, setNuevaBebidaNombre] = useState('');
   const [nuevaBebidaPrecio, setNuevaBebidaPrecio] = useState('');
-
-  // Form Nuevo Postre
-  const [nuevoPostreNombre, setNuevoPostreNombre] = useState('');
-  const [nuevoPostrePrecio, setNuevoPostrePrecio] = useState('');
-
   const [nuevaGuarniNombre, setNuevaGuarniNombre] = useState('');
   const [nuevaGuarniPrecio, setNuevaGuarniPrecio] = useState('0');
   const [nuevaGuarniRequiereIng, setNuevaGuarniRequiereIng] = useState(false);
@@ -150,9 +135,6 @@ export default function AdminPage() {
 
     const { data: bebidasData } = await supabase.from('bebidas').select('*').order('created_at', { ascending: true });
     if (bebidasData) setBebidas(bebidasData);
-
-    const { data: postresData } = await supabase.from('postres').select('*').order('created_at', { ascending: true });
-    if (postresData) setPostres(postresData);
 
     const { data: guarniData } = await supabase.from('guarniciones').select('*').order('created_at', { ascending: true });
     if (guarniData) setGuarniciones(guarniData);
@@ -311,45 +293,6 @@ export default function AdminPage() {
   async function eliminarBebida(id: string) {
     if (confirm('¿Seguro que querés eliminar esta bebida?')) {
       await supabase.from('bebidas').delete().eq('id', id);
-      cargarDatos();
-    }
-  }
-
-  // --- SECCIÓN NUEVA: POSTRES ---
-  async function agregarPostre(e: React.FormEvent) {
-    e.preventDefault();
-    if (!nuevoPostreNombre || !nuevoPostrePrecio) return;
-    const { error } = await supabase.from('postres').insert([
-      { nombre: nuevoPostreNombre, precio: parseFloat(nuevoPostrePrecio), disponible: true }
-    ]);
-    if (error) {
-      alert('Error agregando postre: ' + error.message);
-    } else {
-      setNuevoPostreNombre('');
-      setNuevoPostrePrecio('');
-      cargarDatos();
-    }
-  }
-
-  async function guardarEdicionPostre() {
-    if (!postreEditando) return;
-    const { error } = await supabase.from('postres').update({ nombre: postreEditando.nombre, precio: postreEditando.precio }).eq('id', postreEditando.id);
-    if (error) {
-      alert('Error al actualizar postre: ' + error.message);
-    } else {
-      setPostreEditando(null);
-      cargarDatos();
-    }
-  }
-
-  async function toggleDisponiblePostre(id: string, estadoActual: boolean) {
-    await supabase.from('postres').update({ disponible: !estadoActual }).eq('id', id);
-    cargarDatos();
-  }
-
-  async function eliminarPostre(id: string) {
-    if (confirm('¿Seguro que querés eliminar este postre?')) {
-      await supabase.from('postres').delete().eq('id', id);
       cargarDatos();
     }
   }
@@ -955,79 +898,6 @@ export default function AdminPage() {
                       {b.activa ? 'Activa' : 'Oculta'}
                     </button>
                     <button onClick={() => eliminarBebida(b.id)} className="text-xs text-red-600 font-bold px-1">✕</button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* SECCIÓN NUEVA: POSTRES */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-300 space-y-4">
-        <h2 className="text-xl font-bold" style={styleTextoNegro}>🍨 Gestión de Postres</h2>
-        <form onSubmit={agregarPostre} className="flex gap-3 items-end bg-amber-50 p-4 rounded-lg border border-amber-200">
-          <div className="flex-1">
-            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Nombre del Postre</label>
-            <input
-              type="text"
-              style={styleTextoNegro}
-              value={nuevoPostreNombre}
-              onChange={(e) => setNuevoPostreNombre(e.target.value)}
-              placeholder="Ej: Flan casero / Tiramisú / Chocotorta"
-              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold mb-1" style={styleTextoNegro}>Precio ($)</label>
-            <input
-              type="number"
-              style={styleTextoNegro}
-              value={nuevoPostrePrecio}
-              onChange={(e) => setNuevoPostrePrecio(e.target.value)}
-              placeholder="2500"
-              className="w-full border-2 border-gray-400 p-2 rounded text-sm bg-white font-bold focus:outline-none"
-            />
-          </div>
-          <button type="submit" className="bg-amber-600 text-white text-sm font-extrabold py-2 px-4 rounded hover:bg-amber-700">
-            + Agregar Postre
-          </button>
-        </form>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {postres.map((p) => (
-            <div key={p.id} className="flex justify-between items-center p-3 border border-gray-300 rounded bg-gray-50">
-              {postreEditando?.id === p.id ? (
-                <div className="flex gap-2 w-full">
-                  <input
-                    type="text"
-                    style={styleTextoNegro}
-                    value={postreEditando.nombre}
-                    onChange={(e) => setPostreEditando({ ...postreEditando, nombre: e.target.value })}
-                    className="border p-1 text-sm font-bold w-1/2"
-                  />
-                  <input
-                    type="number"
-                    style={styleTextoNegro}
-                    value={postreEditando.precio}
-                    onChange={(e) => setPostreEditando({ ...postreEditando, precio: parseFloat(e.target.value) || 0 })}
-                    className="border p-1 text-sm font-bold w-1/4"
-                  />
-                  <button onClick={guardarEdicionPostre} className="bg-green-600 text-white text-xs font-bold px-2 rounded">💾</button>
-                  <button onClick={() => setPostreEditando(null)} className="bg-gray-400 text-white text-xs font-bold px-2 rounded">✕</button>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <span className="font-extrabold text-sm block" style={styleTextoNegro}>{p.nombre}</span>
-                    <span className="font-black text-xs text-green-700">${p.precio.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setPostreEditando(p)} className="text-xs bg-blue-100 text-blue-900 font-bold px-2 py-1 rounded">✏️ Editar</button>
-                    <button onClick={() => toggleDisponiblePostre(p.id, p.disponible)} className={`text-xs font-bold px-2 py-1 rounded ${p.disponible ? 'bg-green-200 text-green-900' : 'bg-gray-300 text-gray-700'}`}>
-                      {p.disponible ? 'Disponible' : 'Oculto'}
-                    </button>
-                    <button onClick={() => eliminarPostre(p.id)} className="text-xs text-red-600 font-bold px-1">✕</button>
                   </div>
                 </>
               )}
